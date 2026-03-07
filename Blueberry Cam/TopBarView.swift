@@ -1,0 +1,67 @@
+import SwiftUI
+
+struct TopBarView: View {
+    @ObservedObject var cameraModel: CameraModel
+    
+    var body: some View {
+        HStack(alignment: .center) {
+            // Live EXIF
+            VStack(alignment: .leading, spacing: 2) {
+                Text("ISO \(Int(cameraModel.liveISO))")
+                    .font(.system(size: 12, weight: .medium, design: .monospaced))
+                    .foregroundColor(.yellow)
+                Text(cameraModel.liveShutter)
+                    .font(.system(size: 12, weight: .medium, design: .monospaced))
+                    .foregroundColor(.white.opacity(0.8))
+            }
+            .padding(.leading, 16)
+            
+            Spacer()
+            
+            // Format picker
+            HStack(spacing: 0) {
+                ForEach(cameraModel.availableFormats) { mode in
+                    Button {
+                        cameraModel.captureMode = mode
+                    } label: {
+                        Text(mode.rawValue)
+                            .font(.system(size: 11, weight: .bold))
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 5)
+                            .background(
+                                cameraModel.captureMode == mode
+                                ? Color.yellow
+                                : Color.white.opacity(0.15)
+                            )
+                            .foregroundColor(
+                                cameraModel.captureMode == mode ? .black : .white
+                            )
+                    }
+                }
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 6))
+            .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.white.opacity(0.2), lineWidth: 1))
+            
+            Spacer()
+            
+            // Histogram toggle
+            Button {
+                cameraModel.toggleHistogram()
+            } label: {
+                Image(systemName: "chart.bar.fill")
+                    .font(.system(size: 16))
+                    .foregroundColor(cameraModel.showHistogram ? .yellow : .white.opacity(0.5))
+            }
+            .padding(.trailing, 16)
+        }
+        .padding(.top, 56)
+        .padding(.bottom, 12)
+        .background(
+            LinearGradient(
+                colors: [.black.opacity(0.7), .clear],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+        )
+    }
+}
