@@ -39,8 +39,8 @@ struct ManualControlsView: View {
                             value: $cameraModel.iso,
                             in: cameraModel.minISO...cameraModel.maxISO,
                             step: 1
-                        ) { editing in
-                            if !editing { cameraModel.applyManualExposure() }
+                        ).onChange(of: cameraModel.iso) { _, _ in
+                            cameraModel.applyManualExposure()
                         }
                         .tint(.yellow)
                         Text("\(Int(cameraModel.iso))")
@@ -66,8 +66,8 @@ struct ManualControlsView: View {
                             ),
                             in: 0...Double(cameraModel.shutterSpeeds.count - 1),
                             step: 1
-                        ) { editing in
-                            if !editing { cameraModel.applyManualExposure() }
+                        ).onChange(of: cameraModel.shutterIndex) { _, _ in
+                            cameraModel.applyManualExposure()
                         }
                         .tint(.yellow)
                         Text(shutterLabel)
@@ -75,6 +75,52 @@ struct ManualControlsView: View {
                             .foregroundColor(.yellow)
                             .frame(width: 50, alignment: .trailing)
                     }
+                }
+                .padding(.horizontal, 20)
+            }
+                        
+            Divider()
+                .background(Color.white.opacity(0.1))
+                .padding(.horizontal, 20)
+            
+            // Focus header + toggle
+            HStack {
+                Text("FOCUS")
+                    .font(.system(size: 10, weight: .bold, design: .monospaced))
+                    .foregroundColor(.white.opacity(0.5))
+                    .tracking(2)
+                Spacer()
+                Toggle("", isOn: $cameraModel.isAutoFocus)
+                    .labelsHidden()
+                    .tint(.yellow)
+                    .onChange(of: cameraModel.isAutoFocus) { _, auto in
+                        if auto { cameraModel.setAutoFocus() }
+                        else { cameraModel.applyManualFocus() }
+                    }
+                Text(cameraModel.isAutoFocus ? "AUTO" : "MANUAL")
+                    .font(.system(size: 10, weight: .bold, design: .monospaced))
+                    .foregroundColor(cameraModel.isAutoFocus ? .yellow : .white)
+            }
+            .padding(.horizontal, 20)
+            
+            if !cameraModel.isAutoFocus {
+                HStack {
+                    Text("FOCUS")
+                        .font(.system(size: 10, weight: .bold, design: .monospaced))
+                        .foregroundColor(.white.opacity(0.5))
+                        .tracking(2)
+                        .frame(width: 60, alignment: .leading)
+                    Slider(value: Binding(
+                        get: { 1.0 - cameraModel.lensPosition },
+                        set: { cameraModel.lensPosition = 1.0 - $0 }
+                    ), in: 0...1).onChange(of: cameraModel.lensPosition) { _, _ in
+                        cameraModel.applyManualFocus()
+                    }
+                    .tint(.yellow)
+                    Text(lensPositionToDistance(cameraModel.lensPosition))
+                        .font(.system(size: 12, weight: .medium, design: .monospaced))
+                        .foregroundColor(.yellow)
+                        .frame(width: 50, alignment: .trailing)
                 }
                 .padding(.horizontal, 20)
             }
@@ -93,8 +139,20 @@ struct ManualControlsView: View {
     }
     
     private var shutterLabel: String {
-        guard !cameraModel.shutterSpeeds.isEmpty else { return "--" }
-        let t = cameraModel.shutterSpeeds[cameraModel.shutterIndex]
-        return cameraModel.formatShutter(t)
+        guard cameraModel.shutterSpeeds.indices.contains(cameraModel.shutterIndex) else { return "--" }
+        return CameraModel.formatShutter(cameraModel.shutterSpeeds[cameraModel.shutterIndex])
+    }
+    
+    private func lensPositionToDistance(_ position: Float) -> String {
+        switch position {
+            case 0.0..<0.15: return "∞"
+            case 0.15..<0.25: return "5m+"
+            case 0.25..<0.35: return "2m"
+            case 0.35..<0.50: return "1m"
+            case 0.50..<0.65: return "50cm"
+            case 0.65..<0.80: return "30cm"
+            case 0.80..<0.90: return "20cm"
+            default:          return "macro"
+        }
     }
 }

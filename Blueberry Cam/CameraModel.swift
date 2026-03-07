@@ -22,6 +22,9 @@ class CameraModel: NSObject, ObservableObject {
     @Published var isAutoExposure: Bool = true
     @Published var showManualControls: Bool = false
     @Published var showHistogram: Bool = true
+    @Published var lensPosition: Float = 1.0   // 1.0 = infinity on launch
+    @Published var isAutoFocus: Bool = true
+    private var exposureDebounceTask: Task<Void, Never>?
     
     // Ranges — populated from device at runtime
     @Published var minISO: Float = 25
@@ -61,7 +64,7 @@ class CameraModel: NSObject, ObservableObject {
     // Runs on sessionQueue (not MainActor)
     private func setupSession() {
         session.beginConfiguration()
-        session.sessionPreset = .photo
+        session.sessionPreset = .photo   // required for RAW — do not change
         
         guard let cam = bestCamera(),
               let input = try? AVCaptureDeviceInput(device: cam),
@@ -71,12 +74,8 @@ class CameraModel: NSObject, ObservableObject {
         }
         session.addInput(input)
         
-        // Lock to best full-res format before adding outputs
-        if let best = bestPhotoFormat(for: cam) {
-            try? cam.lockForConfiguration()
-            cam.activeFormat = best
-            cam.unlockForConfiguration()
-        }
+        // Do NOT set activeFormat — .photo preset manages this for RAW support
+        // Resolution is controlled via maxPhotoDimensions in buildPhotoSettings()
         
         if session.canAddOutput(photoOutput) {
             session.addOutput(photoOutput)
@@ -89,14 +88,14 @@ class CameraModel: NSObject, ObservableObject {
         }
         
         session.commitConfiguration()
+        
         Task.detached(priority: .userInitiated) {
             self.session.startRunning()
-        }
-        
-        Task { @MainActor in
-            self.device = cam
-            self.buildAvailableFormats()
-            self.updateDeviceRanges()
+            Task { @MainActor in
+                self.device = cam
+                self.buildAvailableFormats()
+                self.updateDeviceRanges()
+            }
         }
     }
     
@@ -179,6 +178,20 @@ class CameraModel: NSObject, ObservableObject {
         return "1/\(Int(round(1.0 / secs)))"
     }
     
+        func applyManualFocus() {
+            guard let d = device else { return }
+            try? d.lockForConfiguration()
+            d.setFocusModeLocked(lensPosition: lensPosition) { _ in }
+            d.unlockForConfiguration()
+        }
+    
+        func setAutoFocus() {
+            guard let d = device else { return }
+            try? d.lockForConfiguration()
+            d.focusMode = .continuousAutoFocus
+            d.unlockForConfiguration()
+        }
+    
     // MARK: - Capture
     func capturePhoto() {
         // Flash animation on main actor
@@ -216,10 +229,15 @@ class CameraModel: NSObject, ObservableObject {
     
     // MARK: - Manual Exposure
     func applyManualExposure() {
-        guard let d = device, shutterSpeeds.indices.contains(shutterIndex) else { return }
-        try? d.lockForConfiguration()
-        d.setExposureModeCustom(duration: shutterSpeeds[shutterIndex], iso: iso, completionHandler: nil)
-        d.unlockForConfiguration()
+        exposureDebounceTask?.cancel()
+        exposureDebounceTask = Task {
+            try? await Task.sleep(nanoseconds: 50_000_000) // 50ms
+            guard !Task.isCancelled else { return }
+            guard let d = device, shutterSpeeds.indices.contains(shutterIndex) else { return }
+            try? d.lockForConfiguration()
+            d.setExposureModeCustom(duration: shutterSpeeds[shutterIndex], iso: iso, completionHandler: nil)
+            d.unlockForConfiguration()
+        }
     }
     
     func setAutoExposure() {
