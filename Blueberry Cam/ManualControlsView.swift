@@ -2,7 +2,7 @@ import SwiftUI
 import CoreMedia
 
 struct ManualControlsView: View {
-    @ObservedObject var cameraModel: CameraModel
+    @Bindable var cameraModel: CameraModel
     
     var body: some View {
         VStack(spacing: 12) {

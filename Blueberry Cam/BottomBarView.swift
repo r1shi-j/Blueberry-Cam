@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct BottomBarView: View {
-    @ObservedObject var cameraModel: CameraModel
+    @Bindable var cameraModel: CameraModel
     
     var body: some View {
         VStack(spacing: 0) {

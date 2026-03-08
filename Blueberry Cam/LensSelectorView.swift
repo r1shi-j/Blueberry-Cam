@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct LensSelectorView: View {
-    @ObservedObject var cameraModel: CameraModel
+    @Bindable var cameraModel: CameraModel
     
     private let frontLenses: [Lens] = [.frontUltraWide, .front]
     private let backLenses:  [Lens] = [.ultraWide, .wide, .tele2x, .tele4x, .tele8x]

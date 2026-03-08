@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct ContentView: View {
-    @StateObject private var cameraModel = CameraModel()
+    @State private var cameraModel = CameraModel()
     
     var body: some View {
         ZStack {
@@ -49,11 +49,11 @@ struct ContentView: View {
             }
         }
         .onAppear { cameraModel.configure() }
-        .alert("Saved", isPresented: $cameraModel.showSaveAlert) {
-            Button("OK", role: .cancel) {}
-        } message: {
-            Text(cameraModel.saveMessage)
-        }
+//        .alert("Saved", isPresented: $cameraModel.showSaveAlert) {
+//            Button("OK", role: .cancel) {}
+//        } message: {
+//            Text(cameraModel.saveMessage)
+//        }
         .alert("Error", isPresented: $cameraModel.showError) {
             Button("OK", role: .cancel) {}
         } message: {

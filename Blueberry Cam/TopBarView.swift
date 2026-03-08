@@ -1,7 +1,8 @@
 import SwiftUI
+import CoreMedia
 
 struct TopBarView: View {
-    @ObservedObject var cameraModel: CameraModel
+    @Bindable var cameraModel: CameraModel
     
     var body: some View {
         HStack(alignment: .center) {
@@ -18,29 +19,50 @@ struct TopBarView: View {
             
             Spacer()
             
-            // Format picker
-            HStack(spacing: 0) {
-                ForEach(cameraModel.availableFormats) { mode in
-                    Button {
-                        cameraModel.captureMode = mode
-                    } label: {
-                        Text(mode.rawValue)
-                            .font(.system(size: 11, weight: .bold))
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 5)
-                            .background(
-                                cameraModel.captureMode == mode
-                                ? Color.yellow
-                                : Color.white.opacity(0.15)
-                            )
-                            .foregroundColor(
-                                cameraModel.captureMode == mode ? .black : .white
-                            )
+            HStack(spacing: 8) {
+                // Resolution picker — only shown when 2+ options
+                HStack(spacing: 0) {
+                    ForEach(cameraModel.availableResolutions) { opt in
+                        let isSelected = cameraModel.selectedResolution?.id == opt.id
+                        Button {
+                            cameraModel.selectResolution(opt)
+                        } label: {
+                            Text(opt.label)
+                                .font(.system(size: 11, weight: .bold))
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 5)
+                                .background(isSelected ? Color.yellow : Color.white.opacity(0.15))
+                                .foregroundColor(isSelected ? .black : .white)
+                        }
                     }
                 }
+                .clipShape(RoundedRectangle(cornerRadius: 6))
+                .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.white.opacity(0.2), lineWidth: 1))
+                
+                // Format picker
+                HStack(spacing: 0) {
+                    ForEach(cameraModel.availableFormats) { mode in
+                        Button {
+                            cameraModel.captureMode = mode
+                        } label: {
+                            Text(mode.rawValue)
+                                .font(.system(size: 11, weight: .bold))
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 5)
+                                .background(
+                                    cameraModel.captureMode == mode
+                                    ? Color.yellow
+                                    : Color.white.opacity(0.15)
+                                )
+                                .foregroundColor(
+                                    cameraModel.captureMode == mode ? .black : .white
+                                )
+                        }
+                    }
+                }
+                .clipShape(RoundedRectangle(cornerRadius: 6))
+                .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.white.opacity(0.2), lineWidth: 1))
             }
-            .clipShape(RoundedRectangle(cornerRadius: 6))
-            .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.white.opacity(0.2), lineWidth: 1))
             
             Spacer()
             

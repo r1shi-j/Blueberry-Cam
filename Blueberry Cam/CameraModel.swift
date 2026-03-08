@@ -3,10 +3,9 @@ import SwiftUI
 import Photos
 import ImageIO
 import UniformTypeIdentifiers
-import Combine
 
-@MainActor
-class CameraModel: NSObject, ObservableObject {
+@MainActor @Observable
+class CameraModel: NSObject {
     
     // MARK: - Session
     nonisolated let session = AVCaptureSession()
@@ -14,42 +13,50 @@ class CameraModel: NSObject, ObservableObject {
     nonisolated private let photoOutput = AVCapturePhotoOutput()
     nonisolated private let videoOutput = AVCaptureVideoDataOutput()
     nonisolated private let sessionQueue = DispatchQueue(label: "com.rawcam.sessionQueue")
+    // Separate non-isolated storage for passing captureMode to nonisolated delegate
+    private let _pendingCaptureModeBox = CaptureModeBox()
     
     // MARK: - Capture format
-    @Published var captureMode: CaptureMode = .raw
-    @Published var availableFormats: [CaptureMode] = []
+    var captureMode: CaptureMode = .raw {
+        didSet { if oldValue != captureMode { buildAvailableFormats() } }
+    }
+    var availableFormats: [CaptureMode] = []
     
     // MARK: - Manual controls
-    @Published var iso: Float = 100
-    @Published var isAutoExposure: Bool = true
-    @Published var showManualControls: Bool = false
-    @Published var showHistogram: Bool = true
-    @Published var lensPosition: Float = 1.0
-    @Published var isAutoFocus: Bool = true
+    var iso: Float = 100
+    var isAutoExposure: Bool = true
+    var showManualControls: Bool = false
+    var showHistogram: Bool = true
+    var lensPosition: Float = 1.0
+    var isAutoFocus: Bool = true
     private var exposureDebounceTask: Task<Void, Never>?
     
     var supportsManualFocus: Bool {
         device?.isLockingFocusWithCustomLensPositionSupported ?? false
     }
     
-    @Published var minISO: Float = 25
-    @Published var maxISO: Float = 6400
-    @Published var shutterSpeeds: [CMTime] = []
-    @Published var shutterIndex: Int = 0
-    @Published var activeLens: Lens = .wide
+    var minISO: Float = 25
+    var maxISO: Float = 6400
+    var shutterSpeeds: [CMTime] = []
+    var shutterIndex: Int = 0
+    var activeLens: Lens = .wide
     
     // MARK: - UI State
-    @Published var isCapturing: Bool = false
-    @Published var showSaveAlert: Bool = false
-    @Published var showError: Bool = false
-    @Published var saveMessage: String = ""
-    @Published var errorMessage: String = ""
-    @Published var histogramData: [Float] = Array(repeating: 0, count: 256)
-    @Published var liveISO: Float = 0
-    @Published var liveShutter: String = ""
+    var isCapturing: Bool = false
+    var showSaveAlert: Bool = false
+    var showError: Bool = false
+    var saveMessage: String = ""
+    var errorMessage: String = ""
+    var histogramData: [Float] = Array(repeating: 0, count: 256)
+    var liveISO: Float = 0
+    var liveShutter: String = ""
     
     // Always portrait 3:4
     var captureAspectRatio: CGFloat { 3.0 / 4.0 }
+    
+    // MARK: - Resolution
+    var availableResolutions: [ResolutionOption] = []
+    var selectedResolution: ResolutionOption? = nil
     
     // MARK: - Configure
     func configure() {
@@ -94,6 +101,11 @@ class CameraModel: NSObject, ObservableObject {
             self.session.startRunning()
             Task { @MainActor in
                 self.device = cam
+                if let largest = cam.activeFormat.supportedMaxPhotoDimensions.max(by: {
+                    Int($0.width) * Int($0.height) < Int($1.width) * Int($1.height)
+                }) {
+                    self.photoOutput.maxPhotoDimensions = largest
+                }
                 self.buildAvailableFormats()
                 self.updateDeviceRanges()
             }
@@ -157,13 +169,76 @@ class CameraModel: NSObject, ObservableObject {
     // MARK: - Formats & ranges
     private func buildAvailableFormats() {
         let zoomBlocksRAW = (device?.videoZoomFactor ?? 1.0) > 1.0
+        let isFront = activeLens.isFront
         
         var modes: [CaptureMode] = [.jpeg]
+        if photoOutput.availablePhotoCodecTypes.contains(.hevc) {
+            modes.append(.heif)
+        }
         if !photoOutput.availableRawPhotoPixelFormatTypes.isEmpty && !zoomBlocksRAW {
             modes.append(.raw)
         }
         availableFormats = modes
         if !modes.contains(captureMode) { captureMode = .jpeg }
+        
+        // Resolution options
+        let isCropLens = activeLens == .tele2x || activeLens == .tele8x
+        
+        let options: [ResolutionOption]
+        if isFront {
+            options = []
+        } else if isCropLens {
+            let outputMax = photoOutput.maxPhotoDimensions
+            let allDims = (device?.activeFormat.supportedMaxPhotoDimensions ?? [])
+                .filter { $0.width <= outputMax.width && $0.height <= outputMax.height }
+                .sorted { Int($0.width) * Int($0.height) < Int($1.width) * Int($1.height) }
+            
+            var deduped: [ResolutionOption] = []
+            for dim in allDims {
+                let opt = ResolutionOption(width: dim.width, height: dim.height)
+                if !deduped.contains(where: { abs($0.id - opt.id) < 2_000_000 }) {
+                    deduped.append(opt)
+                }
+            }
+            options = deduped.first.map { [$0] } ?? []
+        } else {
+            // Back optical lenses: use active format's supported dims, deduped by MP bucket
+            let outputMax = photoOutput.maxPhotoDimensions
+            let allDims = (device?.activeFormat.supportedMaxPhotoDimensions ?? [])
+                .filter { $0.width <= outputMax.width && $0.height <= outputMax.height }
+                .sorted { Int($0.width) * Int($0.height) < Int($1.width) * Int($1.height) }
+            
+            var deduped: [ResolutionOption] = []
+            for dim in allDims {
+                let opt = ResolutionOption(width: dim.width, height: dim.height)
+                if !deduped.contains(where: { abs($0.id - opt.id) < 2_000_000 }) {
+                    deduped.append(opt)
+                }
+            }
+            // Always show 12MP + 48MP for back optical lenses
+            // RAW locks to 12MP only (48MP RAW not supported by AVFoundation)
+            // JPEG/HEIF allows both
+            let smallest = deduped.first
+            let largest  = deduped.last
+            if captureMode == .raw {
+                options = smallest.map { [$0] } ?? []
+            } else if let s = smallest, let l = largest, s.id != l.id {
+                options = [s, l]
+            } else {
+                options = deduped
+            }
+        }
+        
+        availableResolutions = options
+        
+        // Preserve selection if still valid, otherwise default to highest
+        if options.isEmpty {
+            selectedResolution = nil
+        } else if let current = selectedResolution, options.contains(where: { $0.id == current.id }) {
+            // keep
+        } else {
+            selectedResolution = options.last
+        }
     }
     
     private func updateDeviceRanges() {
@@ -218,26 +293,47 @@ class CameraModel: NSObject, ObservableObject {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
             withAnimation { self.isCapturing = false }
         }
+        _pendingCaptureModeBox.value = captureMode
         photoOutput.capturePhoto(with: buildPhotoSettings(), delegate: self)
     }
     
     private func buildPhotoSettings() -> AVCapturePhotoSettings {
         let zoomBlocksRAW = (device?.videoZoomFactor ?? 1.0) > 1.0
+        let dims = captureDimensions()
         
-        if captureMode == .raw && !zoomBlocksRAW,
-           let fmt = photoOutput.availableRawPhotoPixelFormatTypes.first(where: {
-               !AVCapturePhotoOutput.isAppleProRAWPixelFormat($0)
-           }) ?? photoOutput.availableRawPhotoPixelFormatTypes.first {
-            let s = AVCapturePhotoSettings(rawPixelFormatType: fmt)
-            s.maxPhotoDimensions = captureDimensions()
-            return s
+        switch captureMode {
+            case .raw:
+                if !zoomBlocksRAW,
+                   let fmt = photoOutput.availableRawPhotoPixelFormatTypes.first(where: {
+                       !AVCapturePhotoOutput.isAppleProRAWPixelFormat($0)
+                   }) ?? photoOutput.availableRawPhotoPixelFormatTypes.first {
+                    let s = AVCapturePhotoSettings(rawPixelFormatType: fmt)
+                    s.maxPhotoDimensions = dims
+                    return s
+                }
+                fallthrough
+            case .heif:
+                if photoOutput.availablePhotoCodecTypes.contains(.hevc) {
+                    let s = AVCapturePhotoSettings(format: [AVVideoCodecKey: AVVideoCodecType.hevc])
+                    s.maxPhotoDimensions = dims
+                    return s
+                }
+                fallthrough
+            case .jpeg:
+                let s = AVCapturePhotoSettings()
+                s.maxPhotoDimensions = dims
+                return s
         }
-        let s = AVCapturePhotoSettings()
-        s.maxPhotoDimensions = captureDimensions()
-        return s
+    }
+    
+    func selectResolution(_ opt: ResolutionOption) {
+        selectedResolution = opt
+        // No format switching needed — selectedResolution is used directly in captureDimensions()
+        // The active format already supports this dim (it came from activeFormat.supportedMaxPhotoDimensions)
     }
     
     private func captureDimensions() -> CMVideoDimensions {
+        if let selected = selectedResolution { return selected.dimensions }
         guard let d = device else { return photoOutput.maxPhotoDimensions }
         let outputMax = photoOutput.maxPhotoDimensions
         return d.activeFormat.supportedMaxPhotoDimensions
@@ -313,10 +409,11 @@ extension CameraModel: AVCapturePhotoCaptureDelegate {
             Task { @MainActor in self.errorMessage = "Failed to get photo data."; self.showError = true }
             return
         }
-        saveToPhotos(data: data, isDNG: photo.isRawPhoto)
+        let isHeif = !photo.isRawPhoto && self._pendingCaptureModeBox.value == .heif
+        saveToPhotos(data: data, isDNG: photo.isRawPhoto, isHEIF: isHeif)
     }
     
-    private nonisolated func saveToPhotos(data: Data, isDNG: Bool) {
+    private nonisolated func saveToPhotos(data: Data, isDNG: Bool, isHEIF: Bool = false) {
         PHPhotoLibrary.requestAuthorization(for: .addOnly) { status in
             guard status == .authorized || status == .limited else {
                 Task { @MainActor in self.errorMessage = "Photos access denied."; self.showError = true }
@@ -367,7 +464,7 @@ extension CameraModel: AVCapturePhotoCaptureDelegate {
                 }) { success, error in
                     Task { @MainActor in
                         if success {
-                            self.saveMessage = "JPEG saved to Photos."
+                            self.saveMessage = isHEIF ? "HEIF saved to Photos." : "JPEG saved to Photos."
                             self.showSaveAlert = true
                         } else {
                             self.errorMessage = error?.localizedDescription ?? "Unknown save error."
@@ -425,9 +522,27 @@ extension CameraModel: AVCaptureVideoDataOutputSampleBufferDelegate {
     }
 }
 
+// Simple thread-safe box for passing CaptureMode across isolation boundaries
+final class CaptureModeBox: @unchecked Sendable {
+    nonisolated(unsafe) var value: CaptureMode = .jpeg
+}
+
+// MARK: - ResolutionOption
+struct ResolutionOption: Identifiable, Equatable {
+    let width: Int32
+    let height: Int32
+    var id: Int { Int(width) * Int(height) }
+    var dimensions: CMVideoDimensions { CMVideoDimensions(width: width, height: height) }
+    var label: String {
+        let mp = Int(Double(width) * Double(height) / 1_000_000.0)
+        return "\(mp)MP"
+    }
+}
+
 // MARK: - CaptureMode
 enum CaptureMode: String, CaseIterable, Identifiable {
     case jpeg = "JPEG"
+    case heif = "HEIF"
     case raw  = "RAW"
     var id: String { rawValue }
 }
