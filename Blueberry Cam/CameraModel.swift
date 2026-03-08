@@ -13,7 +13,6 @@ class CameraModel: NSObject {
     nonisolated private let photoOutput = AVCapturePhotoOutput()
     nonisolated private let videoOutput = AVCaptureVideoDataOutput()
     nonisolated private let sessionQueue = DispatchQueue(label: "com.rawcam.sessionQueue")
-    // Separate non-isolated storage for passing captureMode to nonisolated delegate
     private let _pendingCaptureModeBox = CaptureModeBox()
     
     // MARK: - Capture format
@@ -51,7 +50,6 @@ class CameraModel: NSObject {
     var liveISO: Float = 0
     var liveShutter: String = ""
     
-    // Always portrait 3:4
     var captureAspectRatio: CGFloat { 3.0 / 4.0 }
     
     // MARK: - Resolution
@@ -181,7 +179,6 @@ class CameraModel: NSObject {
         availableFormats = modes
         if !modes.contains(captureMode) { captureMode = .jpeg }
         
-        // Resolution options
         let isCropLens = activeLens == .tele2x || activeLens == .tele8x
         
         let options: [ResolutionOption]
@@ -293,8 +290,27 @@ class CameraModel: NSObject {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
             withAnimation { self.isCapturing = false }
         }
+        
+        exposureDebounceTask?.cancel()
         _pendingCaptureModeBox.value = captureMode
-        photoOutput.capturePhoto(with: buildPhotoSettings(), delegate: self)
+        
+        // For manual exposure, wait for hardware to confirm values are applied before firing.
+        // setExposureModeCustom is async — the completionHandler fires once the sensor has
+        // actually settled on the requested ISO/shutter, then we fire the shutter.
+        if !isAutoExposure, let d = device, shutterSpeeds.indices.contains(shutterIndex) {
+            let duration = shutterSpeeds[shutterIndex]
+            let isoValue = iso
+            try? d.lockForConfiguration()
+            d.setExposureModeCustom(duration: duration, iso: isoValue) { [weak self] _ in
+                guard let self else { return }
+                Task { @MainActor in
+                    self.photoOutput.capturePhoto(with: self.buildPhotoSettings(), delegate: self)
+                }
+            }
+            d.unlockForConfiguration()
+        } else {
+            photoOutput.capturePhoto(with: buildPhotoSettings(), delegate: self)
+        }
     }
     
     private func buildPhotoSettings() -> AVCapturePhotoSettings {
