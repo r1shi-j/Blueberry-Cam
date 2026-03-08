@@ -93,6 +93,7 @@ struct ManualControlsView: View {
                 Toggle("", isOn: $cameraModel.isAutoFocus)
                     .labelsHidden()
                     .tint(.yellow)
+                    .disabled(!cameraModel.supportsManualFocus)
                     .onChange(of: cameraModel.isAutoFocus) { _, auto in
                         if auto { cameraModel.setAutoFocus() }
                         else { cameraModel.applyManualFocus() }
@@ -117,7 +118,7 @@ struct ManualControlsView: View {
                         cameraModel.applyManualFocus()
                     }
                     .tint(.yellow)
-                    Text(lensPositionToDistance(cameraModel.lensPosition))
+                    Text(String(format: "%.2f", cameraModel.lensPosition))
                         .font(.system(size: 12, weight: .medium, design: .monospaced))
                         .foregroundColor(.yellow)
                         .frame(width: 50, alignment: .trailing)
@@ -141,18 +142,5 @@ struct ManualControlsView: View {
     private var shutterLabel: String {
         guard cameraModel.shutterSpeeds.indices.contains(cameraModel.shutterIndex) else { return "--" }
         return CameraModel.formatShutter(cameraModel.shutterSpeeds[cameraModel.shutterIndex])
-    }
-    
-    private func lensPositionToDistance(_ position: Float) -> String {
-        switch position {
-            case 0.0..<0.15: return "∞"
-            case 0.15..<0.25: return "5m+"
-            case 0.25..<0.35: return "2m"
-            case 0.35..<0.50: return "1m"
-            case 0.50..<0.65: return "50cm"
-            case 0.65..<0.80: return "30cm"
-            case 0.80..<0.90: return "20cm"
-            default:          return "macro"
-        }
     }
 }

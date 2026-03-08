@@ -24,7 +24,7 @@ final class PreviewUIView: UIView {
         get { previewLayer.session }
         set {
             previewLayer.session = newValue
-            previewLayer.videoGravity = .resizeAspectFill
+            previewLayer.videoGravity = .resizeAspect
         }
     }
 }

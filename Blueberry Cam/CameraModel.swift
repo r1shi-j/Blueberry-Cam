@@ -1,6 +1,8 @@
 import AVFoundation
 import SwiftUI
 import Photos
+import ImageIO
+import UniformTypeIdentifiers
 import Combine
 
 @MainActor
@@ -22,15 +24,19 @@ class CameraModel: NSObject, ObservableObject {
     @Published var isAutoExposure: Bool = true
     @Published var showManualControls: Bool = false
     @Published var showHistogram: Bool = true
-    @Published var lensPosition: Float = 1.0   // 1.0 = infinity on launch
+    @Published var lensPosition: Float = 1.0
     @Published var isAutoFocus: Bool = true
     private var exposureDebounceTask: Task<Void, Never>?
     
-    // Ranges — populated from device at runtime
+    var supportsManualFocus: Bool {
+        device?.isLockingFocusWithCustomLensPositionSupported ?? false
+    }
+    
     @Published var minISO: Float = 25
     @Published var maxISO: Float = 6400
     @Published var shutterSpeeds: [CMTime] = []
     @Published var shutterIndex: Int = 0
+    @Published var activeLens: Lens = .wide
     
     // MARK: - UI State
     @Published var isCapturing: Bool = false
@@ -42,12 +48,11 @@ class CameraModel: NSObject, ObservableObject {
     @Published var liveISO: Float = 0
     @Published var liveShutter: String = ""
     
+    // Always portrait 3:4
+    var captureAspectRatio: CGFloat { 3.0 / 4.0 }
+    
     // MARK: - Configure
     func configure() {
-        checkPermissions()
-    }
-    
-    private func checkPermissions() {
         switch AVCaptureDevice.authorizationStatus(for: .video) {
             case .authorized:
                 sessionQueue.async { Task { @MainActor in self.setupSession() } }
@@ -61,21 +66,17 @@ class CameraModel: NSObject, ObservableObject {
         }
     }
     
-    // Runs on sessionQueue (not MainActor)
     private func setupSession() {
         session.beginConfiguration()
-        session.sessionPreset = .photo   // required for RAW — do not change
+        session.sessionPreset = .photo
         
-        guard let cam = bestCamera(),
+        guard let cam = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back),
               let input = try? AVCaptureDeviceInput(device: cam),
               session.canAddInput(input) else {
             session.commitConfiguration()
             return
         }
         session.addInput(input)
-        
-        // Do NOT set activeFormat — .photo preset manages this for RAW support
-        // Resolution is controlled via maxPhotoDimensions in buildPhotoSettings()
         
         if session.canAddOutput(photoOutput) {
             session.addOutput(photoOutput)
@@ -99,32 +100,70 @@ class CameraModel: NSObject, ObservableObject {
         }
     }
     
-    private func bestCamera() -> AVCaptureDevice? {
-        AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back)
-        ?? AVCaptureDevice.default(for: .video)
+    // MARK: - Lens switching
+    func switchLens(to lens: Lens) {
+        guard lens != activeLens else { return }
+        activeLens = lens
+        
+        sessionQueue.async { Task { @MainActor in
+            self.session.beginConfiguration()
+            for input in self.session.inputs { self.session.removeInput(input) }
+            
+            guard let cam = AVCaptureDevice.default(lens.deviceType, for: .video, position: lens.position),
+                  let input = try? AVCaptureDeviceInput(device: cam),
+                  self.session.canAddInput(input) else {
+                self.session.commitConfiguration()
+                return
+            }
+            self.session.addInput(input)
+            self.device = cam
+            
+            // Crop zoom for 2x / 8x back lenses
+            if lens.zoomFactor > 1.0 {
+                try? cam.lockForConfiguration()
+                cam.videoZoomFactor = lens.zoomFactor
+                cam.unlockForConfiguration()
+            }
+            
+            // Portrait rotation + mirror
+            let isFront = lens.isFront
+            let rotationAngle: CGFloat = isFront ? 0 : 90
+            for conn in [self.photoOutput.connection(with: .video),
+                         self.videoOutput.connection(with: .video)].compactMap({ $0 }) {
+                if conn.isVideoRotationAngleSupported(rotationAngle) {
+                    conn.videoRotationAngle = rotationAngle
+                }
+                conn.isVideoMirrored = isFront
+            }
+            
+            self.session.commitConfiguration()
+            
+            // Set output max to largest the active format supports
+            if let largest = cam.activeFormat.supportedMaxPhotoDimensions.max(by: {
+                Int($0.width) * Int($0.height) < Int($1.width) * Int($1.height)
+            }) {
+                self.photoOutput.maxPhotoDimensions = largest
+            }
+            
+            self.buildAvailableFormats()
+            self.updateDeviceRanges()
+            
+            if !cam.isLockingFocusWithCustomLensPositionSupported {
+                self.isAutoFocus = true
+            }
+        }}
     }
     
-    // Full native sensor resolution, highest ISO ceiling, P3 color preferred
-    private func bestPhotoFormat(for device: AVCaptureDevice) -> AVCaptureDevice.Format? {
-        device.formats
-            .filter {
-                let d = $0.formatDescription.dimensions
-                return d.width >= 4000 && d.height >= 3000
-            }
-            .max {
-                if $0.maxISO != $1.maxISO { return $0.maxISO < $1.maxISO }
-                return !$0.supportedColorSpaces.contains(.P3_D65) &&
-                $1.supportedColorSpaces.contains(.P3_D65)
-            }
-    }
-    
+    // MARK: - Formats & ranges
     private func buildAvailableFormats() {
+        let zoomBlocksRAW = (device?.videoZoomFactor ?? 1.0) > 1.0
+        
         var modes: [CaptureMode] = [.jpeg]
-        if !photoOutput.availableRawPhotoPixelFormatTypes.isEmpty {
+        if !photoOutput.availableRawPhotoPixelFormatTypes.isEmpty && !zoomBlocksRAW {
             modes.append(.raw)
         }
         availableFormats = modes
-        captureMode = modes.contains(.raw) ? .raw : .jpeg
+        if !modes.contains(captureMode) { captureMode = .jpeg }
     }
     
     private func updateDeviceRanges() {
@@ -134,12 +173,9 @@ class CameraModel: NSObject, ObservableObject {
         
         let stops = generateShutterStops(for: d)
         shutterSpeeds = stops
-        
-        // Default to stop nearest 1/60s
-        let target = 1.0 / 60.0
         shutterIndex = stops.indices.min(by: {
-            abs(CMTimeGetSeconds(stops[$0]) - target) <
-                abs(CMTimeGetSeconds(stops[$1]) - target)
+            abs(CMTimeGetSeconds(stops[$0]) - 1.0/60.0) <
+                abs(CMTimeGetSeconds(stops[$1]) - 1.0/60.0)
         }) ?? 0
         
         liveISO = d.iso
@@ -152,7 +188,6 @@ class CameraModel: NSObject, ObservableObject {
         let maxSecs = CMTimeGetSeconds(fmt.maxExposureDuration)
         let timescale = fmt.minExposureDuration.timescale
         
-        // 1/3-stop grid from 1/100000s to 1s — filtered to what the device actually supports
         let allStops: [Double] = [
             1/100000, 1/80000, 1/60000, 1/50000, 1/40000, 1/32000,
             1/25000,  1/20000, 1/16000, 1/12500, 1/10000, 1/8000,
@@ -170,7 +205,6 @@ class CameraModel: NSObject, ObservableObject {
             .map { CMTimeMakeWithSeconds($0, preferredTimescale: timescale) }
     }
     
-    // Used by live overlay, manual controls label, and anywhere else needing a display string
     static func formatShutter(_ time: CMTime) -> String {
         let secs = CMTimeGetSeconds(time)
         guard secs.isFinite && secs > 0 else { return "—" }
@@ -178,62 +212,46 @@ class CameraModel: NSObject, ObservableObject {
         return "1/\(Int(round(1.0 / secs)))"
     }
     
-        func applyManualFocus() {
-            guard let d = device else { return }
-            try? d.lockForConfiguration()
-            d.setFocusModeLocked(lensPosition: lensPosition) { _ in }
-            d.unlockForConfiguration()
-        }
-    
-        func setAutoFocus() {
-            guard let d = device else { return }
-            try? d.lockForConfiguration()
-            d.focusMode = .continuousAutoFocus
-            d.unlockForConfiguration()
-        }
-    
     // MARK: - Capture
     func capturePhoto() {
-        // Flash animation on main actor
         withAnimation { isCapturing = true }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
             withAnimation { self.isCapturing = false }
         }
-        let settings = buildPhotoSettings()
-        photoOutput.capturePhoto(with: settings, delegate: self)
+        photoOutput.capturePhoto(with: buildPhotoSettings(), delegate: self)
     }
     
     private func buildPhotoSettings() -> AVCapturePhotoSettings {
-        if captureMode == .raw,
+        let zoomBlocksRAW = (device?.videoZoomFactor ?? 1.0) > 1.0
+        
+        if captureMode == .raw && !zoomBlocksRAW,
            let fmt = photoOutput.availableRawPhotoPixelFormatTypes.first(where: {
                !AVCapturePhotoOutput.isAppleProRAWPixelFormat($0)
            }) ?? photoOutput.availableRawPhotoPixelFormatTypes.first {
             let s = AVCapturePhotoSettings(rawPixelFormatType: fmt)
-            if let dims = bestCaptureDimensions() { s.maxPhotoDimensions = dims }
+            s.maxPhotoDimensions = captureDimensions()
             return s
         }
         let s = AVCapturePhotoSettings()
-        if let dims = bestCaptureDimensions() { s.maxPhotoDimensions = dims }
+        s.maxPhotoDimensions = captureDimensions()
         return s
     }
     
-    // Largest pixel dimensions both the format and output agree on
-    private func bestCaptureDimensions() -> CMVideoDimensions? {
-        guard let d = device else { return nil }
-        let maxOut = photoOutput.maxPhotoDimensions
+    private func captureDimensions() -> CMVideoDimensions {
+        guard let d = device else { return photoOutput.maxPhotoDimensions }
+        let outputMax = photoOutput.maxPhotoDimensions
         return d.activeFormat.supportedMaxPhotoDimensions
-            .filter { $0.width <= maxOut.width && $0.height <= maxOut.height }
+            .filter { $0.width <= outputMax.width && $0.height <= outputMax.height }
             .max { Int($0.width) * Int($0.height) < Int($1.width) * Int($1.height) }
-        ?? maxOut
+        ?? outputMax
     }
     
     // MARK: - Manual Exposure
     func applyManualExposure() {
         exposureDebounceTask?.cancel()
         exposureDebounceTask = Task {
-            try? await Task.sleep(nanoseconds: 50_000_000) // 50ms
-            guard !Task.isCancelled else { return }
-            guard let d = device, shutterSpeeds.indices.contains(shutterIndex) else { return }
+            try? await Task.sleep(nanoseconds: 50_000_000)
+            guard !Task.isCancelled, let d = device, shutterSpeeds.indices.contains(shutterIndex) else { return }
             try? d.lockForConfiguration()
             d.setExposureModeCustom(duration: shutterSpeeds[shutterIndex], iso: iso, completionHandler: nil)
             d.unlockForConfiguration()
@@ -247,8 +265,38 @@ class CameraModel: NSObject, ObservableObject {
         d.unlockForConfiguration()
     }
     
+    // MARK: - Manual Focus
+    func applyManualFocus() {
+        guard let d = device else { return }
+        guard d.isLockingFocusWithCustomLensPositionSupported else {
+            try? d.lockForConfiguration()
+            d.focusMode = .continuousAutoFocus
+            d.unlockForConfiguration()
+            isAutoFocus = true
+            return
+        }
+        try? d.lockForConfiguration()
+        d.setFocusModeLocked(lensPosition: lensPosition) { _ in }
+        d.unlockForConfiguration()
+    }
+    
+    func setAutoFocus() {
+        guard let d = device else { return }
+        try? d.lockForConfiguration()
+        d.focusMode = .continuousAutoFocus
+        d.unlockForConfiguration()
+    }
+    
     func toggleManualControls() { showManualControls.toggle() }
     func toggleHistogram()      { showHistogram.toggle() }
+    
+    // MARK: - Naming
+    private func nextImageName() -> String {
+        let key = "com.rawcam.imgCounter"
+        let next = UserDefaults.standard.integer(forKey: key) + 1
+        UserDefaults.standard.set(next, forKey: key)
+        return String(format: "IMG_%04d", next)
+    }
 }
 
 // MARK: - AVCapturePhotoCaptureDelegate
@@ -268,29 +316,63 @@ extension CameraModel: AVCapturePhotoCaptureDelegate {
         saveToPhotos(data: data, isDNG: photo.isRawPhoto)
     }
     
-    // DNG must be saved via a file URL — passing raw DNG Data causes PHPhotosErrorDomain 3302
     private nonisolated func saveToPhotos(data: Data, isDNG: Bool) {
         PHPhotoLibrary.requestAuthorization(for: .addOnly) { status in
             guard status == .authorized || status == .limited else {
-                Task { @MainActor in
-                    self.errorMessage = "Photos access denied."
-                    self.showError = true
-                }
+                Task { @MainActor in self.errorMessage = "Photos access denied."; self.showError = true }
                 return
             }
-            PHPhotoLibrary.shared().performChanges({
-                let req = PHAssetCreationRequest.forAsset()
-                let opts = PHAssetResourceCreationOptions()
-                opts.uniformTypeIdentifier = isDNG ? "com.adobe.raw-image" : "public.jpeg"
-                req.addResource(with: isDNG ? .photo : .photo, data: data, options: opts)
-            }) { success, error in
+            
+            if isDNG {
+                let sem = DispatchSemaphore(value: 0)
+                nonisolated(unsafe) var imgName = "IMG_0000"
                 Task { @MainActor in
-                    if success {
-                        self.saveMessage = isDNG ? "RAW DNG saved to Photos." : "JPEG saved to Photos."
-                        self.showSaveAlert = true
-                    } else {
-                        self.errorMessage = error?.localizedDescription ?? "Unknown error saving photo."
+                    imgName = self.nextImageName()
+                    sem.signal()
+                }
+                sem.wait()
+                
+                let url = FileManager.default.temporaryDirectory
+                    .appendingPathComponent(imgName)
+                    .appendingPathExtension("dng")
+                
+                do { try data.write(to: url) } catch {
+                    Task { @MainActor in
+                        self.errorMessage = "Failed to write DNG: \(error.localizedDescription)"
                         self.showError = true
+                    }
+                    return
+                }
+                
+                PHPhotoLibrary.shared().performChanges({
+                    let req = PHAssetCreationRequest.forAsset()
+                    let opts = PHAssetResourceCreationOptions()
+                    opts.shouldMoveFile = true
+                    req.addResource(with: .photo, fileURL: url, options: opts)
+                }) { success, error in
+                    try? FileManager.default.removeItem(at: url)
+                    Task { @MainActor in
+                        if success {
+                            self.saveMessage = "RAW DNG saved to Photos."
+                            self.showSaveAlert = true
+                        } else {
+                            self.errorMessage = error?.localizedDescription ?? "Unknown save error."
+                            self.showError = true
+                        }
+                    }
+                }
+            } else {
+                PHPhotoLibrary.shared().performChanges({
+                    PHAssetCreationRequest.forAsset().addResource(with: .photo, data: data, options: nil)
+                }) { success, error in
+                    Task { @MainActor in
+                        if success {
+                            self.saveMessage = "JPEG saved to Photos."
+                            self.showSaveAlert = true
+                        } else {
+                            self.errorMessage = error?.localizedDescription ?? "Unknown save error."
+                            self.showError = true
+                        }
                     }
                 }
             }
@@ -348,4 +430,43 @@ enum CaptureMode: String, CaseIterable, Identifiable {
     case jpeg = "JPEG"
     case raw  = "RAW"
     var id: String { rawValue }
+}
+
+// MARK: - Lens
+enum Lens: String, CaseIterable {
+    case frontUltraWide, front, ultraWide, wide, tele2x, tele4x, tele8x
+    
+    var label: String {
+        switch self {
+            case .frontUltraWide: return "0.5"
+            case .front:          return "SELF"
+            case .ultraWide:      return "0.5"
+            case .wide:           return "1"
+            case .tele2x:         return "2"
+            case .tele4x:         return "4"
+            case .tele8x:         return "8"
+        }
+    }
+    
+    var isFront: Bool { self == .front || self == .frontUltraWide }
+    
+    var deviceType: AVCaptureDevice.DeviceType {
+        switch self {
+            case .frontUltraWide:      return .builtInUltraWideCamera
+            case .front:               return .builtInWideAngleCamera
+            case .ultraWide:           return .builtInUltraWideCamera
+            case .wide, .tele2x:       return .builtInWideAngleCamera
+            case .tele4x, .tele8x:     return .builtInTelephotoCamera
+        }
+    }
+    
+    var position: AVCaptureDevice.Position { isFront ? .front : .back }
+    
+    var zoomFactor: CGFloat {
+        switch self {
+            case .tele2x: return 2.0
+            case .tele8x: return 2.0
+            default:      return 1.0
+        }
+    }
 }

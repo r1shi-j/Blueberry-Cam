@@ -2,25 +2,25 @@ import SwiftUI
 
 struct ContentView: View {
     @StateObject private var cameraModel = CameraModel()
-    @State private var showSettings = false
     
     var body: some View {
         ZStack {
             Color.black.ignoresSafeArea()
             
-            // MARK: - Viewfinder
+            // MARK: - Viewfinder (resizeAspect — matches exact capture FOV)
             CameraPreviewView(session: cameraModel.session)
                 .ignoresSafeArea()
             
-            // MARK: - Overlays
+            // MARK: - Crop frame overlay
+            CropOverlayView(aspectRatio: cameraModel.captureAspectRatio)
+                .ignoresSafeArea()
+                .allowsHitTesting(false)
+            
+            // MARK: - UI Overlays
             VStack(spacing: 0) {
-                
-                // Top bar
                 TopBarView(cameraModel: cameraModel)
-                
                 Spacer()
                 
-                // Histogram
                 if cameraModel.showHistogram {
                     HistogramView(data: cameraModel.histogramData)
                         .frame(height: 60)
@@ -28,18 +28,19 @@ struct ContentView: View {
                         .padding(.bottom, 8)
                 }
                 
-                // Manual controls
                 if cameraModel.showManualControls {
                     ManualControlsView(cameraModel: cameraModel)
                         .padding(.bottom, 8)
                 }
                 
-                // Bottom controls
+                LensSelectorView(cameraModel: cameraModel)
+                    .padding(.bottom, 8)
+                
                 BottomBarView(cameraModel: cameraModel)
                     .padding(.bottom, 30)
             }
             
-            // Capture flash overlay
+            // Capture flash
             if cameraModel.isCapturing {
                 Color.white
                     .ignoresSafeArea()
