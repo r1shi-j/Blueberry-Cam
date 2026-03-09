@@ -4,48 +4,72 @@ struct ContentView: View {
     @State private var cameraModel = CameraModel()
     
     var body: some View {
-        ZStack {
-            Color.black.ignoresSafeArea()
+        GeometryReader { geo in
+            let previewRect = makePreviewRect(in: geo.size)
             
-            // MARK: - Viewfinder (resizeAspect — matches exact capture FOV)
-            CameraPreviewView(session: cameraModel.session)
-                .ignoresSafeArea()
-            
-            // MARK: - Crop frame overlay
-            CropOverlayView(aspectRatio: cameraModel.captureAspectRatio)
-                .ignoresSafeArea()
-                .allowsHitTesting(false)
-            
-            // MARK: - UI Overlays
-            VStack(spacing: 0) {
-                TopBarView(cameraModel: cameraModel)
-                Spacer()
+            ZStack {
+                Color.black.ignoresSafeArea()
                 
-                if cameraModel.showHistogram {
-                    HistogramView(data: cameraModel.histogramData)
-                        .frame(height: 60)
-                        .padding(.horizontal, 20)
-                        .padding(.bottom, 8)
-                }
-                
-                if cameraModel.showManualControls {
-                    ManualControlsView(cameraModel: cameraModel)
-                        .padding(.bottom, 8)
-                }
-                
-                LensSelectorView(cameraModel: cameraModel)
-                    .padding(.bottom, 8)
-                
-                BottomBarView(cameraModel: cameraModel)
-                    .padding(.bottom, 30)
-            }
-            
-            // Capture flash
-            if cameraModel.isCapturing {
-                Color.white
+                // MARK: - Viewfinder (resizeAspect — matches exact capture FOV)
+                CameraPreviewView(session: cameraModel.session)
                     .ignoresSafeArea()
-                    .opacity(0.3)
-                    .animation(.easeOut(duration: 0.15), value: cameraModel.isCapturing)
+                
+                if cameraModel.showZebraStripes {
+                    AnalysisOverlayView(
+                        mask: cameraModel.zebraMask,
+                        gridSize: cameraModel.analysisGridSize,
+                        style: .zebra
+                    )
+                    .frame(width: previewRect.width, height: previewRect.height)
+                    .position(x: previewRect.midX, y: previewRect.midY)
+                }
+                
+                if cameraModel.showFocusPeaking {
+                    AnalysisOverlayView(
+                        mask: cameraModel.focusPeakingMask,
+                        gridSize: cameraModel.analysisGridSize,
+                        style: .focusPeaking
+                    )
+                    .frame(width: previewRect.width, height: previewRect.height)
+                    .position(x: previewRect.midX, y: previewRect.midY)
+                }
+                
+                // MARK: - Crop frame overlay
+                CropOverlayView(aspectRatio: cameraModel.captureAspectRatio)
+                    .ignoresSafeArea()
+                    .allowsHitTesting(false)
+                
+                // MARK: - UI Overlays
+                VStack(spacing: 0) {
+                    TopBarView(cameraModel: cameraModel)
+                    Spacer()
+                    
+                    if cameraModel.showHistogram {
+                        HistogramView(data: cameraModel.histogramData)
+                            .frame(height: 60)
+                            .padding(.horizontal, 20)
+                            .padding(.bottom, 8)
+                    }
+                    
+                    if cameraModel.showManualControls {
+                        ManualControlsView(cameraModel: cameraModel)
+                            .padding(.bottom, 8)
+                    }
+                    
+                    LensSelectorView(cameraModel: cameraModel)
+                        .padding(.bottom, 8)
+                    
+                    BottomBarView(cameraModel: cameraModel)
+                        .padding(.bottom, 30)
+                }
+                
+                // Capture flash
+                if cameraModel.isCapturing {
+                    Color.white
+                        .ignoresSafeArea()
+                        .opacity(0.3)
+                        .animation(.easeOut(duration: 0.15), value: cameraModel.isCapturing)
+                }
             }
         }
         .onAppear { cameraModel.configure() }
@@ -59,5 +83,17 @@ struct ContentView: View {
         } message: {
             Text(cameraModel.errorMessage)
         }
+    }
+    
+    private func makePreviewRect(in size: CGSize) -> CGRect {
+        let screenW = size.width
+        let screenH = size.height
+        let screenAspect = screenW / screenH
+        let aspect = cameraModel.captureAspectRatio
+        let previewW: CGFloat = aspect < screenAspect ? screenH * aspect : screenW
+        let previewH: CGFloat = aspect < screenAspect ? screenH : screenW / aspect
+        let previewX = (screenW - previewW) / 2
+        let previewY = (screenH - previewH) / 2
+        return CGRect(x: previewX, y: previewY, width: previewW, height: previewH)
     }
 }

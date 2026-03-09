@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 struct BottomBarView: View {
     @Bindable var cameraModel: CameraModel
@@ -53,13 +54,17 @@ struct BottomBarView: View {
                 .frame(maxWidth: .infinity)
                 
                 // Placeholder right side
-                VStack(spacing: 4) {
-                    Image(systemName: "photo.on.rectangle")
-                        .font(.system(size: 20))
-                        .foregroundColor(.white.opacity(0.5))
-                    Text("GALLERY")
-                        .font(.system(size: 9, weight: .medium))
-                        .foregroundColor(.white.opacity(0.4))
+                Button {
+                    openPhotosApp()
+                } label: {
+                    VStack(spacing: 4) {
+                        Image(systemName: "photo.on.rectangle")
+                            .font(.system(size: 20))
+                            .foregroundColor(.white.opacity(0.8))
+                        Text("GALLERY")
+                            .font(.system(size: 9, weight: .medium))
+                            .foregroundColor(.white.opacity(0.7))
+                    }
                 }
                 .frame(maxWidth: .infinity)
             }
@@ -71,5 +76,10 @@ struct BottomBarView: View {
                 endPoint: .bottom
             )
         )
+    }
+    
+    private func openPhotosApp() {
+        guard let url = URL(string: "photos-redirect://") else { return }
+        UIApplication.shared.open(url)
     }
 }

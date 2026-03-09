@@ -26,6 +26,8 @@ class CameraModel: NSObject {
     var isAutoExposure: Bool = true
     var showManualControls: Bool = false
     var showHistogram: Bool = true
+    var showFocusPeaking: Bool = false
+    var showZebraStripes: Bool = false
     var lensPosition: Float = 1.0
     var isAutoFocus: Bool = true
     private var exposureDebounceTask: Task<Void, Never>?
@@ -47,6 +49,9 @@ class CameraModel: NSObject {
     var saveMessage: String = ""
     var errorMessage: String = ""
     var histogramData: [Float] = Array(repeating: 0, count: 256)
+    var analysisGridSize: CGSize = .zero
+    var focusPeakingMask: [UInt8] = []
+    var zebraMask: [UInt8] = []
     var liveISO: Float = 0
     var liveShutter: String = ""
     
@@ -89,8 +94,22 @@ class CameraModel: NSObject {
         
         videoOutput.setSampleBufferDelegate(self, queue: DispatchQueue(label: "com.rawcam.videoQueue"))
         videoOutput.alwaysDiscardsLateVideoFrames = true
+        videoOutput.videoSettings = [
+            kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA
+        ]
         if session.canAddOutput(videoOutput) {
             session.addOutput(videoOutput)
+        }
+        
+        // Keep analysis output orientation aligned with preview from first launch.
+        let isFront = activeLens.isFront
+        let rotationAngle: CGFloat = isFront ? 0 : 90
+        for conn in [photoOutput.connection(with: .video),
+                     videoOutput.connection(with: .video)].compactMap({ $0 }) {
+            if conn.isVideoRotationAngleSupported(rotationAngle) {
+                conn.videoRotationAngle = rotationAngle
+            }
+            conn.isVideoMirrored = isFront
         }
         
         session.commitConfiguration()
@@ -401,6 +420,8 @@ class CameraModel: NSObject {
     
     func toggleManualControls() { showManualControls.toggle() }
     func toggleHistogram()      { showHistogram.toggle() }
+    func toggleFocusPeaking()   { showFocusPeaking.toggle() }
+    func toggleZebraStripes()   { showZebraStripes.toggle() }
     
     // MARK: - Naming
     private func nextImageName() -> String {
@@ -511,29 +532,87 @@ extension CameraModel: AVCaptureVideoDataOutputSampleBufferDelegate {
         CVPixelBufferLockBaseAddress(pixelBuffer, .readOnly)
         defer { CVPixelBufferUnlockBaseAddress(pixelBuffer, .readOnly) }
         
-        let width       = CVPixelBufferGetWidth(pixelBuffer)
-        let height      = CVPixelBufferGetHeight(pixelBuffer)
-        let bytesPerRow = CVPixelBufferGetBytesPerRow(pixelBuffer)
-        guard let base  = CVPixelBufferGetBaseAddress(pixelBuffer) else { return }
+        let pixelFormat = CVPixelBufferGetPixelFormatType(pixelBuffer)
+        let width = CVPixelBufferGetWidth(pixelBuffer)
+        let height = CVPixelBufferGetHeight(pixelBuffer)
         
-        var hist  = [Float](repeating: 0, count: 256)
+        var hist = [Float](repeating: 0, count: 256)
         var count: Float = 0
-        let step  = 8
+        let step = 8
+        let sampleWidth = max(1, width / step)
+        let sampleHeight = max(1, height / step)
+        let sampleCount = sampleWidth * sampleHeight
+        var lumaGrid = [Float](repeating: 0, count: sampleCount)
+        var zebra = [UInt8](repeating: 0, count: sampleCount)
         
-        for y in stride(from: 0, to: height, by: step) {
-            let row = base.advanced(by: y * bytesPerRow).assumingMemoryBound(to: UInt8.self)
-            for x in stride(from: 0, to: width * 4, by: step * 4) {
-                let luma = Int(0.299 * Float(row[x + 2]) +
-                               0.587 * Float(row[x + 1]) +
-                               0.114 * Float(row[x]))
+        let readLuma: (Int, Int) -> Float
+        if pixelFormat == kCVPixelFormatType_32BGRA {
+            let bytesPerRow = CVPixelBufferGetBytesPerRow(pixelBuffer)
+            guard let base = CVPixelBufferGetBaseAddress(pixelBuffer) else { return }
+            readLuma = { x, y in
+                let row = base.advanced(by: y * bytesPerRow).assumingMemoryBound(to: UInt8.self)
+                let offset = x * 4
+                let b = Float(row[offset])
+                let g = Float(row[offset + 1])
+                let r = Float(row[offset + 2])
+                return (0.299 * r) + (0.587 * g) + (0.114 * b)
+            }
+        } else if CVPixelBufferIsPlanar(pixelBuffer), CVPixelBufferGetPlaneCount(pixelBuffer) > 0 {
+            let yWidth = CVPixelBufferGetWidthOfPlane(pixelBuffer, 0)
+            let yHeight = CVPixelBufferGetHeightOfPlane(pixelBuffer, 0)
+            let yBytesPerRow = CVPixelBufferGetBytesPerRowOfPlane(pixelBuffer, 0)
+            guard let yBase = CVPixelBufferGetBaseAddressOfPlane(pixelBuffer, 0) else { return }
+            readLuma = { x, y in
+                let sampleX = min(yWidth - 1, x)
+                let sampleY = min(yHeight - 1, y)
+                let row = yBase.advanced(by: sampleY * yBytesPerRow).assumingMemoryBound(to: UInt8.self)
+                return Float(row[sampleX])
+            }
+        } else {
+            return
+        }
+        
+        for sy in 0..<sampleHeight {
+            let y = min(height - 1, sy * step)
+            for sx in 0..<sampleWidth {
+                let pixelX = min(width - 1, sx * step)
+                let lumaValue = readLuma(pixelX, y)
+                let idx = sy * sampleWidth + sx
+                lumaGrid[idx] = lumaValue
+                zebra[idx] = lumaValue >= 235 ? 1 : 0
+                let luma = Int(lumaValue)
                 hist[min(luma, 255)] += 1
                 count += 1
             }
         }
         
-        if count > 0 {
-            let normalized = hist.map { $0 / count }
-            Task { @MainActor in self.histogramData = normalized }
+        var peaking = [UInt8](repeating: 0, count: sampleCount)
+        if sampleWidth > 2 && sampleHeight > 2 {
+            for y in 1..<(sampleHeight - 1) {
+                for x in 1..<(sampleWidth - 1) {
+                    let i = y * sampleWidth + x
+                    let left = lumaGrid[i - 1]
+                    let right = lumaGrid[i + 1]
+                    let up = lumaGrid[i - sampleWidth]
+                    let down = lumaGrid[i + sampleWidth]
+                    let edgeStrength = abs(right - left) + abs(down - up)
+                    peaking[i] = edgeStrength > 36 ? 1 : 0
+                }
+            }
+        }
+        
+        let normalizedHistogram: [Float]? = count > 0 ? hist.map { $0 / count } : nil
+        let analysisSize = CGSize(width: sampleWidth, height: sampleHeight)
+        let peakingMask = peaking
+        let zebraMask = zebra
+        
+        Task { @MainActor in
+            if let normalizedHistogram {
+                self.histogramData = normalizedHistogram
+            }
+            self.analysisGridSize = analysisSize
+            self.focusPeakingMask = peakingMask
+            self.zebraMask = zebraMask
         }
     }
 }

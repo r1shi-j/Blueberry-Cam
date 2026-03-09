@@ -6,8 +6,15 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		5BD3EC122F5F6C9400B83A36 /* AGENTS.md in Resources */ = {isa = PBXBuildFile; fileRef = 5BD3EC112F5F6C9400B83A36 /* AGENTS.md */; };
+		5BD3EC142F5F6C9500B83A36 /* Journal.md in Resources */ = {isa = PBXBuildFile; fileRef = 5BD3EC132F5F6C9500B83A36 /* Journal.md */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
 		5B3325092F5C7A3200874430 /* Blueberry Cam.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Blueberry Cam.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		5BD3EC112F5F6C9400B83A36 /* AGENTS.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = AGENTS.md; sourceTree = "<group>"; };
+		5BD3EC132F5F6C9500B83A36 /* Journal.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = Journal.md; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -34,6 +41,8 @@
 			children = (
 				5B33250B2F5C7A3200874430 /* Blueberry Cam */,
 				5B33250A2F5C7A3200874430 /* Products */,
+				5BD3EC112F5F6C9400B83A36 /* AGENTS.md */,
+				5BD3EC132F5F6C9500B83A36 /* Journal.md */,
 			);
 			sourceTree = "<group>";
 		};
@@ -109,6 +118,8 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				5BD3EC122F5F6C9400B83A36 /* AGENTS.md in Resources */,
+				5BD3EC142F5F6C9500B83A36 /* Journal.md in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
