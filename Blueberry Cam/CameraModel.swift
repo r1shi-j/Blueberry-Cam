@@ -13,27 +13,67 @@ class CameraModel: NSObject {
     nonisolated private let photoOutput = AVCapturePhotoOutput()
     nonisolated private let videoOutput = AVCaptureVideoDataOutput()
     nonisolated private let sessionQueue = DispatchQueue(label: "com.rawcam.sessionQueue")
+    nonisolated private let _frameCounter = FrameCounter()
     private let _pendingCaptureModeBox = CaptureModeBox()
     
     // MARK: - Capture format
     var captureMode: CaptureMode = .raw {
-        didSet { if oldValue != captureMode { buildAvailableFormats() } }
+        didSet {
+            if !isAutoExposure && captureMode != .raw {
+                captureMode = .raw
+                return
+            }
+            if oldValue != captureMode {
+                buildAvailableFormats()
+            }
+        }
     }
     var availableFormats: [CaptureMode] = []
+    var flashMode: AVCaptureDevice.FlashMode = .off
     
     // MARK: - Manual controls
     var iso: Float = 100
-    var isAutoExposure: Bool = true
+    var isAutoExposure: Bool = true {
+        didSet {
+            if oldValue != isAutoExposure {
+                enforceExposureModeConstraints()
+            }
+        }
+    }
     var showManualControls: Bool = false
     var showHistogram: Bool = true
-    var showFocusPeaking: Bool = false
+    var showClipping: Bool = false
     var showZebraStripes: Bool = false
+    var isAdjustingManualFocus: Bool = false
     var lensPosition: Float = 1.0
     var isAutoFocus: Bool = true
     private var exposureDebounceTask: Task<Void, Never>?
+    private var focusPeakingHoldTask: Task<Void, Never>?
     
     var supportsManualFocus: Bool {
         device?.isLockingFocusWithCustomLensPositionSupported ?? false
+    }
+    
+    var supportsFlash: Bool {
+        guard device?.hasFlash == true else { return false }
+        return !photoOutput.supportedFlashModes.isEmpty
+    }
+    
+    var isFlashControlEnabled: Bool {
+        supportsFlash && isAutoExposure
+    }
+    
+    var isFormatPickerEnabled: Bool {
+        isAutoExposure
+    }
+    
+    var flashLabel: String {
+        switch flashMode {
+            case .off: return "F OFF"
+            case .auto: return "F AUTO"
+            case .on: return "F ON"
+            @unknown default: return "F ?"
+        }
     }
     
     var minISO: Float = 25
@@ -52,10 +92,15 @@ class CameraModel: NSObject {
     var analysisGridSize: CGSize = .zero
     var focusPeakingMask: [UInt8] = []
     var zebraMask: [UInt8] = []
+    var clippingMask: [UInt8] = []
     var liveISO: Float = 0
     var liveShutter: String = ""
     
     var captureAspectRatio: CGFloat { 3.0 / 4.0 }
+    
+    var shouldShowFocusPeakingOverlay: Bool {
+        !isAutoFocus
+    }
     
     // MARK: - Resolution
     var availableResolutions: [ResolutionOption] = []
@@ -125,6 +170,8 @@ class CameraModel: NSObject {
                 }
                 self.buildAvailableFormats()
                 self.updateDeviceRanges()
+                self.normalizeFlashModeForCurrentDevice()
+                self.enforceExposureModeConstraints()
             }
         }
     }
@@ -176,6 +223,8 @@ class CameraModel: NSObject {
             
             self.buildAvailableFormats()
             self.updateDeviceRanges()
+            self.normalizeFlashModeForCurrentDevice()
+            self.enforceExposureModeConstraints()
             
             if !cam.isLockingFocusWithCustomLensPositionSupported {
                 self.isAutoFocus = true
@@ -254,6 +303,26 @@ class CameraModel: NSObject {
             // keep
         } else {
             selectedResolution = options.last
+        }
+    }
+    
+    private func normalizeFlashModeForCurrentDevice() {
+        guard supportsFlash else {
+            flashMode = .off
+            return
+        }
+        if !photoOutput.supportedFlashModes.contains(flashMode) {
+            flashMode = photoOutput.supportedFlashModes.contains(.auto) ? .auto : .off
+        }
+        if !isAutoExposure {
+            flashMode = .off
+        }
+    }
+    
+    private func enforceExposureModeConstraints() {
+        if !isAutoExposure {
+            flashMode = .off
+            captureMode = .raw
         }
     }
     
@@ -344,6 +413,7 @@ class CameraModel: NSObject {
                    }) ?? photoOutput.availableRawPhotoPixelFormatTypes.first {
                     let s = AVCapturePhotoSettings(rawPixelFormatType: fmt)
                     s.maxPhotoDimensions = dims
+                    applyFlashModeIfSupported(to: s)
                     return s
                 }
                 fallthrough
@@ -351,14 +421,53 @@ class CameraModel: NSObject {
                 if photoOutput.availablePhotoCodecTypes.contains(.hevc) {
                     let s = AVCapturePhotoSettings(format: [AVVideoCodecKey: AVVideoCodecType.hevc])
                     s.maxPhotoDimensions = dims
+                    applyFlashModeIfSupported(to: s)
                     return s
                 }
                 fallthrough
             case .jpeg:
                 let s = AVCapturePhotoSettings()
                 s.maxPhotoDimensions = dims
+                applyFlashModeIfSupported(to: s)
                 return s
         }
+    }
+    
+    private func applyFlashModeIfSupported(to settings: AVCapturePhotoSettings) {
+        guard isAutoExposure else {
+            settings.flashMode = .off
+            return
+        }
+        guard supportsFlash else {
+            settings.flashMode = .off
+            return
+        }
+        if photoOutput.supportedFlashModes.contains(flashMode) {
+            settings.flashMode = flashMode
+        } else {
+            settings.flashMode = .off
+        }
+    }
+    
+    func cycleFlashMode() {
+        guard supportsFlash, isAutoExposure else {
+            flashMode = .off
+            return
+        }
+        
+        let supported = photoOutput.supportedFlashModes
+        let order: [AVCaptureDevice.FlashMode] = [.off, .auto, .on]
+        let currentIndex = order.firstIndex(of: flashMode) ?? 0
+        
+        for offset in 1...order.count {
+            let candidate = order[(currentIndex + offset) % order.count]
+            if supported.contains(candidate) {
+                flashMode = candidate
+                return
+            }
+        }
+        
+        flashMode = .off
     }
     
     func selectResolution(_ opt: ResolutionOption) {
@@ -399,6 +508,7 @@ class CameraModel: NSObject {
     // MARK: - Manual Focus
     func applyManualFocus() {
         guard let d = device else { return }
+        beginManualFocusAdjustment()
         guard d.isLockingFocusWithCustomLensPositionSupported else {
             try? d.lockForConfiguration()
             d.focusMode = .continuousAutoFocus
@@ -413,14 +523,30 @@ class CameraModel: NSObject {
     
     func setAutoFocus() {
         guard let d = device else { return }
+        endManualFocusAdjustment()
         try? d.lockForConfiguration()
         d.focusMode = .continuousAutoFocus
         d.unlockForConfiguration()
     }
     
+    func beginManualFocusAdjustment() {
+        guard !isAutoFocus else { return }
+        focusPeakingHoldTask?.cancel()
+        isAdjustingManualFocus = true
+    }
+    
+    func endManualFocusAdjustment() {
+        focusPeakingHoldTask?.cancel()
+        focusPeakingHoldTask = Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 700_000_000)
+            guard !Task.isCancelled else { return }
+            self.isAdjustingManualFocus = false
+        }
+    }
+    
     func toggleManualControls() { showManualControls.toggle() }
     func toggleHistogram()      { showHistogram.toggle() }
-    func toggleFocusPeaking()   { showFocusPeaking.toggle() }
+    func toggleClipping()      { showClipping.toggle() }
     func toggleZebraStripes()   { showZebraStripes.toggle() }
     
     // MARK: - Naming
@@ -538,7 +664,7 @@ extension CameraModel: AVCaptureVideoDataOutputSampleBufferDelegate {
         
         var hist = [Float](repeating: 0, count: 256)
         var count: Float = 0
-        let step = 8
+        let step = 5
         let sampleWidth = max(1, width / step)
         let sampleHeight = max(1, height / step)
         let sampleCount = sampleWidth * sampleHeight
@@ -586,33 +712,51 @@ extension CameraModel: AVCaptureVideoDataOutputSampleBufferDelegate {
             }
         }
         
-        var peaking = [UInt8](repeating: 0, count: sampleCount)
-        if sampleWidth > 2 && sampleHeight > 2 {
+        // Clipping mask: fully blown highlights (>= 250)
+        var clipping = [UInt8](repeating: 0, count: sampleCount)
+        for i in 0..<sampleCount {
+            clipping[i] = lumaGrid[i] >= 250 ? 1 : 0
+        }
+        
+        // Only compute peaking every 3rd frame to reduce CPU load.
+        let frame = _frameCounter.next()
+        var peaking: [UInt8]? = nil
+        if frame % 3 == 0, sampleWidth > 2, sampleHeight > 2 {
+            var p = [UInt8](repeating: 0, count: sampleCount)
             for y in 1..<(sampleHeight - 1) {
                 for x in 1..<(sampleWidth - 1) {
                     let i = y * sampleWidth + x
+                    let center = lumaGrid[i]
                     let left = lumaGrid[i - 1]
                     let right = lumaGrid[i + 1]
                     let up = lumaGrid[i - sampleWidth]
                     let down = lumaGrid[i + sampleWidth]
-                    let edgeStrength = abs(right - left) + abs(down - up)
-                    peaking[i] = edgeStrength > 36 ? 1 : 0
+                    // Laplacian (second derivative) is the primary focus signal.
+                    // Sharp edges: high Laplacian (abrupt brightness change).
+                    // Blurry edges: near-zero Laplacian (gradual change).
+                    // This naturally gives proportional density — in-focus areas
+                    // produce many high-Laplacian pixels, slightly blurry fewer, very blurry none.
+                    let laplacian = abs(left + right - 2 * center) + abs(up + down - 2 * center)
+                    let gradient = abs(right - left) + abs(down - up)
+                    p[i] = (laplacian > 16 && gradient > 8) ? 1 : 0
                 }
             }
+            peaking = p
         }
         
         let normalizedHistogram: [Float]? = count > 0 ? hist.map { $0 / count } : nil
         let analysisSize = CGSize(width: sampleWidth, height: sampleHeight)
-        let peakingMask = peaking
         let zebraMask = zebra
+        let clipMask = clipping
         
         Task { @MainActor in
             if let normalizedHistogram {
                 self.histogramData = normalizedHistogram
             }
             self.analysisGridSize = analysisSize
-            self.focusPeakingMask = peakingMask
+            if let peaking { self.focusPeakingMask = peaking }
             self.zebraMask = zebraMask
+            self.clippingMask = clipMask
         }
     }
 }
@@ -620,6 +764,12 @@ extension CameraModel: AVCaptureVideoDataOutputSampleBufferDelegate {
 // Simple thread-safe box for passing CaptureMode across isolation boundaries
 final class CaptureModeBox: @unchecked Sendable {
     nonisolated(unsafe) var value: CaptureMode = .jpeg
+}
+
+// Thread-safe frame counter for skipping expensive analysis on alternate frames
+final class FrameCounter: @unchecked Sendable {
+    private var _count: Int = 0
+    func next() -> Int { _count &+= 1; return _count }
 }
 
 // MARK: - ResolutionOption

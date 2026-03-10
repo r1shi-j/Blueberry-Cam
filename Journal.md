@@ -32,6 +32,12 @@ The app runs like a restaurant kitchen:
 - Added live focus peaking and zebra overlays using the video output stream. The trick was to keep it fast: downsample first, then compute simple edge/highlight masks.
 - Gotcha we avoided: doing expensive per-pixel work at full resolution can tank preview smoothness. A coarse analysis grid gives responsive overlays without choking the UI.
 - Bug war story: overlays initially looked “haunted” (zebras in wrong places). Root causes were orientation mismatch at startup and drawing the analysis mask across the whole screen instead of the preview rect. Fixing rotation setup and constraining the overlay to the camera rect snapped indicators back into place.
+- Added flash mode cycling (`OFF -> AUTO -> ON`) with AVFoundation safety checks. Key lesson: always gate requested flash mode against `photoOutput.supportedFlashModes` to avoid invalid capture requests.
+- Added a hard rule for manual exposure mode: force format to RAW and force flash OFF, then disable both controls in UI. This prevents contradictory states where users set ISO/shutter manually but still request processed/flash capture paths.
+- Added “pull focus peaking”: while manually adjusting focus, the app automatically shows peaking highlights (now green) and then fades them shortly after slider release. This mirrors how pro camera apps make focus pulls easier without forcing a persistent overlay.
+- Refined peaking to look less “paint bucket” and more surgical: switched to Sobel-based edge scoring, adaptive thresholding, local-maximum filtering, and tiny dot rendering. Result: fewer false positives and much tighter in-focus indicators, closer to the Halide feel.
+- Follow-up tuning after real-device feedback: peaking now stays visible for the full duration of manual-focus mode (not just slider drag), and thresholding was tightened again using stronger adaptive + relative-to-max gating to cut noisy “everywhere dots.”
+- Additional real-world tuning for blur scenes: increased edge thresholding again and added a cluster filter that drops isolated peaks. This specifically targets false positive “sparkle dots” when the frame is broadly out of focus.
 
 ## 6) Engineer's Wisdom
 - Make invalid states hard to represent: if mode/resolution isn’t supported, remove it from options.

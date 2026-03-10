@@ -1,5 +1,6 @@
 import SwiftUI
 import CoreMedia
+import AVFoundation
 
 struct TopBarView: View {
     @Bindable var cameraModel: CameraModel
@@ -61,6 +62,8 @@ struct TopBarView: View {
                             }
                         }
                     }
+                    .opacity(cameraModel.isFormatPickerEnabled ? 1.0 : 0.45)
+                    .disabled(!cameraModel.isFormatPickerEnabled)
                     .clipShape(RoundedRectangle(cornerRadius: 6))
                     .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.white.opacity(0.2), lineWidth: 1))
                 }
@@ -80,6 +83,29 @@ struct TopBarView: View {
                 .padding(.trailing, 16)
             }
             HStack(alignment: .center, spacing: 12) {
+                // Flash toggle
+                Button {
+                    cameraModel.cycleFlashMode()
+                } label: {
+                    Text(cameraModel.flashLabel)
+                        .font(.system(size: 11, weight: .bold, design: .monospaced))
+                        .foregroundColor(
+                            cameraModel.flashMode == .off || !cameraModel.supportsFlash
+                            ? .white.opacity(0.7)
+                            : .black
+                        )
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 5)
+                        .background(
+                            cameraModel.flashMode == .off || !cameraModel.supportsFlash
+                            ? Color.white.opacity(0.15)
+                            : Color.yellow
+                        )
+                        .clipShape(Capsule())
+                }
+                .opacity(cameraModel.isFlashControlEnabled ? 1.0 : 0.45)
+                .disabled(!cameraModel.isFlashControlEnabled)
+                
                 // Zebra toggle
                 Button {
                     cameraModel.toggleZebraStripes()
@@ -93,16 +119,16 @@ struct TopBarView: View {
                         .clipShape(Capsule())
                 }
                 
-                // Focus peaking toggle
+                // Highlight clipping toggle
                 Button {
-                    cameraModel.toggleFocusPeaking()
+                    cameraModel.toggleClipping()
                 } label: {
                     Text("P")
                         .font(.system(size: 11, weight: .bold, design: .monospaced))
-                        .foregroundColor(cameraModel.showFocusPeaking ? .black : .white.opacity(0.7))
+                        .foregroundColor(cameraModel.showClipping ? .black : .white.opacity(0.7))
                         .padding(.horizontal, 8)
                         .padding(.vertical, 5)
-                        .background(cameraModel.showFocusPeaking ? Color.yellow : Color.white.opacity(0.15))
+                        .background(cameraModel.showClipping ? Color.yellow : Color.white.opacity(0.15))
                         .clipShape(Capsule())
                 }
             }

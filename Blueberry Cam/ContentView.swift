@@ -24,11 +24,21 @@ struct ContentView: View {
                     .position(x: previewRect.midX, y: previewRect.midY)
                 }
                 
-                if cameraModel.showFocusPeaking {
+                if cameraModel.shouldShowFocusPeakingOverlay {
                     AnalysisOverlayView(
                         mask: cameraModel.focusPeakingMask,
                         gridSize: cameraModel.analysisGridSize,
                         style: .focusPeaking
+                    )
+                    .frame(width: previewRect.width, height: previewRect.height)
+                    .position(x: previewRect.midX, y: previewRect.midY)
+                }
+                
+                if cameraModel.showClipping {
+                    AnalysisOverlayView(
+                        mask: cameraModel.clippingMask,
+                        gridSize: cameraModel.analysisGridSize,
+                        style: .clipping
                     )
                     .frame(width: previewRect.width, height: previewRect.height)
                     .position(x: previewRect.midX, y: previewRect.midY)

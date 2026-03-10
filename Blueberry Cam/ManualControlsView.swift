@@ -114,7 +114,13 @@ struct ManualControlsView: View {
                     Slider(value: Binding(
                         get: { 1.0 - cameraModel.lensPosition },
                         set: { cameraModel.lensPosition = 1.0 - $0 }
-                    ), in: 0...1).onChange(of: cameraModel.lensPosition) { _, _ in
+                    ), in: 0...1, onEditingChanged: { editing in
+                        if editing {
+                            cameraModel.beginManualFocusAdjustment()
+                        } else {
+                            cameraModel.endManualFocusAdjustment()
+                        }
+                    }).onChange(of: cameraModel.lensPosition) { _, _ in
                         cameraModel.applyManualFocus()
                     }
                     .tint(.yellow)
