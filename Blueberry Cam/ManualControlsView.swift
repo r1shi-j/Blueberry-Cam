@@ -77,6 +77,28 @@ struct ManualControlsView: View {
                     }
                 }
                 .padding(.horizontal, 20)
+            } else {
+                // EV Compensation (auto exposure only)
+                HStack {
+                    Text("EV")
+                        .font(.system(size: 10, weight: .bold, design: .monospaced))
+                        .foregroundColor(.white.opacity(0.5))
+                        .tracking(2)
+                        .frame(width: 60, alignment: .leading)
+                    Slider(
+                        value: $cameraModel.exposureBias,
+                        in: -4.0...4.0,
+                        step: 0.1
+                    ).onChange(of: cameraModel.exposureBias) { _, _ in
+                        cameraModel.applyExposureBias()
+                    }
+                    .tint(.yellow)
+                    Text(String(format: "%+.1f", cameraModel.exposureBias))
+                        .font(.system(size: 12, weight: .medium, design: .monospaced))
+                        .foregroundColor(.yellow)
+                        .frame(width: 50, alignment: .trailing)
+                }
+                .padding(.horizontal, 20)
             }
                         
             Divider()

@@ -55,10 +55,22 @@ struct ContentView: View {
                     Spacer()
                     
                     if cameraModel.showHistogram {
-                        HistogramView(data: cameraModel.histogramData)
-                            .frame(height: 60)
-                            .padding(.horizontal, 20)
-                            .padding(.bottom, 8)
+                        HistogramView(
+                            mode: cameraModel.histogramMode,
+                            lumaData: cameraModel.histogramData,
+                            redData: cameraModel.redHistogram,
+                            greenData: cameraModel.greenHistogram,
+                            blueData: cameraModel.blueHistogram,
+                            waveformData: cameraModel.waveformData,
+                            waveformCols: cameraModel.waveformCols,
+                            waveformRows: cameraModel.waveformRows
+                        )
+                        .frame(height: 60)
+                        .padding(.horizontal, 20)
+                        .padding(.bottom, 8)
+                        .onTapGesture {
+                            cameraModel.cycleHistogramMode()
+                        }
                     }
                     
                     if cameraModel.showManualControls {

@@ -47,6 +47,9 @@ class CameraModel: NSObject {
     var isAdjustingManualFocus: Bool = false
     var lensPosition: Float = 1.0
     var isAutoFocus: Bool = true
+    var exposureBias: Float = 0.0
+    var minExposureBias: Float = -8.0
+    var maxExposureBias: Float = 8.0
     private var exposureDebounceTask: Task<Void, Never>?
     private var focusPeakingHoldTask: Task<Void, Never>?
     
@@ -89,6 +92,13 @@ class CameraModel: NSObject {
     var saveMessage: String = ""
     var errorMessage: String = ""
     var histogramData: [Float] = Array(repeating: 0, count: 256)
+    var redHistogram: [Float] = Array(repeating: 0, count: 256)
+    var greenHistogram: [Float] = Array(repeating: 0, count: 256)
+    var blueHistogram: [Float] = Array(repeating: 0, count: 256)
+    var waveformData: [Float] = []
+    var waveformCols: Int = 128
+    var waveformRows: Int = 64
+    var histogramMode: HistogramMode = .luminance
     var analysisGridSize: CGSize = .zero
     var focusPeakingMask: [UInt8] = []
     var zebraMask: [UInt8] = []
@@ -340,6 +350,8 @@ class CameraModel: NSObject {
         
         liveISO = d.iso
         liveShutter = Self.formatShutter(d.exposureDuration)
+        minExposureBias = d.minExposureTargetBias
+        maxExposureBias = d.maxExposureTargetBias
     }
     
     private func generateShutterStops(for device: AVCaptureDevice) -> [CMTime] {
@@ -503,6 +515,15 @@ class CameraModel: NSObject {
         try? d.lockForConfiguration()
         d.exposureMode = .continuousAutoExposure
         d.unlockForConfiguration()
+        applyExposureBias()
+    }
+    
+    func applyExposureBias() {
+        guard let d = device else { return }
+        let clamped = max(minExposureBias, min(maxExposureBias, exposureBias))
+        try? d.lockForConfiguration()
+        d.setExposureTargetBias(clamped, completionHandler: nil)
+        d.unlockForConfiguration()
     }
     
     // MARK: - Manual Focus
@@ -548,6 +569,13 @@ class CameraModel: NSObject {
     func toggleHistogram()      { showHistogram.toggle() }
     func toggleClipping()      { showClipping.toggle() }
     func toggleZebraStripes()   { showZebraStripes.toggle() }
+    func cycleHistogramMode()   {
+        switch histogramMode {
+        case .luminance: histogramMode = .color
+        case .color:     histogramMode = .waveform
+        case .waveform:  histogramMode = .luminance
+        }
+    }
     
     // MARK: - Naming
     private func nextImageName() -> String {
@@ -663,6 +691,9 @@ extension CameraModel: AVCaptureVideoDataOutputSampleBufferDelegate {
         let height = CVPixelBufferGetHeight(pixelBuffer)
         
         var hist = [Float](repeating: 0, count: 256)
+        var rHist = [Float](repeating: 0, count: 256)
+        var gHist = [Float](repeating: 0, count: 256)
+        var bHist = [Float](repeating: 0, count: 256)
         var count: Float = 0
         let step = 5
         let sampleWidth = max(1, width / step)
@@ -671,28 +702,35 @@ extension CameraModel: AVCaptureVideoDataOutputSampleBufferDelegate {
         var lumaGrid = [Float](repeating: 0, count: sampleCount)
         var zebra = [UInt8](repeating: 0, count: sampleCount)
         
-        let readLuma: (Int, Int) -> Float
+        // Waveform: 128 columns × 64 brightness bins
+        let wfCols = 128
+        let wfRows = 64
+        var waveform = [Float](repeating: 0, count: wfCols * wfRows)
+        
+        let readPixel: (Int, Int) -> (Float, Float, Float, Float) // r, g, b, luma
         if pixelFormat == kCVPixelFormatType_32BGRA {
             let bytesPerRow = CVPixelBufferGetBytesPerRow(pixelBuffer)
             guard let base = CVPixelBufferGetBaseAddress(pixelBuffer) else { return }
-            readLuma = { x, y in
+            readPixel = { x, y in
                 let row = base.advanced(by: y * bytesPerRow).assumingMemoryBound(to: UInt8.self)
                 let offset = x * 4
                 let b = Float(row[offset])
                 let g = Float(row[offset + 1])
                 let r = Float(row[offset + 2])
-                return (0.299 * r) + (0.587 * g) + (0.114 * b)
+                let luma = (0.299 * r) + (0.587 * g) + (0.114 * b)
+                return (r, g, b, luma)
             }
         } else if CVPixelBufferIsPlanar(pixelBuffer), CVPixelBufferGetPlaneCount(pixelBuffer) > 0 {
             let yWidth = CVPixelBufferGetWidthOfPlane(pixelBuffer, 0)
             let yHeight = CVPixelBufferGetHeightOfPlane(pixelBuffer, 0)
             let yBytesPerRow = CVPixelBufferGetBytesPerRowOfPlane(pixelBuffer, 0)
             guard let yBase = CVPixelBufferGetBaseAddressOfPlane(pixelBuffer, 0) else { return }
-            readLuma = { x, y in
+            readPixel = { x, y in
                 let sampleX = min(yWidth - 1, x)
                 let sampleY = min(yHeight - 1, y)
                 let row = yBase.advanced(by: sampleY * yBytesPerRow).assumingMemoryBound(to: UInt8.self)
-                return Float(row[sampleX])
+                let luma = Float(row[sampleX])
+                return (luma, luma, luma, luma)
             }
         } else {
             return
@@ -702,13 +740,22 @@ extension CameraModel: AVCaptureVideoDataOutputSampleBufferDelegate {
             let y = min(height - 1, sy * step)
             for sx in 0..<sampleWidth {
                 let pixelX = min(width - 1, sx * step)
-                let lumaValue = readLuma(pixelX, y)
+                let (r, g, b, lumaValue) = readPixel(pixelX, y)
                 let idx = sy * sampleWidth + sx
                 lumaGrid[idx] = lumaValue
                 zebra[idx] = lumaValue >= 235 ? 1 : 0
+                
                 let luma = Int(lumaValue)
                 hist[min(luma, 255)] += 1
+                rHist[min(Int(r), 255)] += 1
+                gHist[min(Int(g), 255)] += 1
+                bHist[min(Int(b), 255)] += 1
                 count += 1
+                
+                // Waveform: map pixel X to waveform column, luma to row
+                let wfCol = min(wfCols - 1, pixelX * wfCols / max(width, 1))
+                let wfRow = min(wfRows - 1, Int(lumaValue) * wfRows / 256)
+                waveform[wfRow * wfCols + wfCol] += 1
             }
         }
         
@@ -731,11 +778,6 @@ extension CameraModel: AVCaptureVideoDataOutputSampleBufferDelegate {
                     let right = lumaGrid[i + 1]
                     let up = lumaGrid[i - sampleWidth]
                     let down = lumaGrid[i + sampleWidth]
-                    // Laplacian (second derivative) is the primary focus signal.
-                    // Sharp edges: high Laplacian (abrupt brightness change).
-                    // Blurry edges: near-zero Laplacian (gradual change).
-                    // This naturally gives proportional density — in-focus areas
-                    // produce many high-Laplacian pixels, slightly blurry fewer, very blurry none.
                     let laplacian = abs(left + right - 2 * center) + abs(up + down - 2 * center)
                     let gradient = abs(right - left) + abs(down - up)
                     p[i] = (laplacian > 16 && gradient > 8) ? 1 : 0
@@ -744,17 +786,29 @@ extension CameraModel: AVCaptureVideoDataOutputSampleBufferDelegate {
             peaking = p
         }
         
-        let normalizedHistogram: [Float]? = count > 0 ? hist.map { $0 / count } : nil
+        let normalizedHist: [Float]? = count > 0 ? hist.map { $0 / count } : nil
+        let normR = count > 0 ? rHist.map { $0 / count } : nil
+        let normG = count > 0 ? gHist.map { $0 / count } : nil
+        let normB = count > 0 ? bHist.map { $0 / count } : nil
+        let wfMax = waveform.max() ?? 1
+        let normWaveform = wfMax > 0 ? waveform.map { $0 / wfMax } : waveform
         let analysisSize = CGSize(width: sampleWidth, height: sampleHeight)
+        let peakingMask = peaking
         let zebraMask = zebra
         let clipMask = clipping
         
         Task { @MainActor in
-            if let normalizedHistogram {
-                self.histogramData = normalizedHistogram
+            if let normalizedHist {
+                self.histogramData = normalizedHist
             }
+            if let normR { self.redHistogram = normR }
+            if let normG { self.greenHistogram = normG }
+            if let normB { self.blueHistogram = normB }
+            self.waveformData = normWaveform
+            self.waveformCols = wfCols
+            self.waveformRows = wfRows
             self.analysisGridSize = analysisSize
-            if let peaking { self.focusPeakingMask = peaking }
+            if let peakingMask { self.focusPeakingMask = peakingMask }
             self.zebraMask = zebraMask
             self.clippingMask = clipMask
         }
@@ -768,8 +822,9 @@ final class CaptureModeBox: @unchecked Sendable {
 
 // Thread-safe frame counter for skipping expensive analysis on alternate frames
 final class FrameCounter: @unchecked Sendable {
-    private var _count: Int = 0
-    func next() -> Int { _count &+= 1; return _count }
+    nonisolated(unsafe) private var _count: Int = 0
+    nonisolated init() {}
+    nonisolated func next() -> Int { _count &+= 1; return _count }
 }
 
 // MARK: - ResolutionOption
@@ -829,4 +884,10 @@ enum Lens: String, CaseIterable {
             default:      return 1.0
         }
     }
+}
+
+enum HistogramMode: String, CaseIterable {
+    case luminance = "LUMA"
+    case color = "RGB"
+    case waveform = "WAVE"
 }
