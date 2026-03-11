@@ -21,6 +21,7 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
     private var evControl: AVCaptureSlider?
     private var isoControl: AVCaptureSlider?
     private var ssControl: AVCaptureIndexPicker?
+    private var wbControl: AVCaptureSlider?
     /// Prevents Camera Control action callbacks from overwriting properties when we set ctrl.value programmatically
     private var isUpdatingHardwareControl = false
     
@@ -58,6 +59,25 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
     var isAdjustingManualFocus: Bool = false
     var lensPosition: Float = 1.0
     var isAutoFocus: Bool = true
+    var isAutoWhiteBalance: Bool = true {
+        didSet {
+            if oldValue != isAutoWhiteBalance {
+                if isAutoWhiteBalance { setAutoWhiteBalance() }
+                else { applyManualWhiteBalance() }
+                updateCameraControlsMode()
+            }
+        }
+    }
+    var whiteBalanceTargetKelvin: Float = 5000 {
+        didSet {
+            if oldValue != whiteBalanceTargetKelvin {
+                if !isAutoWhiteBalance {
+                    applyManualWhiteBalance()
+                }
+                syncWBToHardware()
+            }
+        }
+    }
     var exposureBias: Float = 0.0 {
         didSet {
             if oldValue != exposureBias {
@@ -599,6 +619,40 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
         }
     }
     
+    // MARK: - White Balance
+    func applyManualWhiteBalance() {
+        guard let d = device else { return }
+        try? d.lockForConfiguration()
+        applyManualWhiteBalanceLocked()
+        d.unlockForConfiguration()
+    }
+    
+    private func applyManualWhiteBalanceLocked() {
+        guard let d = device else { return }
+        // Expanded bounding from 2000K (very cool/blue) to 10000K (very warm/orange)
+        let kelvin = max(2000, min(10000, whiteBalanceTargetKelvin))
+        let tempAndTint = AVCaptureDevice.WhiteBalanceTemperatureAndTintValues(temperature: kelvin, tint: 0)
+        let rawGains = d.deviceWhiteBalanceGains(for: tempAndTint)
+        
+        let maxGain = d.maxWhiteBalanceGain
+        let clampedGains = AVCaptureDevice.WhiteBalanceGains(
+            redGain: max(1.0, min(maxGain, rawGains.redGain)),
+            greenGain: max(1.0, min(maxGain, rawGains.greenGain)),
+            blueGain: max(1.0, min(maxGain, rawGains.blueGain))
+        )
+        
+        d.setWhiteBalanceModeLocked(with: clampedGains, completionHandler: nil)
+    }
+    
+    func setAutoWhiteBalance() {
+        guard let d = device else { return }
+        try? d.lockForConfiguration()
+        if d.isWhiteBalanceModeSupported(.continuousAutoWhiteBalance) {
+            d.whiteBalanceMode = .continuousAutoWhiteBalance
+        }
+        d.unlockForConfiguration()
+    }
+    
     func setAutoExposure() {
         guard let d = device else { return }
         try? d.lockForConfiguration()
@@ -1022,6 +1076,20 @@ extension CameraModel {
             session.addControl(ssPicker)
         }
         
+        // White Balance Slider
+        let wb = AVCaptureSlider("WB", symbolName: "thermometer.sun.fill", in: 2000...10000, step: 100)
+        wb.localizedValueFormat = "%@K"
+        wb.value = whiteBalanceTargetKelvin
+        wb.setActionQueue(.main) { [weak self] value in
+            guard let self, !self.isUpdatingHardwareControl else { return }
+            if abs(self.whiteBalanceTargetKelvin - value) > 10 {
+                self.whiteBalanceTargetKelvin = value
+                // Setting whiteBalanceTargetKelvin triggers applyManualWhiteBalance() via didSet if manual WB
+            }
+        }
+        self.wbControl = wb
+        session.addControl(wb)
+        
         updateCameraControlsMode()
     }
     
@@ -1029,6 +1097,7 @@ extension CameraModel {
         evControl?.isEnabled = isAutoExposure
         isoControl?.isEnabled = !isAutoExposure
         ssControl?.isEnabled = !isAutoExposure
+        wbControl?.isEnabled = !isAutoWhiteBalance
     }
     
     // MARK: - Bidirectional Sync Helpers
@@ -1042,6 +1111,16 @@ extension CameraModel {
         if abs(ctrl.value - final) > 0.1 {
             isUpdatingHardwareControl = true
             ctrl.value = final
+            isUpdatingHardwareControl = false
+        }
+    }
+    
+    private func syncWBToHardware() {
+        guard let ctrl = wbControl else { return }
+        let clamped = max(2000, min(10000, whiteBalanceTargetKelvin))
+        if abs(ctrl.value - clamped) > 1.0 {
+            isUpdatingHardwareControl = true
+            ctrl.value = clamped
             isUpdatingHardwareControl = false
         }
     }

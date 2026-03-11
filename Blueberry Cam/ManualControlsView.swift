@@ -131,7 +131,7 @@ struct ManualControlsView: View {
             
             if !cameraModel.isAutoFocus {
                 HStack {
-                    Text("FOCUS")
+                    Text("")
                         .font(.system(size: 10, weight: .bold, design: .monospaced))
                         .foregroundColor(.white.opacity(0.5))
                         .tracking(2)
@@ -153,6 +153,47 @@ struct ManualControlsView: View {
                         .font(.system(size: 12, weight: .medium, design: .monospaced))
                         .foregroundColor(.yellow)
                         .frame(width: 50, alignment: .trailing)
+                }
+                .padding(.horizontal, 20)
+            }
+            
+            Divider()
+                .background(Color.white.opacity(0.1))
+                .padding(.horizontal, 20)
+            
+            // White Balance header + toggle
+            HStack {
+                Text("WHITE BALANCE")
+                    .font(.system(size: 10, weight: .bold, design: .monospaced))
+                    .foregroundColor(.white.opacity(0.5))
+                    .tracking(2)
+                Spacer()
+                Toggle("", isOn: $cameraModel.isAutoWhiteBalance)
+                    .labelsHidden()
+                    .tint(.yellow)
+                Text(cameraModel.isAutoWhiteBalance ? "AUTO" : "MANUAL")
+                    .font(.system(size: 10, weight: .bold, design: .monospaced))
+                    .foregroundColor(cameraModel.isAutoWhiteBalance ? .yellow : .white)
+            }
+            .padding(.horizontal, 20)
+            
+            if !cameraModel.isAutoWhiteBalance {
+                HStack {
+                    Text("")
+                        .font(.system(size: 10, weight: .bold, design: .monospaced))
+                        .foregroundColor(.white.opacity(0.5))
+                        .tracking(2)
+                        .frame(width: 60, alignment: .leading)
+                    Slider(
+                        value: $cameraModel.whiteBalanceTargetKelvin,
+                        in: 2000...10000,
+                        step: 100
+                    )
+                    .tint(.yellow)
+                    Text("\(Int(cameraModel.whiteBalanceTargetKelvin))K")
+                        .font(.system(size: 12, weight: .medium, design: .monospaced))
+                        .foregroundColor(.yellow)
+                        .frame(width: 65, alignment: .trailing)
                 }
                 .padding(.horizontal, 20)
             }
