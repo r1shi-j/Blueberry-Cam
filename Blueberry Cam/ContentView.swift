@@ -11,8 +11,10 @@ struct ContentView: View {
                 Color.black.ignoresSafeArea()
                 
                 // MARK: - Viewfinder (resizeAspect — matches exact capture FOV)
-                CameraPreviewView(session: cameraModel.session)
-                    .ignoresSafeArea()
+                CameraPreviewView(session: cameraModel.session) {
+                    cameraModel.capturePhoto()
+                }
+                .ignoresSafeArea()
                 
                 if cameraModel.showZebraStripes {
                     AnalysisOverlayView(

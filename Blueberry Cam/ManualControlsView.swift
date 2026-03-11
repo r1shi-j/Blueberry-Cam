@@ -51,7 +51,8 @@ struct ManualControlsView: View {
                 }
                 .padding(.horizontal, 20)
                 
-                // Shutter Speed
+                // Shutter Speed — stop-based (fastest on left, slowest on right)
+                // shutterSpeeds[0] = fastest, [count-1] = slowest → equal spacing per photographic stop
                 VStack(spacing: 4) {
                     HStack {
                         Text("SHUTTER")
@@ -62,18 +63,20 @@ struct ManualControlsView: View {
                         Slider(
                             value: Binding(
                                 get: { Double(cameraModel.shutterIndex) },
-                                set: { cameraModel.shutterIndex = Int($0) }
+                                set: {
+                                    cameraModel.manualShutterDenominator = 0   // use stop-based path
+                                    cameraModel.shutterIndex = Int($0)
+                                    cameraModel.applyManualExposure()
+                                }
                             ),
-                            in: 0...Double(cameraModel.shutterSpeeds.count - 1),
+                            in: 0...Double(max(0, cameraModel.shutterSpeeds.count - 1)),
                             step: 1
-                        ).onChange(of: cameraModel.shutterIndex) { _, _ in
-                            cameraModel.applyManualExposure()
-                        }
+                        )
                         .tint(.yellow)
                         Text(shutterLabel)
                             .font(.system(size: 12, weight: .medium, design: .monospaced))
                             .foregroundColor(.yellow)
-                            .frame(width: 50, alignment: .trailing)
+                            .frame(width: 65, alignment: .trailing)
                     }
                 }
                 .padding(.horizontal, 20)
@@ -168,7 +171,11 @@ struct ManualControlsView: View {
     }
     
     private var shutterLabel: String {
-        guard cameraModel.shutterSpeeds.indices.contains(cameraModel.shutterIndex) else { return "--" }
-        return CameraModel.formatShutter(cameraModel.shutterSpeeds[cameraModel.shutterIndex])
+        let denom = cameraModel.manualShutterDenominator
+        if denom <= 0 {
+            guard cameraModel.shutterSpeeds.indices.contains(cameraModel.shutterIndex) else { return "--" }
+            return CameraModel.formatShutter(cameraModel.shutterSpeeds[cameraModel.shutterIndex])
+        }
+        return "1/\(denom)"
     }
 }

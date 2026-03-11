@@ -1,12 +1,15 @@
 import SwiftUI
 import AVFoundation
+import AVKit
 
 struct CameraPreviewView: UIViewRepresentable {
     let session: AVCaptureSession
+    let onCapture: () -> Void
     
     func makeUIView(context: Context) -> PreviewUIView {
         let view = PreviewUIView()
         view.session = session
+        view.onCapture = onCapture
         return view
     }
     
@@ -15,6 +18,9 @@ struct CameraPreviewView: UIViewRepresentable {
 
 final class PreviewUIView: UIView {
     override class var layerClass: AnyClass { AVCaptureVideoPreviewLayer.self }
+    
+    var onCapture: (() -> Void)?
+    private var eventInteraction: AVCaptureEventInteraction?
     
     var previewLayer: AVCaptureVideoPreviewLayer {
         layer as! AVCaptureVideoPreviewLayer
@@ -25,6 +31,19 @@ final class PreviewUIView: UIView {
         set {
             previewLayer.session = newValue
             previewLayer.videoGravity = .resizeAspect
+            setupInteraction()
+        }
+    }
+    
+    private func setupInteraction() {
+        if eventInteraction == nil {
+            let interaction = AVCaptureEventInteraction { [weak self] event in
+                if event.phase == .ended {
+                    self?.onCapture?()
+                }
+            }
+            addInteraction(interaction)
+            eventInteraction = interaction
         }
     }
 }
