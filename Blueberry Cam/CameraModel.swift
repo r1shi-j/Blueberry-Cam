@@ -3,6 +3,7 @@ import SwiftUI
 import Photos
 import ImageIO
 import UniformTypeIdentifiers
+import CoreLocation
 
 @MainActor @Observable
 class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
@@ -188,6 +189,11 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
     var liveWB: String = ""
     var liveFocus: String = ""
     
+    // MARK: - Location
+    private let locationManager = CLLocationManager()
+    private var currentLocation: CLLocation?
+    private var shouldEmbedLocationData: Bool = false
+    
     var captureAspectRatio: CGFloat { 3.0 / 4.0 }
     
     var shouldShowFocusPeakingOverlay: Bool {
@@ -200,6 +206,13 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
     
     // MARK: - Configure
     func configure() {
+        if shouldEmbedLocationData {
+            locationManager.delegate = self
+            locationManager.desiredAccuracy = kCLLocationAccuracyBest
+            locationManager.requestWhenInUseAuthorization()
+            locationManager.startUpdatingLocation()
+        }
+        
         switch AVCaptureDevice.authorizationStatus(for: .video) {
             case .authorized:
                 sessionQueue.async { Task { @MainActor in self.setupSession() } }
@@ -777,10 +790,13 @@ extension CameraModel: AVCapturePhotoCaptureDelegate {
             return
         }
         let isHeif = !photo.isRawPhoto && self._pendingCaptureModeBox.value == .heif
-        saveToPhotos(data: data, isDNG: photo.isRawPhoto, isHEIF: isHeif)
+        Task {
+            let loc = await MainActor.run { self.currentLocation }
+            self.saveToPhotos(data: data, location: loc, isDNG: photo.isRawPhoto, isHEIF: isHeif)
+        }
     }
     
-    private nonisolated func saveToPhotos(data: Data, isDNG: Bool, isHEIF: Bool = false) {
+    private nonisolated func saveToPhotos(data: Data, location: CLLocation?, isDNG: Bool, isHEIF: Bool = false) {
         PHPhotoLibrary.requestAuthorization(for: .addOnly) { status in
             guard status == .authorized || status == .limited else {
                 Task { @MainActor in self.errorMessage = "Photos access denied."; self.showError = true }
@@ -790,7 +806,11 @@ extension CameraModel: AVCapturePhotoCaptureDelegate {
             PHPhotoLibrary.shared().performChanges({
                 let opts = PHAssetResourceCreationOptions()
                 opts.uniformTypeIdentifier = isDNG ? "com.adobe.raw-image" : "public.jpeg"
-                PHAssetCreationRequest.forAsset().addResource(with: .photo, data: data, options: isDNG ? opts : nil)
+                let req = PHAssetCreationRequest.forAsset()
+                if let loc = location {
+                    req.location = loc
+                }
+                req.addResource(with: .photo, data: data, options: isDNG ? opts : nil)
             }) { success, error in
                 Task { @MainActor in
                     if !success {
@@ -1230,6 +1250,13 @@ extension CameraModel {
     
     func sessionControlsDidBecomeInactive(_ session: AVCaptureSession) {
         // Called when the controls become inactive.
+    }
+}
+
+// MARK: - CLLocationManagerDelegate
+extension CameraModel: CLLocationManagerDelegate {
+    func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
+        currentLocation = locations.last
     }
 }
 
