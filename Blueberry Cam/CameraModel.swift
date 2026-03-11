@@ -669,14 +669,6 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
         case .waveform:  histogramMode = .luminance
         }
     }
-    
-    // MARK: - Naming
-    private func nextImageName() -> String {
-        let key = "com.rawcam.imgCounter"
-        let next = UserDefaults.standard.integer(forKey: key) + 1
-        UserDefaults.standard.set(next, forKey: key)
-        return String(format: "IMG_%04d", next)
-    }
 }
 
 // MARK: - AVCapturePhotoCaptureDelegate
@@ -704,56 +696,15 @@ extension CameraModel: AVCapturePhotoCaptureDelegate {
                 return
             }
             
-            if isDNG {
-                let sem = DispatchSemaphore(value: 0)
-                nonisolated(unsafe) var imgName = "IMG_0000"
+            PHPhotoLibrary.shared().performChanges({
+                let opts = PHAssetResourceCreationOptions()
+                opts.uniformTypeIdentifier = isDNG ? "com.adobe.raw-image" : "public.jpeg"
+                PHAssetCreationRequest.forAsset().addResource(with: .photo, data: data, options: isDNG ? opts : nil)
+            }) { success, error in
                 Task { @MainActor in
-                    imgName = self.nextImageName()
-                    sem.signal()
-                }
-                sem.wait()
-                
-                let url = FileManager.default.temporaryDirectory
-                    .appendingPathComponent(imgName)
-                    .appendingPathExtension("dng")
-                
-                do { try data.write(to: url) } catch {
-                    Task { @MainActor in
-                        self.errorMessage = "Failed to write DNG: \(error.localizedDescription)"
+                    if !success {
+                        self.errorMessage = error?.localizedDescription ?? "Unknown save error."
                         self.showError = true
-                    }
-                    return
-                }
-                
-                PHPhotoLibrary.shared().performChanges({
-                    let req = PHAssetCreationRequest.forAsset()
-                    let opts = PHAssetResourceCreationOptions()
-                    opts.shouldMoveFile = true
-                    req.addResource(with: .photo, fileURL: url, options: opts)
-                }) { success, error in
-                    try? FileManager.default.removeItem(at: url)
-                    Task { @MainActor in
-                        if success {
-                            self.saveMessage = "RAW DNG saved to Photos."
-                            self.showSaveAlert = true
-                        } else {
-                            self.errorMessage = error?.localizedDescription ?? "Unknown save error."
-                            self.showError = true
-                        }
-                    }
-                }
-            } else {
-                PHPhotoLibrary.shared().performChanges({
-                    PHAssetCreationRequest.forAsset().addResource(with: .photo, data: data, options: nil)
-                }) { success, error in
-                    Task { @MainActor in
-                        if success {
-                            self.saveMessage = isHEIF ? "HEIF saved to Photos." : "JPEG saved to Photos."
-                            self.showSaveAlert = true
-                        } else {
-                            self.errorMessage = error?.localizedDescription ?? "Unknown save error."
-                            self.showError = true
-                        }
                     }
                 }
             }
