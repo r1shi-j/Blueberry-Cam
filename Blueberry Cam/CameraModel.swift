@@ -22,6 +22,7 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
     private var isoControl: AVCaptureSlider?
     private var ssControl: AVCaptureIndexPicker?
     private var wbControl: AVCaptureSlider?
+    private var focusControl: AVCaptureSlider?
     /// Prevents Camera Control action callbacks from overwriting properties when we set ctrl.value programmatically
     private var isUpdatingHardwareControl = false
     
@@ -47,6 +48,18 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
     var isAutoExposure: Bool = true {
         didSet {
             if oldValue != isAutoExposure {
+                if !isAutoExposure, let d = device {
+                    let currentISO = d.iso
+                    let currentDur = d.exposureDuration
+                    let snappedISO = round(currentISO / 50.0) * 50.0
+                    self.iso = max(minISO, min(maxISO, snappedISO))
+                    if let closestIdx = shutterSpeeds.indices.min(by: {
+                        abs(CMTimeGetSeconds(shutterSpeeds[$0]) - CMTimeGetSeconds(currentDur)) <
+                            abs(CMTimeGetSeconds(shutterSpeeds[$1]) - CMTimeGetSeconds(currentDur))
+                    }) {
+                        self.shutterIndex = closestIdx
+                    }
+                }
                 enforceExposureModeConstraints()
                 updateCameraControlsMode()
             }
@@ -57,13 +70,35 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
     var showClipping: Bool = false
     var showZebraStripes: Bool = false
     var isAdjustingManualFocus: Bool = false
-    var lensPosition: Float = 1.0
-    var isAutoFocus: Bool = true
+    var lensPosition: Float = 1.0 {
+        didSet {
+            if oldValue != lensPosition {
+                syncFocusToHardware()
+            }
+        }
+    }
+    var isAutoFocus: Bool = true {
+        didSet {
+            if oldValue != isAutoFocus {
+                if !isAutoFocus, let d = device {
+                    self.lensPosition = d.lensPosition
+                }
+                updateCameraControlsMode()
+            }
+        }
+    }
     var isAutoWhiteBalance: Bool = true {
         didSet {
             if oldValue != isAutoWhiteBalance {
-                if isAutoWhiteBalance { setAutoWhiteBalance() }
-                else { applyManualWhiteBalance() }
+                if isAutoWhiteBalance { 
+                    setAutoWhiteBalance() 
+                } else { 
+                    if let d = device {
+                        let tnt = d.temperatureAndTintValues(for: d.deviceWhiteBalanceGains)
+                        self.whiteBalanceTargetKelvin = tnt.temperature
+                    }
+                    applyManualWhiteBalance() 
+                }
                 updateCameraControlsMode()
             }
         }
@@ -150,6 +185,8 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
     var clippingMask: [UInt8] = []
     var liveISO: Float = 0
     var liveShutter: String = ""
+    var liveWB: String = ""
+    var liveFocus: String = ""
     
     var captureAspectRatio: CGFloat { 3.0 / 4.0 }
     
@@ -778,6 +815,9 @@ extension CameraModel: AVCaptureVideoDataOutputSampleBufferDelegate {
             if let d = self.device {
                 self.liveISO = d.iso
                 self.liveShutter = Self.formatShutter(d.exposureDuration)
+                let tnt = d.temperatureAndTintValues(for: d.deviceWhiteBalanceGains)
+                self.liveWB = "\(Int(tnt.temperature))K"
+                self.liveFocus = String(format: "%.2f", d.lensPosition)
             }
         }
         
@@ -1001,7 +1041,7 @@ extension CameraModel {
             AVCaptureDevice.default(len.deviceType, for: .video, position: len.position) != nil
         }
         if !availableLenses.isEmpty {
-            let titles = availableLenses.map { $0.label }
+            let titles = availableLenses.map { "\($0.label)x" }
             let picker = AVCaptureIndexPicker("Cameras", symbolName: "camera.aperture", localizedIndexTitles: titles)
             picker.setActionQueue(.main) { [weak self] index in
                 guard let self else { return }
@@ -1056,7 +1096,7 @@ extension CameraModel {
         // This solves both the negative sign formatting limitations of AVCaptureSlider
         // and ensures we only select valid stops for the current camera.
         if shutterSpeeds.count > 0 {
-            let ssPicker = AVCaptureIndexPicker("Shutter", symbolName: "lightspectrum.horizontal", numberOfIndexes: shutterSpeeds.count) { [weak self] index in
+            let ssPicker = AVCaptureIndexPicker("Shutter Speed", symbolName: "lightspectrum.horizontal", numberOfIndexes: shutterSpeeds.count) { [weak self] index in
                 guard let self else { return "" }
                 guard index >= 0 && index < self.shutterSpeeds.count else { return "" }
                 return Self.formatShutter(self.shutterSpeeds[index])
@@ -1076,8 +1116,24 @@ extension CameraModel {
             session.addControl(ssPicker)
         }
         
+        // Focus Slider
+        // Trick: slider runs 0...100 so iOS formats it as whole numbers, and we prefix with "0."
+        let focus = AVCaptureSlider("Focus", symbolName: "scope", in: 0...100, step: 1)
+        focus.localizedValueFormat = "0.%@"
+        focus.value = Float(lensPosition * 100.0)
+        focus.setActionQueue(.main) { [weak self] value in
+            guard let self, !self.isUpdatingHardwareControl else { return }
+            let normalized = value / 100.0
+            if abs(self.lensPosition - normalized) > 0.01 {
+                self.lensPosition = normalized
+                self.applyManualFocus()
+            }
+        }
+        self.focusControl = focus
+        session.addControl(focus)
+        
         // White Balance Slider
-        let wb = AVCaptureSlider("WB", symbolName: "thermometer.sun.fill", in: 2000...10000, step: 100)
+        let wb = AVCaptureSlider("White Balance", symbolName: "thermometer.sun.fill", in: 2000...10000, step: 100)
         wb.localizedValueFormat = "%@K"
         wb.value = whiteBalanceTargetKelvin
         wb.setActionQueue(.main) { [weak self] value in
@@ -1089,7 +1145,7 @@ extension CameraModel {
         }
         self.wbControl = wb
         session.addControl(wb)
-        
+           
         updateCameraControlsMode()
     }
     
@@ -1097,10 +1153,22 @@ extension CameraModel {
         evControl?.isEnabled = isAutoExposure
         isoControl?.isEnabled = !isAutoExposure
         ssControl?.isEnabled = !isAutoExposure
+        focusControl?.isEnabled = !isAutoFocus
         wbControl?.isEnabled = !isAutoWhiteBalance
     }
     
     // MARK: - Bidirectional Sync Helpers
+    private func syncEVToHardware() {
+        guard let ctrl = evControl else { return }
+        let clamped = max(-4.0, min(4.0, exposureBias))
+        let snapped = round(clamped * 10.0) / 10.0
+        if abs(ctrl.value - snapped) > 0.01 {
+            isUpdatingHardwareControl = true
+            ctrl.value = snapped
+            isUpdatingHardwareControl = false
+        }
+    }
+    
     private func syncISOToHardware() {
         guard let ctrl = isoControl else { return }
         let raw = max(minISO, min(maxISO, iso))
@@ -1115,16 +1183,6 @@ extension CameraModel {
         }
     }
     
-    private func syncWBToHardware() {
-        guard let ctrl = wbControl else { return }
-        let clamped = max(2000, min(10000, whiteBalanceTargetKelvin))
-        if abs(ctrl.value - clamped) > 1.0 {
-            isUpdatingHardwareControl = true
-            ctrl.value = clamped
-            isUpdatingHardwareControl = false
-        }
-    }
-    
     private func syncShutterToHardware() {
         guard let ctrl = ssControl, shutterSpeeds.indices.contains(shutterIndex) else { return }
         if ctrl.selectedIndex != shutterIndex {
@@ -1134,13 +1192,23 @@ extension CameraModel {
         }
     }
     
-    private func syncEVToHardware() {
-        guard let ctrl = evControl else { return }
-        let clamped = max(-4.0, min(4.0, exposureBias))
-        let snapped = round(clamped * 10.0) / 10.0
-        if abs(ctrl.value - snapped) > 0.01 {
+    private func syncFocusToHardware() {
+        guard let ctrl = focusControl else { return }
+        let clamped = max(0.0, min(1.0, lensPosition))
+        let sliderValue = Float(clamped * 100.0)
+        if abs(ctrl.value - sliderValue) > 1.0 {
             isUpdatingHardwareControl = true
-            ctrl.value = snapped
+            ctrl.value = sliderValue
+            isUpdatingHardwareControl = false
+        }
+    }
+    
+    private func syncWBToHardware() {
+        guard let ctrl = wbControl else { return }
+        let clamped = max(2000, min(10000, whiteBalanceTargetKelvin))
+        if abs(ctrl.value - clamped) > 1.0 {
+            isUpdatingHardwareControl = true
+            ctrl.value = clamped
             isUpdatingHardwareControl = false
         }
     }

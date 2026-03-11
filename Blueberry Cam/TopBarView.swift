@@ -9,15 +9,30 @@ struct TopBarView: View {
         VStack {
             HStack(alignment: .center) {
                 // Live EXIF
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("ISO \(Int(cameraModel.liveISO))")
-                        .font(.system(size: 12, weight: .medium, design: .monospaced))
-                        .foregroundColor(.yellow)
-                    Text(cameraModel.liveShutter)
-                        .font(.system(size: 12, weight: .medium, design: .monospaced))
-                        .foregroundColor(.white.opacity(0.8))
+                HStack(spacing: 12) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("ISO \(Int(cameraModel.liveISO))")
+                            .font(.system(size: 12, weight: .medium, design: .monospaced))
+                            .foregroundColor(.yellow)
+                        Text(cameraModel.liveShutter)
+                            .font(.system(size: 12, weight: .medium, design: .monospaced))
+                            .foregroundColor(.white.opacity(0.8))
+                        if cameraModel.isAutoExposure {
+                            Text(String(format: "EV %+.1f", cameraModel.exposureBias))
+                                .font(.system(size: 12, weight: .medium, design: .monospaced))
+                                .foregroundColor(.yellow.opacity(0.8))
+                        }
+                    }
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(cameraModel.liveFocus)
+                            .font(.system(size: 12, weight: .medium, design: .monospaced))
+                            .foregroundColor(.green.opacity(0.8))
+                        Text(cameraModel.liveWB)                        
+                            .font(.system(size: 12, weight: .medium, design: .monospaced))
+                            .foregroundColor(.cyan)
+                    }
                 }
-                .padding(.leading, 16)
+                .padding(.leading, 12)
                 
                 Spacer()
                 
