@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ContentView: View {
     @State private var cameraModel = CameraModel()
+    @State private var levelModel  = LevelMotionModel()
     
     var body: some View {
         GeometryReader { geo in
@@ -15,73 +16,89 @@ struct ContentView: View {
                     cameraModel.capturePhoto()
                 }
                 .ignoresSafeArea()
-                
-                if cameraModel.showZebraStripes {
-                    AnalysisOverlayView(
-                        mask: cameraModel.zebraMask,
-                        gridSize: cameraModel.analysisGridSize,
-                        style: .zebra
-                    )
-                    .frame(width: previewRect.width, height: previewRect.height)
-                    .position(x: previewRect.midX, y: previewRect.midY)
+                if !cameraModel.isCleanUI {
+                    if cameraModel.showZebraStripes {
+                        AnalysisOverlayView(
+                            mask: cameraModel.zebraMask,
+                            gridSize: cameraModel.analysisGridSize,
+                            style: .zebra
+                        )
+                        .frame(width: previewRect.width, height: previewRect.height)
+                        .position(x: previewRect.midX, y: previewRect.midY)
+                    }
+                    
+                    if cameraModel.shouldShowFocusPeakingOverlay {
+                        AnalysisOverlayView(
+                            mask: cameraModel.focusPeakingMask,
+                            gridSize: cameraModel.analysisGridSize,
+                            style: .focusPeaking
+                        )
+                        .frame(width: previewRect.width, height: previewRect.height)
+                        .position(x: previewRect.midX, y: previewRect.midY)
+                    }
+                    
+                    if cameraModel.showClipping {
+                        AnalysisOverlayView(
+                            mask: cameraModel.clippingMask,
+                            gridSize: cameraModel.analysisGridSize,
+                            style: .clipping
+                        )
+                        .frame(width: previewRect.width, height: previewRect.height)
+                        .position(x: previewRect.midX, y: previewRect.midY)
+                    }
                 }
-                
-                if cameraModel.shouldShowFocusPeakingOverlay {
-                    AnalysisOverlayView(
-                        mask: cameraModel.focusPeakingMask,
-                        gridSize: cameraModel.analysisGridSize,
-                        style: .focusPeaking
-                    )
-                    .frame(width: previewRect.width, height: previewRect.height)
-                    .position(x: previewRect.midX, y: previewRect.midY)
-                }
-                
-                if cameraModel.showClipping {
-                    AnalysisOverlayView(
-                        mask: cameraModel.clippingMask,
-                        gridSize: cameraModel.analysisGridSize,
-                        style: .clipping
-                    )
-                    .frame(width: previewRect.width, height: previewRect.height)
-                    .position(x: previewRect.midX, y: previewRect.midY)
-                }
-                
                 // MARK: - Crop frame overlay
-                CropOverlayView(aspectRatio: cameraModel.captureAspectRatio)
-                    .ignoresSafeArea()
-                    .allowsHitTesting(false)
+                if !cameraModel.isCleanUI {
+                    CropOverlayView(aspectRatio: cameraModel.captureAspectRatio)
+                        .ignoresSafeArea()
+                        .allowsHitTesting(false)
+                }
+                
+                // MARK: - Level / Horizon overlay
+                if !cameraModel.isCleanUI {
+                    LevelOverlayView(model: levelModel)
+                        .ignoresSafeArea()
+                }
                 
                 // MARK: - UI Overlays
                 VStack(spacing: 0) {
-                    TopBarView(cameraModel: cameraModel)
+                    if !cameraModel.isCleanUI {
+                        TopBarView(cameraModel: cameraModel)
+                    }
                     Spacer()
                     
-                    if cameraModel.showHistogram {
-                        HistogramView(
-                            mode: cameraModel.histogramMode,
-                            lumaData: cameraModel.histogramData,
-                            redData: cameraModel.redHistogram,
-                            greenData: cameraModel.greenHistogram,
-                            blueData: cameraModel.blueHistogram,
-                            waveformData: cameraModel.waveformData,
-                            waveformCols: cameraModel.waveformCols,
-                            waveformRows: cameraModel.waveformRows
-                        )
-                        .frame(height: 60)
-                        .padding(.horizontal, 20)
-                        .padding(.bottom, 8)
-                        .onTapGesture {
-                            cameraModel.cycleHistogramMode()
+                    if !cameraModel.isCleanUI {
+                        if cameraModel.showHistogram {
+                            HistogramView(
+                                mode: cameraModel.histogramMode,
+                                lumaData: cameraModel.histogramData,
+                                redData: cameraModel.redHistogram,
+                                greenData: cameraModel.greenHistogram,
+                                blueData: cameraModel.blueHistogram,
+                                waveformData: cameraModel.waveformData,
+                                waveformCols: cameraModel.waveformCols,
+                                waveformRows: cameraModel.waveformRows
+                            )
+                            .frame(height: 60)
+                            .padding(.horizontal, 20)
+                            .padding(.bottom, 8)
+                            .onTapGesture {
+                                cameraModel.cycleHistogramMode()
+                            }
                         }
                     }
                     
-                    if cameraModel.showManualControls {
-                        ManualControlsView(cameraModel: cameraModel)
-                            .padding(.bottom, 8)
+                    if !cameraModel.isCleanUI {
+                        if cameraModel.showManualControls {
+                            ManualControlsView(cameraModel: cameraModel)
+                                .padding(.bottom, 8)
+                        }
                     }
                     
-                    LensSelectorView(cameraModel: cameraModel)
-                        .padding(.bottom, 8)
+                    if !cameraModel.isCleanUI {
+                        LensSelectorView(cameraModel: cameraModel)
+                            .padding(.bottom, 8)
+                    }
                     
                     BottomBarView(cameraModel: cameraModel)
                         .padding(.bottom, 30)
@@ -96,12 +113,14 @@ struct ContentView: View {
                 }
             }
         }
-        .onAppear { cameraModel.configure() }
-//        .alert("Saved", isPresented: $cameraModel.showSaveAlert) {
-//            Button("OK", role: .cancel) {}
-//        } message: {
-//            Text(cameraModel.saveMessage)
-//        }
+        .statusBarHidden(cameraModel.isCleanUI)
+        .onAppear {
+            cameraModel.configure()
+            levelModel.startUpdates()
+        }
+        .onDisappear {
+            levelModel.stopUpdates()
+        }
         .alert("Error", isPresented: $cameraModel.showError) {
             Button("OK", role: .cancel) {}
         } message: {

@@ -6,67 +6,57 @@ struct BottomBarView: View {
     
     var body: some View {
         VStack(spacing: 0) {
-            // Divider
-            Rectangle()
-                .fill(Color.white.opacity(0.1))
-                .frame(height: 1)
-                .padding(.bottom, 24)
-            
             HStack(alignment: .center, spacing: 0) {
-                
-                // Manual controls toggle
-                Button {
-                    withAnimation(.spring(response: 0.3)) {
-                        cameraModel.toggleManualControls()
-                    }
-                } label: {
-                    VStack(spacing: 4) {
-                        Image(systemName: "slider.horizontal.3")
-                            .font(.system(size: 20))
-                            .foregroundColor(cameraModel.showManualControls ? .yellow : .white)
-                        Text("MANUAL")
-                            .font(.system(size: 9, weight: .medium))
-                            .foregroundColor(cameraModel.showManualControls ? .yellow : .white.opacity(0.6))
-                    }
-                }
-                .frame(maxWidth: .infinity)
-                
-                // Shutter button
-                Button {
-                    cameraModel.capturePhoto()
-                } label: {
-                    ZStack {
-                        Circle()
-                            .stroke(Color.white, lineWidth: 3)
-                            .frame(width: 76, height: 76)
-                        Circle()
-                            .fill(Color.white)
-                            .frame(width: 62, height: 62)
-                        
-                        // RAW indicator ring
-                        if cameraModel.captureMode != .jpeg {
-                            Circle()
-                                .stroke(Color.yellow, lineWidth: 2)
-                                .frame(width: 70, height: 70)
+                if !cameraModel.isCleanUI {
+                    // Manual controls toggle
+                    Button {
+                        withAnimation(.spring(response: 0.3)) {
+                            cameraModel.toggleManualControls()
+                        }
+                    } label: {
+                        VStack(spacing: 4) {
+                            Image(systemName: "slider.horizontal.3")
+                                .font(.system(size: 20))
+                                .foregroundColor(cameraModel.showManualControls ? .yellow : .white)
+                            Text("MANUAL")
+                                .font(.system(size: 9, weight: .medium))
+                                .foregroundColor(cameraModel.showManualControls ? .yellow : .white.opacity(0.6))
                         }
                     }
+                    .frame(maxWidth: .infinity)
+                }
+                // Shutter button
+                ZStack {
+                    Circle()
+                        .frame(width: 82, height: 82)
+                        .glassEffect(.regular.tint(cameraModel.captureMode == .raw ? .blue.opacity(0.7) : .white.opacity(0.2)).interactive())
+                    Button {
+                        cameraModel.capturePhoto()
+                    } label: {
+                        Circle()
+                            .fill(Color.white)
+                            .frame(width: 69, height: 69)
+                    }
+                    .glassEffect(.regular.interactive())
                 }
                 .frame(maxWidth: .infinity)
                 
-                // Placeholder right side
-                Button {
-                    openPhotosApp()
-                } label: {
-                    VStack(spacing: 4) {
-                        Image(systemName: "photo.on.rectangle")
-                            .font(.system(size: 20))
-                            .foregroundColor(.white.opacity(0.8))
-                        Text("GALLERY")
-                            .font(.system(size: 9, weight: .medium))
-                            .foregroundColor(.white.opacity(0.7))
+                if !cameraModel.isCleanUI {
+                    // Placeholder right side
+                    Button {
+                        openPhotosApp()
+                    } label: {
+                        VStack(spacing: 4) {
+                            Image(systemName: "photo.on.rectangle")
+                                .font(.system(size: 20))
+                                .foregroundColor(.white.opacity(0.8))
+                            Text("GALLERY")
+                                .font(.system(size: 9, weight: .medium))
+                                .foregroundColor(.white.opacity(0.7))
+                        }
                     }
+                    .frame(maxWidth: .infinity)
                 }
-                .frame(maxWidth: .infinity)
             }
         }
         .background(

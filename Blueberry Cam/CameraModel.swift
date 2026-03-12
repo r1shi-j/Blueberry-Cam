@@ -18,12 +18,13 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
     private let _pendingCaptureModeBox = CaptureModeBox()
     
     // MARK: - Camera Control (iOS 18)
+    private var cleanUIControl: AVCaptureIndexPicker?
     private var lensControl: AVCaptureIndexPicker?
     private var evControl: AVCaptureSlider?
     private var isoControl: AVCaptureSlider?
     private var ssControl: AVCaptureIndexPicker?
-    private var wbControl: AVCaptureSlider?
     private var focusControl: AVCaptureSlider?
+    private var wbControl: AVCaptureSlider?
     /// Prevents Camera Control action callbacks from overwriting properties when we set ctrl.value programmatically
     private var isUpdatingHardwareControl = false
     
@@ -168,9 +169,7 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
     
     // MARK: - UI State
     var isCapturing: Bool = false
-    var showSaveAlert: Bool = false
     var showError: Bool = false
-    var saveMessage: String = ""
     var errorMessage: String = ""
     var histogramData: [Float] = Array(repeating: 0, count: 256)
     var redHistogram: [Float] = Array(repeating: 0, count: 256)
@@ -188,6 +187,7 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
     var liveShutter: String = ""
     var liveWB: String = ""
     var liveFocus: String = ""
+    var isCleanUI: Bool = false
     
     // MARK: - Location
     private let locationManager = CLLocationManager()
@@ -791,6 +791,10 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
         case .waveform:  histogramMode = .luminance
         }
     }
+    
+    private func setCleanUI(to value: Bool) {
+        isCleanUI = value
+    }
 }
 
 // MARK: - AVCapturePhotoCaptureDelegate
@@ -1124,13 +1128,29 @@ enum Lens: String, CaseIterable {
 extension CameraModel {
     private func setupCameraControls() {
         // Surgical removal to prevent duplicates
+        if let c = cleanUIControl { session.removeControl(c); cleanUIControl = nil }
         if let l = lensControl { session.removeControl(l); lensControl = nil }
         if let e = evControl { session.removeControl(e); evControl = nil }
         if let i = isoControl { session.removeControl(i); isoControl = nil }
         if let s = ssControl { session.removeControl(s); ssControl = nil }
+        if let f = focusControl { session.removeControl(f); focusControl = nil }
+        if let wb = wbControl { session.removeControl(wb); wbControl = nil }
         
         // Final wipe of any orphans just in case
         session.controls.forEach { session.removeControl($0) }
+        
+        // Clean UI Picker
+        let titles = ["On", "Off"]
+        let values = [true, false]
+        let cUI = AVCaptureIndexPicker("Clean UI", symbolName: "square.arrowtriangle.4.outward", localizedIndexTitles: titles)
+        cUI.setActionQueue(.main) { [weak self] index in
+            guard let self else { return }
+            guard index >= 0 else { return }
+            self.setCleanUI(to: values[index])
+        }
+        cUI.selectedIndex = self.isCleanUI ? 0 : 1
+        self.cleanUIControl = cUI
+        session.addControl(cUI)
         
         // Lens Picker
         let availableLenses = Lens.allCases.filter { len in
