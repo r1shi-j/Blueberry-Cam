@@ -3,6 +3,7 @@ import UIKit
 
 struct BottomBarView: View {
     @Bindable var cameraModel: CameraModel
+    @State private var count = 0
     
     var body: some View {
         VStack(spacing: 0) {
@@ -29,15 +30,17 @@ struct BottomBarView: View {
                 ZStack {
                     Circle()
                         .frame(width: 82, height: 82)
-                        .glassEffect(.regular.tint(cameraModel.captureMode == .raw ? .blue.opacity(0.7) : .white.opacity(0.2)).interactive())
+                        .glassEffect(.regular.tint(cameraModel.captureMode == .raw ? .blue.mix(with: .mint, by: 0.5).opacity(0.4) : .white.opacity(0.2)).interactive())
                     Button {
                         cameraModel.capturePhoto()
+                        count += 1
                     } label: {
                         Circle()
                             .fill(Color.white)
                             .frame(width: 69, height: 69)
                     }
                     .glassEffect(.regular.interactive())
+                    .sensoryFeedback(.selection, trigger: count)
                 }
                 .frame(maxWidth: .infinity)
                 
