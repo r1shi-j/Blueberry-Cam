@@ -53,7 +53,7 @@ struct TopBarView: View {
                             }
                         }
                     }
-                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                    .clipShape(.rect(cornerRadius: 6))
                     .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.white.opacity(0.2), lineWidth: 1))
                     
                     // Format picker
@@ -79,7 +79,7 @@ struct TopBarView: View {
                     }
                     .opacity(cameraModel.isFormatPickerEnabled ? 1.0 : 0.45)
                     .disabled(!cameraModel.isFormatPickerEnabled)
-                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                    .clipShape(.rect(cornerRadius: 6))
                     .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.white.opacity(0.2), lineWidth: 1))
                 }
                 
@@ -98,6 +98,23 @@ struct TopBarView: View {
                 .padding(.trailing, 16)
             }
             HStack(alignment: .center, spacing: 12) {
+                // Location geotag toggle
+                Button {
+                    cameraModel.toggleLocationGeotag()
+                } label: {
+                    Image(systemName: cameraModel.locationLabel)
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundColor(
+                            cameraModel.shouldEmbedLocationData ? .black : .white.opacity(0.7)
+                        )
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 5)
+                        .background(
+                            cameraModel.shouldEmbedLocationData ? Color.yellow : Color.white.opacity(0.15)
+                        )
+                        .clipShape(.capsule)
+                }
+                
                 // Flash toggle
                 Button {
                     cameraModel.cycleFlashMode()
@@ -116,7 +133,7 @@ struct TopBarView: View {
                             ? Color.white.opacity(0.15)
                             : Color.yellow
                         )
-                        .clipShape(Capsule())
+                        .clipShape(.capsule)
                 }
                 .opacity(cameraModel.isFlashControlEnabled ? 1.0 : 0.45)
                 .disabled(!cameraModel.isFlashControlEnabled)
@@ -131,7 +148,7 @@ struct TopBarView: View {
                         .padding(.horizontal, 8)
                         .padding(.vertical, 5)
                         .background(cameraModel.showZebraStripes ? Color.yellow : Color.white.opacity(0.15))
-                        .clipShape(Capsule())
+                        .clipShape(.capsule)
                 }
                 
                 // Highlight clipping toggle
@@ -144,7 +161,7 @@ struct TopBarView: View {
                         .padding(.horizontal, 8)
                         .padding(.vertical, 5)
                         .background(cameraModel.showClipping ? Color.yellow : Color.white.opacity(0.15))
-                        .clipShape(Capsule())
+                        .clipShape(.capsule)
                 }
             }
         }

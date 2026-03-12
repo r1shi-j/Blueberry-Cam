@@ -28,7 +28,7 @@ struct HistogramView: View {
                         drawWaveform(context: context, size: size)
                     }
                 }
-                .clipShape(RoundedRectangle(cornerRadius: 6))
+                .clipShape(.rect(cornerRadius: 6))
 
                 // Mode label
                 HStack {

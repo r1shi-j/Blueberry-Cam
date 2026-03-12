@@ -33,7 +33,7 @@ struct LensSelectorView: View {
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
         .background(Color.black.opacity(0.4))
-        .clipShape(Capsule())
+        .clipShape(.capsule)
     }
     
     @ViewBuilder
@@ -52,7 +52,7 @@ struct LensSelectorView: View {
                     ? Color.white.opacity(0.15)
                     : Color.clear
                 )
-                .clipShape(Circle())
+                .clipShape(.circle)
         }
     }
 }
