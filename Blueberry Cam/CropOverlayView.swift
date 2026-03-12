@@ -25,9 +25,34 @@ struct CropOverlayView: View {
                             .position(x: cropRect.midX, y: cropRect.midY)
                     }
                 
-                // Corner marks
-                CornerMarks(rect: cropRect)
-                    .stroke(Color.white.opacity(0.8), lineWidth: 1.5)
+                // Rule-of-thirds grid (2 vertical + 2 horizontal inner lines only)
+                Canvas { ctx, _ in
+                    let lineColor = Color.white.opacity(0.25)
+                    let style = StrokeStyle(lineWidth: 0.75)
+                    let thirdW = cropW / 3
+                    let thirdH = cropH / 3
+                    
+                    for i in 1...2 {
+                        // Vertical
+                        var v = Path()
+                        let vx = cropX + thirdW * CGFloat(i)
+                        v.move(to: CGPoint(x: vx, y: cropY))
+                        v.addLine(to: CGPoint(x: vx, y: cropY + cropH))
+                        ctx.stroke(v, with: .color(lineColor), style: style)
+                        
+                        // Horizontal
+                        var h = Path()
+                        let hy = cropY + thirdH * CGFloat(i)
+                        h.move(to: CGPoint(x: cropX, y: hy))
+                        h.addLine(to: CGPoint(x: cropX + cropW, y: hy))
+                        ctx.stroke(h, with: .color(lineColor), style: style)
+                    }
+                }
+                .allowsHitTesting(false)
+                
+                // Corner marks (inset slightly so they don't bleed off the screen edge)
+                CornerMarks(rect: cropRect.insetBy(dx: 0.4, dy: 0.5))
+                    .stroke(Color.white.opacity(0.75), lineWidth: 1.0)
             }
         }
     }
@@ -36,7 +61,7 @@ struct CropOverlayView: View {
 // Draws L-shaped corners at each corner of rect
 struct CornerMarks: Shape {
     let rect: CGRect
-    let len: CGFloat = 20
+    let len: CGFloat = 14
     
     func path(in _: CGRect) -> Path {
         var p = Path()
