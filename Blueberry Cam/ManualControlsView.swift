@@ -18,7 +18,10 @@ struct ManualControlsView: View {
                     .tint(.yellow)
                     .onChange(of: cameraModel.isAutoExposure) { _, auto in
                         if auto { cameraModel.setAutoExposure() }
-                        else { cameraModel.applyManualExposure() }
+                        else {
+                            cameraModel.exposureBias = 0.0
+                            cameraModel.applyManualExposure()
+                        }
                     }
                 Text(cameraModel.isAutoExposure ? "AUTO" : "MANUAL")
                     .font(.system(size: 10, weight: .bold, design: .monospaced))

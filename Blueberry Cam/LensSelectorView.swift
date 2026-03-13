@@ -2,6 +2,8 @@ import SwiftUI
 
 struct LensSelectorView: View {
     @Bindable var cameraModel: CameraModel
+    @State private var count = 0
+    @State private var count2 = 0
     
     private let frontLenses: [Lens] = [.frontUltraWide, .front]
     private let backLenses:  [Lens] = [.ultraWide, .wide, .tele2x, .tele4x, .tele8x]
@@ -12,13 +14,14 @@ struct LensSelectorView: View {
             Button {
                 let target: Lens = cameraModel.activeLens.isFront ? .wide : .front
                 cameraModel.switchLens(to: target)
-                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                count += 1
             } label: {
                 Image(systemName: "arrow.triangle.2.circlepath.camera")
                     .font(.system(size: 16))
                     .foregroundColor(.white.opacity(0.8))
                     .frame(width: 36, height: 36)
             }
+            .sensoryFeedback(.selection, trigger: count)
             
             Rectangle()
                 .fill(Color.white.opacity(0.2))
@@ -41,7 +44,7 @@ struct LensSelectorView: View {
         let isActive = cameraModel.activeLens == lens
         Button {
             cameraModel.switchLens(to: lens)
-            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            count2 += 1
         } label: {
             Text(lens.label)
                 .font(.system(size: 14, weight: isActive ? .bold : .regular, design: .monospaced))
@@ -54,5 +57,6 @@ struct LensSelectorView: View {
                 )
                 .clipShape(.circle)
         }
+        .sensoryFeedback(.selection, trigger: count2)
     }
 }

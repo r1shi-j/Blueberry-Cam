@@ -3,6 +3,8 @@ import SwiftUI
 struct ContentView: View {
     @State private var cameraModel = CameraModel()
     @State private var levelModel  = LevelMotionModel()
+    @AppStorage("shutterCount") private var shutterCount = 0
+    @State private var count = 0
     
     var body: some View {
         GeometryReader { geo in
@@ -15,7 +17,16 @@ struct ContentView: View {
                 CameraPreviewView(session: cameraModel.session) {
                     cameraModel.capturePhoto()
                 }
+                .onTapGesture(count: 2) {
+                    withAnimation(.bouncy) {
+                        let target: Lens = cameraModel.activeLens.isFront ? .wide : .front
+                        cameraModel.switchLens(to: target)
+                    }
+                    count += 1
+                }
+                .sensoryFeedback(.selection, trigger: count)
                 .ignoresSafeArea()
+                
                 if !cameraModel.isCleanUI {
                     if cameraModel.showZebraStripes {
                         AnalysisOverlayView(
@@ -47,6 +58,7 @@ struct ContentView: View {
                         .position(x: previewRect.midX, y: previewRect.midY)
                     }
                 }
+                
                 // MARK: - Crop frame overlay
                 if !cameraModel.isCleanUI {
                     CropOverlayView(aspectRatio: cameraModel.captureAspectRatio)
@@ -68,20 +80,19 @@ struct ContentView: View {
                     Spacer()
                     
                     if !cameraModel.isCleanUI {
-                        if cameraModel.showHistogram {
+                        if cameraModel.showHistogram && cameraModel.histogramSize == .large {
                             HistogramView(
                                 mode: cameraModel.histogramMode,
+                                size: cameraModel.histogramSize,
                                 lumaData: cameraModel.histogramData,
                                 redData: cameraModel.redHistogram,
                                 greenData: cameraModel.greenHistogram,
                                 blueData: cameraModel.blueHistogram,
-                                waveformData: cameraModel.waveformData,
-                                waveformCols: cameraModel.waveformCols,
-                                waveformRows: cameraModel.waveformRows
+                                waveformData: cameraModel.waveformData
                             )
                             .frame(height: 60)
                             .padding(.horizontal, 20)
-                            .padding(.bottom, 8)
+                            .padding(.bottom, 32)
                             .onTapGesture {
                                 cameraModel.cycleHistogramMode()
                             }
@@ -97,10 +108,10 @@ struct ContentView: View {
                     
                     if !cameraModel.isCleanUI {
                         LensSelectorView(cameraModel: cameraModel)
-                            .padding(.bottom, 8)
+                            .padding(.bottom, 30)
                     }
                     
-                    BottomBarView(cameraModel: cameraModel)
+                    BottomBarView(cameraModel: cameraModel, shutterCount: $shutterCount)
                         .padding(.bottom, 30)
                 }
                 
@@ -113,7 +124,16 @@ struct ContentView: View {
                 }
             }
         }
-        .statusBarHidden(cameraModel.isCleanUI)
+        .safeAreaInset(edge: .top) {
+            if !cameraModel.isCleanUI {
+                StatusBarAreaView(cameraModel: cameraModel)
+                    .padding()
+                    .ignoresSafeArea()
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .frame(height: .zero)
+            }
+        }
+        .statusBarHidden()
         .onAppear {
             cameraModel.configure()
             levelModel.startUpdates()

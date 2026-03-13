@@ -1,51 +1,14 @@
 import SwiftUI
-import UIKit
 
 struct BottomBarView: View {
     @Bindable var cameraModel: CameraModel
-    @State private var count = 0
+    @Binding var shutterCount: Int
     
     var body: some View {
-        VStack(spacing: 0) {
+        VStack() {
             HStack(alignment: .center, spacing: 0) {
+                // Photos app link
                 if !cameraModel.isCleanUI {
-                    // Manual controls toggle
-                    Button {
-                        withAnimation(.spring(response: 0.3)) {
-                            cameraModel.toggleManualControls()
-                        }
-                    } label: {
-                        VStack(spacing: 4) {
-                            Image(systemName: "slider.horizontal.3")
-                                .font(.system(size: 20))
-                                .foregroundColor(cameraModel.showManualControls ? .yellow : .white)
-                            Text("MANUAL")
-                                .font(.system(size: 9, weight: .medium))
-                                .foregroundColor(cameraModel.showManualControls ? .yellow : .white.opacity(0.6))
-                        }
-                    }
-                    .frame(maxWidth: .infinity)
-                }
-                // Shutter button
-                ZStack {
-                    Circle()
-                        .frame(width: 82, height: 82)
-                        .glassEffect(.regular.tint(cameraModel.captureMode == .raw ? .blue.mix(with: .mint, by: 0.5).opacity(0.4) : .white.opacity(0.2)).interactive())
-                    Button {
-                        cameraModel.capturePhoto()
-                        count += 1
-                    } label: {
-                        Circle()
-                            .fill(Color.white)
-                            .frame(width: 69, height: 69)
-                    }
-                    .glassEffect(.regular.interactive())
-                    .sensoryFeedback(.selection, trigger: count)
-                }
-                .frame(maxWidth: .infinity)
-                
-                if !cameraModel.isCleanUI {
-                    // Placeholder right side
                     Button {
                         openPhotosApp()
                     } label: {
@@ -53,22 +16,49 @@ struct BottomBarView: View {
                             Image(systemName: "photo.on.rectangle")
                                 .font(.system(size: 20))
                                 .foregroundColor(.white.opacity(0.8))
-                            Text("GALLERY")
-                                .font(.system(size: 9, weight: .medium))
-                                .foregroundColor(.white.opacity(0.7))
+                            Text(String(shutterCount))
+                                .font(.caption)
+                                .fontWidth(.expanded)
+                                .foregroundColor(.white.opacity(0.6))
                         }
+                        .padding(.top)
+                    }
+                    .frame(maxWidth: .infinity)
+                }
+                
+                // Shutter button
+                ZStack {
+                    Circle()
+                        .frame(width: 82, height: 82)
+                        .glassEffect(.regular.tint(cameraModel.captureMode == .raw ? .blue.mix(with: .mint, by: 0.5).opacity(0.4) : .white.opacity(0.2)).interactive())
+                    Button {
+                        cameraModel.capturePhoto()
+                        shutterCount += 1
+                    } label: {
+                        Circle()
+                            .fill(Color.white)
+                            .frame(width: 69, height: 69)
+                    }
+                    .glassEffect(.regular.interactive())
+                    .sensoryFeedback(.selection, trigger: shutterCount)
+                }
+                .frame(maxWidth: .infinity)
+                
+                // Manual controls toggle
+                if !cameraModel.isCleanUI {
+                    Button {
+                        withAnimation(.spring(response: 0.3)) {
+                            cameraModel.toggleManualControls()
+                        }
+                    } label: {
+                        Image(systemName: "slider.horizontal.3")
+                            .font(.system(size: 20))
+                            .foregroundColor(cameraModel.showManualControls ? .yellow : .white.opacity(0.8))
                     }
                     .frame(maxWidth: .infinity)
                 }
             }
         }
-        .background(
-            LinearGradient(
-                colors: [.clear, .black.opacity(0.75)],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-        )
     }
     
     private func openPhotosApp() {
