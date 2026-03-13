@@ -5,6 +5,7 @@ struct ContentView: View {
     @State private var levelModel  = LevelMotionModel()
     @AppStorage("shutterCount") private var shutterCount = 0
     @State private var count = 0
+    @State private var selectedControl: ManualControl?
     
     var body: some View {
         GeometryReader { geo in
@@ -75,7 +76,7 @@ struct ContentView: View {
                 // MARK: - UI Overlays
                 VStack(spacing: 0) {
                     if !cameraModel.isCleanUI {
-                        TopBarView(cameraModel: cameraModel)
+                        TopBarView(cameraModel: cameraModel, selectedControl: $selectedControl)
                     }
                     Spacer()
                     
@@ -100,8 +101,8 @@ struct ContentView: View {
                     }
                     
                     if !cameraModel.isCleanUI {
-                        if cameraModel.showManualControls {
-                            ManualControlsView(cameraModel: cameraModel)
+                        if let selectedControl {
+                            ManualControlsView(cameraModel: cameraModel, control: selectedControl)
                                 .padding(.bottom, 8)
                         }
                     }

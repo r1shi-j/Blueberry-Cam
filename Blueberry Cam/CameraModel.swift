@@ -67,7 +67,6 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
             }
         }
     }
-    var showManualControls: Bool = false
     var showHistogram: Bool = false
     var showClipping: Bool = false
     var showZebraStripes: Bool = false
@@ -781,7 +780,25 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
         }
     }
     
-    func toggleManualControls() { showManualControls.toggle() }
+    func resetControl(for control: ManualControl) {
+        switch control {
+            case .ev:
+                if isAutoExposure {
+                    exposureBias = 0.0
+                    applyExposureBias()
+                }
+            case .iso:
+                isAutoExposure = true
+            case .ss:
+                isAutoExposure = true
+            case .f:
+                isAutoFocus = true
+                setAutoFocus()
+            case .wb:
+                isAutoWhiteBalance = true
+        }
+    }
+    
     func toggleHistogram() { showHistogram.toggle() }
     func toggleClipping() { showClipping.toggle() }
     func toggleZebraStripes() { showZebraStripes.toggle() }

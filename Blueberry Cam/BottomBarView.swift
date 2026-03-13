@@ -47,15 +47,14 @@ struct BottomBarView: View {
                 // Manual controls toggle
                 if !cameraModel.isCleanUI {
                     Button {
-                        withAnimation(.spring(response: 0.3)) {
-                            cameraModel.toggleManualControls()
-                        }
+                        
                     } label: {
-                        Image(systemName: "slider.horizontal.3")
+                        Image(systemName: "applelogo")
                             .font(.system(size: 20))
-                            .foregroundColor(cameraModel.showManualControls ? .yellow : .white.opacity(0.8))
+                            .foregroundColor(.white.opacity(0.8))
                     }
                     .frame(maxWidth: .infinity)
+                    .disabled(true)
                 }
             }
         }

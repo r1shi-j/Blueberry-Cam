@@ -3,23 +3,59 @@ import AVFoundation
 
 struct TopBarView: View {
     @Bindable var cameraModel: CameraModel
+    @Binding var selectedControl: ManualControl?
+    
+    private let readoutColor: (ManualControl) -> Color = { control in
+        switch control {
+            case .ev: .orange
+            case .iso: .yellow
+            case .ss: .white.opacity(0.8)
+            case .f: .green
+            case .wb: .cyan
+        }
+    }
+    
+    private func readoutTitle(for control: ManualControl) -> String {
+        switch control {
+            case .ev: String(format: "EV %+.1f", cameraModel.exposureBias)
+            case .iso: "ISO \(Int(cameraModel.liveISO))"
+            case .ss: cameraModel.liveShutter
+            case .f: cameraModel.liveFocus
+            case .wb: cameraModel.liveWB
+        }
+    }
     
     var body: some View {
         VStack(spacing: 20) {
             HStack(alignment: .center, spacing: 30) {
                 // Live EXIF
                 // long press or double tap resets and enables auto
-                // one tap opens slider and disables auto
-                Text(String(format: "EV %+.1f", cameraModel.exposureBias))
-                    .foregroundColor(.yellow.opacity(0.8))
-                Text("ISO \(Int(cameraModel.liveISO))")
-                    .foregroundColor(.yellow)
-                Text(cameraModel.liveShutter)
-                    .foregroundColor(.white.opacity(0.8))
-                Text(cameraModel.liveFocus)
-                    .foregroundColor(.green.opacity(0.8))
-                Text(cameraModel.liveWB)
-                    .foregroundColor(.cyan)
+                // one tap opens slider
+                ForEach(ManualControl.allCases, id: \.self) { control in
+                    Text(readoutTitle(for: control))
+                        .underline(selectedControl == control)
+                        .foregroundColor(readoutColor(control))
+                        .onTapGesture(count: 2) {
+                            withAnimation(.spring(duration: 0.5)) {
+                                cameraModel.resetControl(for: control)
+                            }
+                        }
+                        .onLongPressGesture {
+                            withAnimation(.spring(duration: 0.5)) {
+                                cameraModel.resetControl(for: control)
+                            }
+                        }
+                        .disabled(control == ManualControl.ev && !cameraModel.isAutoExposure)
+                        .disabled(control == ManualControl.iso && cameraModel.isAutoExposure)
+                        .disabled(control == ManualControl.ss && cameraModel.isAutoExposure)
+                        .disabled(control == ManualControl.f && cameraModel.isAutoFocus)
+                        .disabled(control == ManualControl.wb && cameraModel.isAutoWhiteBalance)
+                        .onTapGesture {
+                            withAnimation(.spring(duration: 0.5)) {
+                                selectedControl = selectedControl == control ? nil : control
+                            }
+                        }
+                }
             }
             .font(.system(size: 12, weight: .medium, design: .monospaced))
             .padding(.horizontal, 12)
