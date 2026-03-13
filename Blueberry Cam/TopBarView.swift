@@ -26,14 +26,19 @@ struct TopBarView: View {
     }
     
     var body: some View {
-        VStack(spacing: 20) {
-            HStack(alignment: .center, spacing: 30) {
+        VStack(spacing: 12) {
+            HStack(alignment: .center, spacing: 22) {
                 // Live EXIF
                 // long press or double tap resets and enables auto
                 // one tap opens slider
                 ForEach(ManualControl.allCases, id: \.self) { control in
                     Text(readoutTitle(for: control))
-                        .underline(selectedControl == control)
+                        .padding(4)
+//                        .background {
+//                            Color.red.opacity(0.15)
+//                                .clipShape(.capsule)
+//                        }
+                        .font(.system(size: 12, weight: selectedControl == control ? .black : .regular, design: .monospaced))
                         .foregroundColor(readoutColor(control))
                         .onTapGesture(count: 2) {
                             withAnimation(.spring(duration: 0.5)) {
@@ -57,7 +62,6 @@ struct TopBarView: View {
                         }
                 }
             }
-            .font(.system(size: 12, weight: .medium, design: .monospaced))
             .padding(.horizontal, 12)
             
             HStack(alignment: .center, spacing: 10) {
