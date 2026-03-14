@@ -9,7 +9,7 @@ struct ContentView: View {
     
     var body: some View {
         GeometryReader { geo in
-            let previewRect = makePreviewRect(in: geo.size)
+            let previewRect = makePreviewRect(in: geo)
             
             ZStack {
                 Color.black.ignoresSafeArea()
@@ -18,6 +18,8 @@ struct ContentView: View {
                 CameraPreviewView(session: cameraModel.session) {
                     cameraModel.capturePhoto()
                 }
+                .ignoresSafeArea()
+                .contentShape(.rect.path(in: previewRect))
                 .onTapGesture(count: 2) {
                     withAnimation(.bouncy) {
                         let target: Lens = cameraModel.activeLens.isFront ? .wide : .front
@@ -26,7 +28,6 @@ struct ContentView: View {
                     count += 1
                 }
                 .sensoryFeedback(.selection, trigger: count)
-                .ignoresSafeArea()
                 
                 if !cameraModel.isCleanUI {
                     if cameraModel.showZebraStripes {
@@ -118,9 +119,9 @@ struct ContentView: View {
                 
                 // Capture flash
                 if cameraModel.isCapturing {
-                    Color.white
-                        .ignoresSafeArea()
-                        .opacity(0.3)
+                    Color.white.opacity(0.3)
+                        .frame(width: previewRect.width, height: previewRect.height)
+                        .position(x: previewRect.midX, y: previewRect.midY)
                         .animation(.easeOut(duration: 0.15), value: cameraModel.isCapturing)
                 }
             }
@@ -149,15 +150,16 @@ struct ContentView: View {
         }
     }
     
-    private func makePreviewRect(in size: CGSize) -> CGRect {
-        let screenW = size.width
-        let screenH = size.height
-        let screenAspect = screenW / screenH
+    private func makePreviewRect(in geo: GeometryProxy) -> CGRect {
+        let size = geo.size
+        let topInset = geo.safeAreaInsets.top
+        let botInset = geo.safeAreaInsets.bottom
+        let xHeight = (topInset - botInset) / 2
         let aspect = cameraModel.captureAspectRatio
-        let previewW: CGFloat = aspect < screenAspect ? screenH * aspect : screenW
-        let previewH: CGFloat = aspect < screenAspect ? screenH : screenW / aspect
-        let previewX = (screenW - previewW) / 2
-        let previewY = (screenH - previewH) / 2
-        return CGRect(x: previewX, y: previewY, width: previewW, height: previewH)
+        let previewW: CGFloat = aspect < size.width / size.height ? size.height * aspect : size.width
+        let previewH: CGFloat = aspect < size.width / size.height ? size.height : size.width / aspect
+        let previewX = (size.width - previewW) / 2
+        let previewY = (size.height - previewH) / 2
+        return CGRect(x: previewX, y: previewY - xHeight, width: previewW, height: previewH)
     }
 }
