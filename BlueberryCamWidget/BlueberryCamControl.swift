@@ -15,7 +15,7 @@ struct BlueberryCamControl: ControlWidget {
             kind: "com.blueberrycam.cameracontrol"
         ) {
             ControlWidgetButton(action: BlueberryCamCaptureIntent()) {
-                Label("Blueberry Cam", systemImage: "camera.aperture")
+                Label("Blueberry Cam", image: "camera.blueberry.reversed")
             }
         }
         .displayName("Blueberry Cam")

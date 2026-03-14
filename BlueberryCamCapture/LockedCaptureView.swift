@@ -32,10 +32,10 @@ struct LockedCaptureView: View {
                     }
                     
                     LockedLensSelectorView(model: model)
-                        .padding(.bottom, 30)
+                        .padding(.bottom, 23)
                     
                     LockedBottomBarView(model: model, lockedSession: lockedSession)
-                        .padding(.bottom, 30)
+                        .padding(.bottom, 23)
                 }
                 
                 // Capture flash
@@ -461,16 +461,32 @@ struct LockedBottomBarView: View {
     
     var body: some View {
         HStack(alignment: .center, spacing: 0) {
-            // Right side placeholder — keeps shutter centred
+            // Open full app — replaces the applelogo placeholder.
+            // lockedSession.openApplication() is the approved way to launch
+            // the main app from a LockedCameraCaptureExtension.
             Button {
-                
+                Task {
+                    let activity = NSUserActivity(activityType: "com.jansari.rishi.Blueberry-Cam.opencamera")
+                    try? await lockedSession.openApplication(for: activity)
+                    
+                }
             } label: {
-                Image(systemName: "applelogo")
-                    .font(.system(size: 20))
-                    .foregroundColor(.white.opacity(0.8))
+                VStack(spacing: 4) {
+                    Image("camera.blueberry")
+                        .font(.system(size: 20))
+                        .symbolRenderingMode(.palette)
+                        .foregroundStyle(Color.black, Color.blue, Color.green)
+                        .padding()
+                        .clipShape(.circle)
+                        .glassEffect(.regular.interactive().tint(.white.mix(with: .teal, by: 0.4)), in: .circle)
+                    Text("OPEN")
+                        .font(.caption)
+                        .fontWidth(.expanded)
+                        .foregroundColor(.white.opacity(0.6))
+                }
+                .padding(.top)
             }
             .frame(maxWidth: .infinity)
-            .disabled(true)
             
             // Shutter button — same style as main app
             ZStack {
@@ -494,28 +510,16 @@ struct LockedBottomBarView: View {
             }
             .frame(maxWidth: .infinity)
             
-            // Open full app — replaces the applelogo placeholder.
-            // lockedSession.openApplication() is the approved way to launch
-            // the main app from a LockedCameraCaptureExtension.
+            // Right side placeholder — keeps shutter centred
             Button {
-                Task {
-                    let activity = NSUserActivity(activityType: "com.jansari.rishi.Blueberry-Cam.opencamera")
-                    try? await lockedSession.openApplication(for: activity)
-                    
-                }
+                
             } label: {
-                VStack(spacing: 4) {
-                    Image(systemName: "camera.aperture")
-                        .font(.system(size: 20))
-                        .foregroundColor(.white.opacity(0.8))
-                    Text("OPEN")
-                        .font(.caption)
-                        .fontWidth(.expanded)
-                        .foregroundColor(.white.opacity(0.6))
-                }
-                .padding(.top)
+                Image(systemName: "applelogo")
+                    .font(.system(size: 20))
+                    .foregroundColor(.white.opacity(0.8))
             }
             .frame(maxWidth: .infinity)
+            .disabled(true)
         }
     }
 }

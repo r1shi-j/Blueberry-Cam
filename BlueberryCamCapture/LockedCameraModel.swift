@@ -33,7 +33,7 @@ class LockedCameraModel: NSObject {
     private let _pendingCaptureModeBox = CaptureModeBox()
     
     // MARK: - Capture format
-    var captureMode: CaptureMode = .jpeg {
+    var captureMode: CaptureMode = .raw {
         didSet { if oldValue != captureMode { buildAvailableFormats() } }
     }
     var availableFormats: [CaptureMode] = []
@@ -111,7 +111,6 @@ class LockedCameraModel: NSObject {
     var isCapturing: Bool = false
     var showError: Bool = false
     var errorMessage: String = ""
-    var showHistogram: Bool = false
     var showManualControls: Bool = false
     var liveISO: Float = 0
     var liveShutter: String = ""

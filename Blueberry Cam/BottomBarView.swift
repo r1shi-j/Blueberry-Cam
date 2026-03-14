@@ -13,9 +13,13 @@ struct BottomBarView: View {
                         openPhotosApp()
                     } label: {
                         VStack(spacing: 4) {
-                            Image(systemName: "photo.on.rectangle")
+                            Image(systemName: "photo.on.rectangle.angled.fill")
                                 .font(.system(size: 20))
-                                .foregroundColor(.white.opacity(0.8))
+                                .symbolRenderingMode(.hierarchical)
+                                .tint(.primary)
+                                .padding()
+                                .clipShape(.circle)
+                                .glassEffect(.regular.interactive().tint(.black.mix(with: .white, by: 0.2)), in: .circle)
                             Text(String(shutterCount))
                                 .font(.caption)
                                 .fontWidth(.expanded)
