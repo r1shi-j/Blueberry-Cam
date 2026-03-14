@@ -127,7 +127,7 @@ extension CameraModel {
         // White Balance Slider
         let wb = AVCaptureSlider("White Balance", symbolName: "thermometer.sun.fill", in: 2000...10000, step: 100)
         wb.localizedValueFormat = "%@K"
-        wb.value = whiteBalanceTargetKelvin
+        wb.value = max(2000, min(10000, whiteBalanceTargetKelvin))
         wb.setActionQueue(.main) { [weak self] value in
             guard let self, !self.isUpdatingHardwareControl else { return }
             if abs(self.whiteBalanceTargetKelvin - value) > 10 {

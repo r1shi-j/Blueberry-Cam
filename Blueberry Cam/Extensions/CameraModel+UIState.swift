@@ -49,9 +49,12 @@ extension CameraModel {
             }
             
             self.buildAvailableFormats()
+            let previousShutterDuration: CMTime? = (!self.isAutoExposure && self.shutterSpeeds.indices.contains(self.shutterIndex)) ? self.shutterSpeeds[self.shutterIndex] : nil
             self.updateDeviceRanges()
             self.normalizeFlashModeForCurrentDevice()
             self.enforceExposureModeConstraints()
+            // Re-apply all active manual settings to the new device
+            self.reapplyManualSettingsAfterLensSwitch(previousShutterDuration: previousShutterDuration)
             // Recreate camera controls with new device's ISO/SS bounds
             self.setupCameraControls()
             
@@ -147,8 +150,34 @@ extension CameraModel {
                 histogramMode = .luminance
         }
     }
-
+    
     func setCleanUI(to value: Bool) {
         isCleanUI = value
+    }
+    
+    func reapplyManualSettingsAfterLensSwitch(previousShutterDuration: CMTime?) {
+        if !isAutoExposure {
+            if let prevDuration = previousShutterDuration, !shutterSpeeds.isEmpty {
+                let prevSecs = CMTimeGetSeconds(prevDuration)
+                shutterIndex = shutterSpeeds.indices.min { a, b in
+                    abs(CMTimeGetSeconds(shutterSpeeds[a]) - prevSecs) < abs(CMTimeGetSeconds(shutterSpeeds[b]) - prevSecs)
+                } ?? 0
+            }
+            applyManualExposure()
+        } else {
+            setAutoExposure()
         }
+        
+        if !isAutoFocus {
+            applyManualFocus()
+        } else {
+            setAutoFocus()
+        }
+        
+        if !isAutoWhiteBalance {
+            applyManualWhiteBalance()
+        } else {
+            setAutoWhiteBalance()
+        }
+    }
 }
