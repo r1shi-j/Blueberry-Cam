@@ -1,0 +1,154 @@
+internal import AVFoundation
+internal import CoreLocation
+import Foundation
+
+extension CameraModel {
+    // MARK: - UI Controls
+    func switchLens(to lens: Lens) {
+        guard lens != activeLens else { return }
+        activeLens = lens
+        
+        sessionQueue.async { Task { @MainActor in
+            self.session.beginConfiguration()
+            for input in self.session.inputs { self.session.removeInput(input) }
+            
+            guard let cam = AVCaptureDevice.default(lens.deviceType, for: .video, position: lens.position),
+                  let input = try? AVCaptureDeviceInput(device: cam),
+                  self.session.canAddInput(input) else {
+                self.session.commitConfiguration()
+                return
+            }
+            self.session.addInput(input)
+            self.device = cam
+            
+            // Crop zoom for 2x / 8x back lenses
+            if lens.zoomFactor > 1.0 {
+                try? cam.lockForConfiguration()
+                cam.videoZoomFactor = lens.zoomFactor
+                cam.unlockForConfiguration()
+            }
+            
+            // Portrait rotation + mirror
+            let isFront = lens.isFront
+            let rotationAngle: CGFloat = isFront ? 0 : 90
+            for conn in [self.photoOutput.connection(with: .video),
+                         self.videoOutput.connection(with: .video)].compactMap({ $0 }) {
+                if conn.isVideoRotationAngleSupported(rotationAngle) {
+                    conn.videoRotationAngle = rotationAngle
+                }
+                conn.isVideoMirrored = isFront
+            }
+            
+            self.session.commitConfiguration()
+            
+            // Set output max to largest the active format supports
+            if let largest = cam.activeFormat.supportedMaxPhotoDimensions.max(by: {
+                Int($0.width) * Int($0.height) < Int($1.width) * Int($1.height)
+            }) {
+                self.photoOutput.maxPhotoDimensions = largest
+            }
+            
+            self.buildAvailableFormats()
+            self.updateDeviceRanges()
+            self.normalizeFlashModeForCurrentDevice()
+            self.enforceExposureModeConstraints()
+            // Recreate camera controls with new device's ISO/SS bounds
+            self.setupCameraControls()
+            
+            if !cam.isLockingFocusWithCustomLensPositionSupported {
+                self.isAutoFocus = true
+            }
+        }}
+    }
+
+    func resetControl(for control: ManualControl) {
+        switch control {
+            case .ev:
+                if isAutoExposure {
+                    exposureBias = 0.0
+                    applyExposureBias()
+                }
+            case .iso:
+                isAutoExposure = true
+            case .ss:
+                isAutoExposure = true
+            case .f:
+                isAutoFocus = true
+                setAutoFocus()
+            case .wb:
+                isAutoWhiteBalance = true
+        }
+    }
+
+    func cycleFlashMode() {
+        guard supportsFlash, isAutoExposure else {
+            flashMode = .off
+            return
+        }
+        
+        let supported = photoOutput.supportedFlashModes
+        let order: [AVCaptureDevice.FlashMode] = [.off, .auto, .on]
+        let currentIndex = order.firstIndex(of: flashMode) ?? 0
+        
+        for offset in 1...order.count {
+            let candidate = order[(currentIndex + offset) % order.count]
+            if supported.contains(candidate) {
+                flashMode = candidate
+                return
+            }
+        }
+        
+        flashMode = .off
+    }
+
+    func toggleLocationGeotag() {
+        shouldEmbedLocationData.toggle()
+        if shouldEmbedLocationData {
+            locationManager.delegate = self
+            locationManager.desiredAccuracy = kCLLocationAccuracyBest
+            locationManager.requestWhenInUseAuthorization()
+            locationManager.startUpdatingLocation()
+        } else {
+            locationManager.stopUpdatingLocation()
+            locationManager.delegate = nil
+            currentLocation = nil
+        }
+    }
+
+    func selectResolution(_ opt: ResolutionOption) {
+        selectedResolution = opt
+        // No format switching needed — selectedResolution is used directly in captureDimensions()
+        // The active format already supports this dim (it came from activeFormat.supportedMaxPhotoDimensions)
+    }
+
+    func toggleClipping() { showClipping.toggle() }
+
+    func toggleZebraStripes() { showZebraStripes.toggle() }
+
+    func cycleHistogramMode() {
+        switch (histogramSize, histogramMode) {
+            case (.small, .luminance):
+                histogramMode = .color
+            case (.small, .color):
+                histogramMode = .waveform
+            case (.small, .waveform):
+                histogramMode = .parade
+            case (.small, .parade):
+                histogramSize = .large
+                histogramMode = .luminance
+            case (.large, .luminance):
+                histogramMode = .color
+            case (.large, .color):
+                histogramMode = .waveform
+            case (.large, .waveform):
+                histogramMode = .parade
+            case (.large, .parade):
+                histogramSize = .small
+                histogramMode = .luminance
+        }
+    }
+
+    func setCleanUI(to value: Bool) {
+        isCleanUI = value
+        }
+}

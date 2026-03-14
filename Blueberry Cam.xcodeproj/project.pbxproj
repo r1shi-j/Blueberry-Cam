@@ -80,8 +80,8 @@
 		5B5FC8432F64A9D700532B15 /* Exceptions for "Blueberry Cam" folder in "BlueberryCamCapture" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
-				CameraPreviewView.swift,
-				SharedTypes.swift,
+				Models/SharedTypes.swift,
+				Views/CameraPreviewView.swift,
 			);
 			target = 5B5FC82B2F648F8E00532B15 /* BlueberryCamCapture */;
 		};
