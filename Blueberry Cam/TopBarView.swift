@@ -5,13 +5,13 @@ struct TopBarView: View {
     @Bindable var cameraModel: CameraModel
     @Binding var selectedControl: ManualControl?
     
-    private let readoutColor: (ManualControl) -> Color = { control in
+    private func readoutColor(for control: ManualControl) -> Color {
         switch control {
-            case .ev: .orange
-            case .iso: .yellow
-            case .ss: .white.opacity(0.8)
-            case .f: .green
-            case .wb: .cyan
+            case .ev:  return .orange
+            case .iso: return .yellow
+            case .ss:  return .white.opacity(0.8)
+            case .f:   return .green
+            case .wb:  return .cyan
         }
     }
     
@@ -39,7 +39,14 @@ struct TopBarView: View {
 //                                .clipShape(.capsule)
 //                        }
                         .font(.system(size: 12, weight: selectedControl == control ? .black : .regular, design: .monospaced))
-                        .foregroundColor(readoutColor(control))
+                        .underline(
+                            (control == ManualControl.ev && cameraModel.exposureBias != 0.0) ||
+                            (control == ManualControl.iso && !cameraModel.isAutoExposure) ||
+                            (control == ManualControl.ss && !cameraModel.isAutoExposure) ||
+                            (control == ManualControl.f && !cameraModel.isAutoFocus) ||
+                            (control == ManualControl.wb && !cameraModel.isAutoWhiteBalance)
+                        )
+                        .foregroundColor(readoutColor(for: control))
                         .onTapGesture(count: 2) {
                             withAnimation(.spring(duration: 0.5)) {
                                 cameraModel.resetControl(for: control)

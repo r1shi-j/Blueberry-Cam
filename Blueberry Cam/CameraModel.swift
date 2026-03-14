@@ -866,12 +866,12 @@ extension CameraModel: AVCapturePhotoCaptureDelegate {
             
             PHPhotoLibrary.shared().performChanges({
                 let opts = PHAssetResourceCreationOptions()
-                opts.uniformTypeIdentifier = isDNG ? "com.adobe.raw-image" : "public.jpeg"
+                opts.uniformTypeIdentifier = isDNG ? "com.adobe.raw-image" : (isHEIF ? "public.heic" : "public.jpeg")
                 let req = PHAssetCreationRequest.forAsset()
                 if let loc = location {
                     req.location = loc
                 }
-                req.addResource(with: .photo, data: data, options: isDNG ? opts : nil)
+                req.addResource(with: .photo, data: data, options: opts)
                 
                 // 2. Add the new asset to the album
                 if let album, let placeholder = req.placeholderForCreatedAsset {
