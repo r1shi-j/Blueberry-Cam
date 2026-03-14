@@ -25,6 +25,7 @@ struct StatusBarAreaView: View {
                                 .background(Color.yellow)
                                 .clipShape(.capsule)
                         }
+                        .padding(.leading)
                     } else {
                         // show small histogram
                         HistogramView(
@@ -56,6 +57,7 @@ struct StatusBarAreaView: View {
                             .background(Color.white.opacity(0.15))
                             .clipShape(.capsule)
                     }
+                    .padding(.leading)
                 }
                 
                 Spacer()

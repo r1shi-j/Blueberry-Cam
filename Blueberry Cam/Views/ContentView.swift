@@ -93,7 +93,7 @@ struct ContentView: View {
                             )
                             .frame(height: 60)
                             .padding(.horizontal, 20)
-                            .padding(.bottom, 32)
+                            .padding(.bottom, 8)
                             .onTapGesture {
                                 hapticTrigger += 1
                                 cameraModel.cycleHistogramMode()

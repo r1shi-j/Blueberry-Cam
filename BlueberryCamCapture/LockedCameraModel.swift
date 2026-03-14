@@ -212,9 +212,12 @@ class LockedCameraModel: NSObject {
                 Int($0.width) * Int($0.height) < Int($1.width) * Int($1.height)
             }) { self.photoOutput.maxPhotoDimensions = largest }
             self.buildAvailableFormats()
+            let previousShutterDuration: CMTime? = (!self.isAutoExposure && self.shutterSpeeds.indices.contains(self.shutterIndex)) ? self.shutterSpeeds[self.shutterIndex] : nil
             self.updateDeviceRanges()
             self.normalizeFlashModeForCurrentDevice()
             self.enforceExposureModeConstraints()
+            // Re-apply all active manual settings to the new device
+            self.reapplyManualSettingsAfterLensSwitch(previousShutterDuration: previousShutterDuration)
         }}
     }
     
@@ -230,6 +233,32 @@ class LockedCameraModel: NSObject {
         if !isAutoExposure {
             flashMode = .off
             if captureMode != .raw { captureMode = .raw }
+        }
+    }
+    
+    private func reapplyManualSettingsAfterLensSwitch(previousShutterDuration: CMTime?) {
+        if !isAutoExposure {
+            if let prevDuration = previousShutterDuration, !shutterSpeeds.isEmpty {
+                let prevSecs = CMTimeGetSeconds(prevDuration)
+                shutterIndex = shutterSpeeds.indices.min { a, b in
+                    abs(CMTimeGetSeconds(shutterSpeeds[a]) - prevSecs) < abs(CMTimeGetSeconds(shutterSpeeds[b]) - prevSecs)
+                } ?? 0
+            }
+            applyManualExposure()
+        } else {
+            setAutoExposure()
+        }
+        
+        if !isAutoFocus {
+            applyManualFocus()
+        } else {
+            setAutoFocus()
+        }
+        
+        if !isAutoWhiteBalance {
+            applyManualWhiteBalance()
+        } else {
+            setAutoWhiteBalance()
         }
     }
     
