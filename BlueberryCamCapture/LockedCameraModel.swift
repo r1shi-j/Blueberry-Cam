@@ -24,6 +24,7 @@ class LockedCameraModel: NSObject {
     // sessionContentURL (file storage) and openApplication(); it does NOT wrap AVCaptureSession.
     nonisolated let session = AVCaptureSession()
     private var lockedSession: LockedCameraCaptureSession?
+    nonisolated private let _sessionContentURLBox = SessionURLBox()
     
     private var device: AVCaptureDevice?
     nonisolated private let photoOutput = AVCapturePhotoOutput()
@@ -126,6 +127,7 @@ class LockedCameraModel: NSObject {
     // Called from LockedCaptureView.onAppear with the system-provided session.
     func configure(with lockedSession: LockedCameraCaptureSession) {
         self.lockedSession = lockedSession
+        _sessionContentURLBox.value = lockedSession.sessionContentURL
         sessionQueue.async { Task { @MainActor in self.setupPipeline() } }
     }
     
@@ -448,6 +450,10 @@ class LockedCameraModel: NSObject {
     func selectResolution(_ opt: ResolutionOption) { selectedResolution = opt }
 }
 
+final class SessionURLBox: @unchecked Sendable {
+    nonisolated(unsafe) var value: URL? = nil
+}
+
 // MARK: - AVCapturePhotoCaptureDelegate
 extension LockedCameraModel: AVCapturePhotoCaptureDelegate {
     nonisolated func photoOutput(_ output: AVCapturePhotoOutput,
@@ -462,19 +468,51 @@ extension LockedCameraModel: AVCapturePhotoCaptureDelegate {
             return
         }
         let isHeif = !photo.isRawPhoto && _pendingCaptureModeBox.value == .heif
-        // No location in extension sandbox
-        saveToPhotos(data: data, isDNG: photo.isRawPhoto, isHEIF: isHeif)
+        let url = _sessionContentURLBox.value  // read via box, same pattern as CaptureModeBox
+        saveToSessionDirectory(data: data, isDNG: photo.isRawPhoto, isHEIF: isHeif, sessionURL: url)
     }
     
-    private nonisolated func saveToPhotos(data: Data, isDNG: Bool, isHEIF: Bool) {
+    private nonisolated func saveToSessionDirectory(data: Data, isDNG: Bool, isHEIF: Bool, sessionURL: URL?) {
+        guard let sessionURL else {
+            saveDirectlyToPhotos(data: data, isDNG: isDNG, isHEIF: isHEIF, sessionURL: sessionURL)
+            return
+        }
+        
+        let ext = isDNG ? "dng" : (isHEIF ? "heic" : "jpg")
+        let filename = "IMG_\(Int(Date().timeIntervalSince1970)).\(ext)"
+        let fileURL = sessionURL.appendingPathComponent(filename)
+        
+        do {
+            try data.write(to: fileURL)
+            // Also save immediately to camera roll so photo is available straight away
+            saveDirectlyToPhotos(data: data, isDNG: isDNG, isHEIF: isHEIF, sessionURL: sessionURL)
+        } catch {
+            Task { @MainActor in self.errorMessage = error.localizedDescription; self.showError = true }
+        }
+    }
+    
+    private nonisolated func saveDirectlyToPhotos(data: Data, isDNG: Bool, isHEIF: Bool, sessionURL: URL?) {
         PHPhotoLibrary.requestAuthorization(for: .addOnly) { status in
-            guard status == .authorized || status == .limited else { return }
+            guard status == .authorized || status == .limited else {
+                Task { @MainActor in self.errorMessage = "Photos access denied."; self.showError = true }
+                return
+            }
+            var placeholderID: String?
             PHPhotoLibrary.shared().performChanges({
                 let opts = PHAssetResourceCreationOptions()
                 opts.uniformTypeIdentifier = isDNG ? "com.adobe.raw-image" : (isHEIF ? "public.heic" : "public.jpeg")
                 let req = PHAssetCreationRequest.forAsset()
                 req.addResource(with: .photo, data: data, options: opts)
+                placeholderID = req.placeholderForCreatedAsset?.localIdentifier
             }) { success, error in
+                if success, let id = placeholderID, let sessionURL {
+                    // Write the localIdentifier to a manifest file in the session dir
+                    // so the main app can find the exact asset later
+                    let manifestURL = sessionURL.appendingPathComponent("manifest.txt")
+                    var existing = (try? String(contentsOf: manifestURL, encoding: .utf8)) ?? ""
+                    existing += id + "\n"
+                    try? existing.write(to: manifestURL, atomically: true, encoding: .utf8)
+                }
                 if let error {
                     Task { @MainActor in self.errorMessage = error.localizedDescription; self.showError = true }
                 }

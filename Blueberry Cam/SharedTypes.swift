@@ -1,4 +1,5 @@
 import Foundation
+import Photos
 internal import AVFoundation
 import CoreMedia
 
@@ -32,6 +33,28 @@ enum CaptureMode: String, CaseIterable, Identifiable {
     case heif = "HEIF"
     case raw  = "RAW"
     var id: String { rawValue }
+}
+
+// MARK: - Histograms
+enum HistogramMode: String, CaseIterable {
+    case luminance = "LUMA"
+    case color = "RGB"
+    case waveform = "WAVE"
+    case parade = "PARADE"
+}
+
+enum HistogramSize: String, CaseIterable {
+    case small, large
+}
+
+enum WaveformConstants {
+    nonisolated static let wfCols = 512
+    nonisolated static let wfRows = 200
+}
+
+// MARK: - ManualControl
+enum ManualControl: CaseIterable {
+    case ev, iso, ss, f, wb
 }
 
 // MARK: - Lens
@@ -73,22 +96,48 @@ enum Lens: String, CaseIterable {
     }
 }
 
-enum HistogramMode: String, CaseIterable {
-    case luminance = "LUMA"
-    case color = "RGB"
-    case waveform = "WAVE"
-    case parade = "PARADE"
-}
-
-enum HistogramSize: String, CaseIterable {
-    case small, large
-}
-
-enum ManualControl: CaseIterable {
-    case ev, iso, ss, f, wb
-}
-
-enum WaveformConstants {
-    nonisolated static let wfCols = 512
-    nonisolated static let wfRows = 200
+// MARK: - ResolveAlbumID -
+// Same resolveAlbumID logic as CameraModel — finds or creates "Blueberry Cam" album
+func resolveAlbumID() -> String? {
+    let key = "blueberryCamAlbumID"
+    let defaults = UserDefaults.standard
+    
+    // Check for a cached ID first
+    if let savedID = defaults.string(forKey: key) {
+        let existing = PHAssetCollection.fetchAssetCollections(withLocalIdentifiers: [savedID], options: nil)
+        if existing.firstObject != nil {
+            return savedID  // Found it – even if the user moved it to a folder
+        }
+        // ID is stale (album was deleted), fall through to create a new one
+    }
+    
+    // Try to find an existing album with our name
+    let fetch = PHAssetCollection.fetchAssetCollections(with: .album, subtype: .albumRegular, options: nil)
+    var foundID: String?
+    fetch.enumerateObjects { col, _, stop in
+        if col.localizedTitle == "Blueberry Cam" {
+            foundID = col.localIdentifier
+            stop.pointee = true
+        }
+    }
+    if let foundID {
+        defaults.set(foundID, forKey: key)
+        return foundID
+    }
+    
+    // Create a brand new album
+    var newID: String?
+    try? PHPhotoLibrary.shared().performChangesAndWait {
+        let createReq = PHAssetCollectionChangeRequest.creationRequestForAssetCollection(withTitle: "Blueberry Cam")
+        newID = createReq.placeholderForCreatedAssetCollection.localIdentifier
+    }
+    
+    // Resolve placeholder → real localIdentifier
+    if let placeholder = newID {
+        let created = PHAssetCollection.fetchAssetCollections(withLocalIdentifiers: [placeholder], options: nil)
+        let realID = created.firstObject?.localIdentifier ?? placeholder
+        defaults.set(realID, forKey: key)
+        return realID
+    }
+    return nil
 }

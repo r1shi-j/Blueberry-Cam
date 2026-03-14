@@ -859,7 +859,7 @@ extension CameraModel: AVCapturePhotoCaptureDelegate {
             }
             
             // 1. Resolve the "Blueberry Cam" album, creating it only when necessary.
-            let albumID = self.resolveAlbumID()
+            let albumID = resolveAlbumID()
             let album = albumID.flatMap {
                 PHAssetCollection.fetchAssetCollections(withLocalIdentifiers: [$0], options: nil).firstObject
             }
@@ -887,52 +887,6 @@ extension CameraModel: AVCapturePhotoCaptureDelegate {
                 }
             }
         }
-    }
-    
-    /// Returns the localIdentifier for the "Blueberry Cam" album, creating one if needed.
-    /// The result is cached in UserDefaults so the album can be moved to a folder without losing it.
-    private nonisolated func resolveAlbumID() -> String? {
-        let key = "blueberryCamAlbumID"
-        let defaults = UserDefaults.standard
-        
-        // Check for a cached ID first
-        if let savedID = defaults.string(forKey: key) {
-            let existing = PHAssetCollection.fetchAssetCollections(withLocalIdentifiers: [savedID], options: nil)
-            if existing.firstObject != nil {
-                return savedID  // Found it – even if the user moved it to a folder
-            }
-            // ID is stale (album was deleted), fall through to create a new one
-        }
-        
-        // Try to find an existing album with our name
-        let fetch = PHAssetCollection.fetchAssetCollections(with: .album, subtype: .albumRegular, options: nil)
-        var foundID: String?
-        fetch.enumerateObjects { col, _, stop in
-            if col.localizedTitle == "Blueberry Cam" {
-                foundID = col.localIdentifier
-                stop.pointee = true
-            }
-        }
-        if let foundID {
-            defaults.set(foundID, forKey: key)
-            return foundID
-        }
-        
-        // Create a brand new album
-        var newID: String?
-        try? PHPhotoLibrary.shared().performChangesAndWait {
-            let createReq = PHAssetCollectionChangeRequest.creationRequestForAssetCollection(withTitle: "Blueberry Cam")
-            newID = createReq.placeholderForCreatedAssetCollection.localIdentifier
-        }
-        
-        // Resolve placeholder → real localIdentifier
-        if let placeholder = newID {
-            let created = PHAssetCollection.fetchAssetCollections(withLocalIdentifiers: [placeholder], options: nil)
-            let realID = created.firstObject?.localIdentifier ?? placeholder
-            defaults.set(realID, forKey: key)
-            return realID
-        }
-        return nil
     }
 }
 

@@ -1,9 +1,9 @@
 import SwiftUI
 
 struct ContentView: View {
+    @Binding var shutterCount: Int
     @State private var cameraModel = CameraModel()
     @State private var levelModel  = LevelMotionModel()
-    @AppStorage("shutterCount") private var shutterCount = 0
     @State private var count = 0
     @State private var selectedControl: ManualControl?
     
