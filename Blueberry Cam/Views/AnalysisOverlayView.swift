@@ -16,7 +16,9 @@ struct AnalysisOverlayView: View {
             Canvas { context, size in
                 let cols = Int(gridSize.width)
                 let rows = Int(gridSize.height)
-                guard cols > 0, rows > 0, mask.count == cols * rows else { return }
+                guard cols > 0, rows > 0, mask.count == cols * rows else {
+                    return
+                }
                 
                 let cellWidth = size.width / CGFloat(cols)
                 let cellHeight = size.height / CGFloat(rows)
@@ -39,13 +41,17 @@ struct AnalysisOverlayView: View {
                         
                         switch style {
                             case .focusPeaking:
-                                let r = max(0.4, min(cellWidth, cellHeight) * 0.12)
+                                let r = max(1.5, min(cellWidth, cellHeight) * 0.25)
                                 let dot = CGRect(x: rect.midX - r, y: rect.midY - r, width: r * 2, height: r * 2)
-                                context.fill(Path(ellipseIn: dot), with: .color(Color.green.opacity(0.9)))
+                                context.fill(Path(ellipseIn: dot), with: .color(Color.green.opacity(0.85)))
                             case .zebra:
-                                context.fill(Path(rect), with: .color(Color.white.opacity(0.45)))
+                                let r = max(0.75, min(cellWidth, cellHeight) * 0.45)
+                                let dot = CGRect(x: rect.midX - r, y: rect.midY - r, width: r * 2, height: r * 2)
+                                context.fill(Path(dot), with: .color(Color.gray.opacity(0.6)))
                             case .clipping:
-                                context.fill(Path(rect), with: .color(Color.red.opacity(0.6)))
+                                let r = max(0.6, min(cellWidth, cellHeight) * 0.3)
+                                let dot = CGRect(x: rect.midX - r, y: rect.midY - r, width: r * 2, height: r * 2)
+                                context.fill(Path(ellipseIn: dot), with: .color(Color.red.opacity(0.9)))
                         }
                     }
                 }

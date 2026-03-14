@@ -12,6 +12,8 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
     var device: AVCaptureDevice?
     nonisolated let photoOutput = AVCapturePhotoOutput()
     nonisolated let videoOutput = AVCaptureVideoDataOutput()
+    nonisolated let depthOutput = AVCaptureDepthDataOutput()
+    private var synchronizer: AVCaptureDataOutputSynchronizer?
     nonisolated let sessionQueue = DispatchQueue(label: "com.rawcam.sessionQueue")
     nonisolated private let _frameCounter = FrameCounter()
     let _pendingCaptureModeBox = CaptureModeBox()
@@ -107,9 +109,13 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
         didSet {
             if oldValue != lensPosition {
                 syncFocusToHardware()
+                lastLensPosition = lensPosition
             }
         }
     }
+    
+    @ObservationIgnored
+    nonisolated(unsafe) var lastLensPosition: Float = 1.0
     var focusPeakingHoldTask: Task<Void, Never>?
     
     var isAutoWhiteBalance: Bool = true {
@@ -249,13 +255,17 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
             session.addOutput(photoOutput)
         }
         
-        videoOutput.setSampleBufferDelegate(self, queue: DispatchQueue(label: "com.rawcam.videoQueue"))
         videoOutput.alwaysDiscardsLateVideoFrames = true
         videoOutput.videoSettings = [
             kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA
         ]
         if session.canAddOutput(videoOutput) {
             session.addOutput(videoOutput)
+        }
+        
+        if session.canAddOutput(depthOutput) {
+            session.addOutput(depthOutput)
+            depthOutput.isFilteringEnabled = true
         }
         
         // Keep analysis output orientation aligned with preview from first launch.
@@ -270,6 +280,16 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
         }
         
         session.commitConfiguration()
+        
+        // Safely setup synchronizer or fallback
+        let syncQueue = DispatchQueue(label: "com.rawcam.analysisQueue")
+        if depthOutput.connection(with: .depthData) != nil && videoOutput.connection(with: .video) != nil {
+            synchronizer = AVCaptureDataOutputSynchronizer(dataOutputs: [videoOutput, depthOutput])
+            synchronizer?.setDelegate(self, queue: syncQueue)
+        } else {
+            // Fallback for devices without LiDAR or if depth is not available in current format
+            videoOutput.setSampleBufferDelegate(self, queue: syncQueue)
+        }
         
         Task.detached(priority: .userInitiated) {
             self.session.startRunning()

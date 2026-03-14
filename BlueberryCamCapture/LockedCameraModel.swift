@@ -29,7 +29,6 @@ class LockedCameraModel: NSObject {
     nonisolated private let photoOutput = AVCapturePhotoOutput()
     nonisolated private let videoOutput = AVCaptureVideoDataOutput()
     nonisolated private let sessionQueue = DispatchQueue(label: "com.blueberrycam.locked.sessionQueue")
-    nonisolated private let _frameCounter = FrameCounter()
     private let _pendingCaptureModeBox = CaptureModeBox()
     nonisolated private let _sessionContentURLBox = SessionURLBox()
     
