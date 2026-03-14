@@ -24,5 +24,6 @@ struct Blueberry_CamApp: App {
                     }
                 }
         }
+        .handlesExternalEvents(matching: ["*"])
     }
 }
