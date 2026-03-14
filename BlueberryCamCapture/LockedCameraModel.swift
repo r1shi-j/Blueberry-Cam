@@ -24,7 +24,6 @@ class LockedCameraModel: NSObject {
     // sessionContentURL (file storage) and openApplication(); it does NOT wrap AVCaptureSession.
     nonisolated let session = AVCaptureSession()
     private var lockedSession: LockedCameraCaptureSession?
-    nonisolated private let _sessionContentURLBox = SessionURLBox()
     
     private var device: AVCaptureDevice?
     nonisolated private let photoOutput = AVCapturePhotoOutput()
@@ -32,6 +31,7 @@ class LockedCameraModel: NSObject {
     nonisolated private let sessionQueue = DispatchQueue(label: "com.blueberrycam.locked.sessionQueue")
     nonisolated private let _frameCounter = FrameCounter()
     private let _pendingCaptureModeBox = CaptureModeBox()
+    nonisolated private let _sessionContentURLBox = SessionURLBox()
     
     // MARK: - Capture format
     var captureMode: CaptureMode = .raw {
@@ -44,17 +44,26 @@ class LockedCameraModel: NSObject {
     var iso: Float = 100
     var isAutoExposure: Bool = true {
         didSet {
-            if !isAutoExposure, let d = device {
-                let snapped = round(d.iso / 50.0) * 50.0
-                self.iso = max(minISO, min(maxISO, snapped))
-                if let idx = shutterSpeeds.indices.min(by: {
-                    abs(CMTimeGetSeconds(shutterSpeeds[$0]) - CMTimeGetSeconds(d.exposureDuration)) <
-                        abs(CMTimeGetSeconds(shutterSpeeds[$1]) - CMTimeGetSeconds(d.exposureDuration))
-                }) { shutterIndex = idx }
+            if oldValue != isAutoExposure {
+                if !isAutoExposure, let d = device {
+                    let snapped = round(d.iso / 50.0) * 50.0
+                    self.iso = max(minISO, min(maxISO, snapped))
+                    if let idx = shutterSpeeds.indices.min(by: {
+                        abs(CMTimeGetSeconds(shutterSpeeds[$0]) - CMTimeGetSeconds(d.exposureDuration)) <
+                            abs(CMTimeGetSeconds(shutterSpeeds[$1]) - CMTimeGetSeconds(d.exposureDuration))
+                    }) { shutterIndex = idx }
+                }
+                enforceExposureModeConstraints()
             }
         }
     }
-    var isAutoFocus: Bool = true
+    var isAutoFocus: Bool = true {
+        didSet {
+            if oldValue != isAutoFocus, !isAutoFocus, let d = device {
+                self.lensPosition = d.lensPosition
+            }
+        }
+    }
     var lensPosition: Float = 1.0
     var isAutoWhiteBalance: Bool = true {
         didSet {
@@ -149,7 +158,7 @@ class LockedCameraModel: NSObject {
         // Video output for live analysis (histogram, peaking, zebra)
         videoOutput.setSampleBufferDelegate(self, queue: DispatchQueue(label: "com.blueberrycam.locked.videoQueue"))
         videoOutput.alwaysDiscardsLateVideoFrames = true
-        videoOutput.videoSettings = [kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA]
+//        videoOutput.videoSettings = [kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA]
         if session.canAddOutput(videoOutput) { session.addOutput(videoOutput) }
         
         // Portrait rotation
@@ -169,6 +178,8 @@ class LockedCameraModel: NSObject {
                 }) { self.photoOutput.maxPhotoDimensions = largest }
                 self.buildAvailableFormats()
                 self.updateDeviceRanges()
+                self.normalizeFlashModeForCurrentDevice()
+                self.enforceExposureModeConstraints()
             }
         }
     }
@@ -202,7 +213,24 @@ class LockedCameraModel: NSObject {
             }) { self.photoOutput.maxPhotoDimensions = largest }
             self.buildAvailableFormats()
             self.updateDeviceRanges()
+            self.normalizeFlashModeForCurrentDevice()
+            self.enforceExposureModeConstraints()
         }}
+    }
+    
+    private func normalizeFlashModeForCurrentDevice() {
+        guard supportsFlash else { flashMode = .off; return }
+        if !photoOutput.supportedFlashModes.contains(flashMode) {
+            flashMode = photoOutput.supportedFlashModes.contains(.auto) ? .auto : .off
+        }
+        if !isAutoExposure { flashMode = .off }
+    }
+    
+    private func enforceExposureModeConstraints() {
+        if !isAutoExposure {
+            flashMode = .off
+            if captureMode != .raw { captureMode = .raw }
+        }
     }
     
     // MARK: - Formats & ranges (identical logic to main app)
@@ -257,8 +285,15 @@ class LockedCameraModel: NSObject {
         let maxSecs = CMTimeGetSeconds(fmt.maxExposureDuration)
         let ts = fmt.minExposureDuration.timescale
         let stops: [Double] = [
-            1/8000, 1/4000, 1/2000, 1/1000, 1/500, 1/250, 1/125,
-            1/60, 1/30, 1/15, 1/8, 1/4, 1/2
+            1/100000, 1/80000, 1/60000, 1/50000, 1/40000, 1/32000,
+            1/25000,  1/20000, 1/16000, 1/12500, 1/10000, 1/8000,
+            1/6400,   1/5000,  1/4000,  1/3200,  1/2500,  1/2000,
+            1/1600,   1/1250,  1/1000,  1/800,   1/640,   1/500,
+            1/400,    1/320,   1/250,   1/200,   1/160,   1/125,
+            1/100,    1/80,    1/60,    1/50,    1/40,    1/30,
+            1/25,     1/20,    1/15,    1/13,    1/10,    1/8,
+            1/6,      1/5,     1/4,     1/3,     1/2.5,   1/2,
+            1/1.6,    1/1.3
         ]
         return stops.filter { $0 >= minSecs - 1e-9 && $0 <= maxSecs + 1e-9 }
             .map { CMTimeMakeWithSeconds($0, preferredTimescale: ts) }
@@ -305,16 +340,34 @@ class LockedCameraModel: NSObject {
                        !AVCapturePhotoOutput.isAppleProRAWPixelFormat($0)
                    }) ?? photoOutput.availableRawPhotoPixelFormatTypes.first {
                     let s = AVCapturePhotoSettings(rawPixelFormatType: fmt)
-                    s.maxPhotoDimensions = dims; return s
+                    s.maxPhotoDimensions = dims
+                    applyFlashModeIfSupported(to: s)
+                    return s
                 }; fallthrough
             case .heif:
                 if photoOutput.availablePhotoCodecTypes.contains(.hevc) {
                     let s = AVCapturePhotoSettings(format: [AVVideoCodecKey: AVVideoCodecType.hevc])
-                    s.maxPhotoDimensions = dims; return s
+                    s.maxPhotoDimensions = dims
+                    applyFlashModeIfSupported(to: s)
+                    return s
                 }; fallthrough
             case .jpeg:
                 let s = AVCapturePhotoSettings()
-                s.maxPhotoDimensions = dims; return s
+                s.maxPhotoDimensions = dims
+                applyFlashModeIfSupported(to: s)
+                return s
+        }
+    }
+    
+    private func applyFlashModeIfSupported(to settings: AVCapturePhotoSettings) {
+        guard isAutoExposure, supportsFlash else {
+            settings.flashMode = .off
+            return
+        }
+        if photoOutput.supportedFlashModes.contains(flashMode) {
+            settings.flashMode = flashMode
+        } else {
+            settings.flashMode = .off
         }
     }
     
@@ -362,7 +415,7 @@ class LockedCameraModel: NSObject {
         d.unlockForConfiguration()
     }
     
-    // MARK: White Balance
+    // MARK: - White Balance
     func applyManualWhiteBalance() {
         guard let d = device else { return }
         try? d.lockForConfiguration()
@@ -448,10 +501,6 @@ class LockedCameraModel: NSObject {
     }
     
     func selectResolution(_ opt: ResolutionOption) { selectedResolution = opt }
-}
-
-final class SessionURLBox: @unchecked Sendable {
-    nonisolated(unsafe) var value: URL? = nil
 }
 
 // MARK: - AVCapturePhotoCaptureDelegate
