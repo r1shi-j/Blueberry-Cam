@@ -1,5 +1,5 @@
 import SwiftUI
-import AVFoundation
+internal import AVFoundation
 
 struct TopBarView: View {
     @Bindable var cameraModel: CameraModel

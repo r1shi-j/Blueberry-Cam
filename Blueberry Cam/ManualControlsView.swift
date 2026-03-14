@@ -1,10 +1,6 @@
 import SwiftUI
 import CoreMedia
 
-enum ManualControl: CaseIterable {
-    case ev, iso, ss, f, wb
-}
-
 struct ManualControlsView: View {
     @Bindable var cameraModel: CameraModel
     let control: ManualControl

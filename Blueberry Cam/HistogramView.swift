@@ -135,8 +135,8 @@ struct HistogramView: View {
     // that has data. Point size is smaller than a cell so there is always a visible
     // gap between dots, giving the oscilloscope-dot look Halide uses.
     private func drawWaveform(_ ctx: GraphicsContext, _ sz: CGSize, outCols: Int) {
-        let wfCols = CameraModel.wfCols
-        let wfRows = CameraModel.wfRows
+        let wfCols = WaveformConstants.wfCols
+        let wfRows = WaveformConstants.wfRows
         guard waveformData.count == wfCols * wfRows * 4 else { return }
         
         let clampedCols = min(outCols, wfCols)

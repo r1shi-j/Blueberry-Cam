@@ -7,20 +7,132 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		5B5FC8352F648F8E00532B15 /* BlueberryCamCapture.appex in Embed ExtensionKit Extensions */ = {isa = PBXBuildFile; fileRef = 5B5FC82C2F648F8E00532B15 /* BlueberryCamCapture.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		5B5FC84C2F64AC3800532B15 /* LockedCameraCapture.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 5B5FC84B2F64AC3800532B15 /* LockedCameraCapture.framework */; };
+		5B5FC8532F64B32E00532B15 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 5B5FC8522F64B32E00532B15 /* WidgetKit.framework */; };
+		5B5FC8552F64B32E00532B15 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 5B5FC8542F64B32E00532B15 /* SwiftUI.framework */; };
+		5B5FC8642F64B32F00532B15 /* BlueberryCamWidgetExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 5B5FC8512F64B32E00532B15 /* BlueberryCamWidgetExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		5BD3EC122F5F6C9400B83A36 /* AGENTS.md in Resources */ = {isa = PBXBuildFile; fileRef = 5BD3EC112F5F6C9400B83A36 /* AGENTS.md */; };
 		5BD3EC142F5F6C9500B83A36 /* Journal.md in Resources */ = {isa = PBXBuildFile; fileRef = 5BD3EC132F5F6C9500B83A36 /* Journal.md */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		5B5FC8332F648F8E00532B15 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 5B3325012F5C7A3200874430 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 5B5FC82B2F648F8E00532B15;
+			remoteInfo = BlueberryCamCapture;
+		};
+		5B5FC8622F64B32F00532B15 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 5B3325012F5C7A3200874430 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 5B5FC8502F64B32E00532B15;
+			remoteInfo = BlueberryCamWidgetExtension;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		5B5FC83A2F648F8E00532B15 /* Embed ExtensionKit Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "$(EXTENSIONS_FOLDER_PATH)";
+			dstSubfolderSpec = 16;
+			files = (
+				5B5FC8352F648F8E00532B15 /* BlueberryCamCapture.appex in Embed ExtensionKit Extensions */,
+			);
+			name = "Embed ExtensionKit Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		5B5FC8692F64B32F00532B15 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				5B5FC8642F64B32F00532B15 /* BlueberryCamWidgetExtension.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
 		5B3325092F5C7A3200874430 /* Blueberry Cam.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Blueberry Cam.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		5B5FC82C2F648F8E00532B15 /* BlueberryCamCapture.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.extensionkit-extension"; includeInIndex = 0; path = BlueberryCamCapture.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		5B5FC84B2F64AC3800532B15 /* LockedCameraCapture.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = LockedCameraCapture.framework; path = System/Library/Frameworks/LockedCameraCapture.framework; sourceTree = SDKROOT; };
+		5B5FC8512F64B32E00532B15 /* BlueberryCamWidgetExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = BlueberryCamWidgetExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		5B5FC8522F64B32E00532B15 /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
+		5B5FC8542F64B32E00532B15 /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
 		5BD3EC112F5F6C9400B83A36 /* AGENTS.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = AGENTS.md; sourceTree = "<group>"; };
 		5BD3EC132F5F6C9500B83A36 /* Journal.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = Journal.md; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		5B5FC8362F648F8E00532B15 /* Exceptions for "BlueberryCamCapture" folder in "BlueberryCamCapture" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 5B5FC82B2F648F8E00532B15 /* BlueberryCamCapture */;
+		};
+		5B5FC8432F64A9D700532B15 /* Exceptions for "Blueberry Cam" folder in "BlueberryCamCapture" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				CameraPreviewView.swift,
+				SharedTypes.swift,
+			);
+			target = 5B5FC82B2F648F8E00532B15 /* BlueberryCamCapture */;
+		};
+		5B5FC8652F64B32F00532B15 /* Exceptions for "BlueberryCamWidget" folder in "BlueberryCamWidgetExtension" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 5B5FC8502F64B32E00532B15 /* BlueberryCamWidgetExtension */;
+		};
+		5B5FC8702F64B47200532B15 /* Exceptions for "BlueberryCamWidget" folder in "Blueberry Cam" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				BlueberryCamCaptureIntent.swift,
+			);
+			target = 5B3325082F5C7A3200874430 /* Blueberry Cam */;
+		};
+		5B5FC8712F64B47200532B15 /* Exceptions for "BlueberryCamWidget" folder in "BlueberryCamCapture" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				BlueberryCamCaptureIntent.swift,
+			);
+			target = 5B5FC82B2F648F8E00532B15 /* BlueberryCamCapture */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		5B33250B2F5C7A3200874430 /* Blueberry Cam */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				5B5FC8432F64A9D700532B15 /* Exceptions for "Blueberry Cam" folder in "BlueberryCamCapture" target */,
+			);
 			path = "Blueberry Cam";
+			sourceTree = "<group>";
+		};
+		5B5FC82D2F648F8E00532B15 /* BlueberryCamCapture */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				5B5FC8362F648F8E00532B15 /* Exceptions for "BlueberryCamCapture" folder in "BlueberryCamCapture" target */,
+			);
+			path = BlueberryCamCapture;
+			sourceTree = "<group>";
+		};
+		5B5FC8562F64B32E00532B15 /* BlueberryCamWidget */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				5B5FC8702F64B47200532B15 /* Exceptions for "BlueberryCamWidget" folder in "Blueberry Cam" target */,
+				5B5FC8712F64B47200532B15 /* Exceptions for "BlueberryCamWidget" folder in "BlueberryCamCapture" target */,
+				5B5FC8652F64B32F00532B15 /* Exceptions for "BlueberryCamWidget" folder in "BlueberryCamWidgetExtension" target */,
+			);
+			path = BlueberryCamWidget;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -33,6 +145,23 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		5B5FC8292F648F8E00532B15 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				5B5FC84C2F64AC3800532B15 /* LockedCameraCapture.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		5B5FC84E2F64B32E00532B15 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				5B5FC8552F64B32E00532B15 /* SwiftUI.framework in Frameworks */,
+				5B5FC8532F64B32E00532B15 /* WidgetKit.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -40,9 +169,12 @@
 			isa = PBXGroup;
 			children = (
 				5B33250B2F5C7A3200874430 /* Blueberry Cam */,
+				5B5FC82D2F648F8E00532B15 /* BlueberryCamCapture */,
+				5B5FC8562F64B32E00532B15 /* BlueberryCamWidget */,
 				5B33250A2F5C7A3200874430 /* Products */,
 				5BD3EC112F5F6C9400B83A36 /* AGENTS.md */,
 				5BD3EC132F5F6C9500B83A36 /* Journal.md */,
+				5B5FC84A2F64AC3800532B15 /* Frameworks */,
 			);
 			sourceTree = "<group>";
 		};
@@ -50,8 +182,20 @@
 			isa = PBXGroup;
 			children = (
 				5B3325092F5C7A3200874430 /* Blueberry Cam.app */,
+				5B5FC82C2F648F8E00532B15 /* BlueberryCamCapture.appex */,
+				5B5FC8512F64B32E00532B15 /* BlueberryCamWidgetExtension.appex */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		5B5FC84A2F64AC3800532B15 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				5B5FC84B2F64AC3800532B15 /* LockedCameraCapture.framework */,
+				5B5FC8522F64B32E00532B15 /* WidgetKit.framework */,
+				5B5FC8542F64B32E00532B15 /* SwiftUI.framework */,
+			);
+			name = Frameworks;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -64,10 +208,14 @@
 				5B3325052F5C7A3200874430 /* Sources */,
 				5B3325062F5C7A3200874430 /* Frameworks */,
 				5B3325072F5C7A3200874430 /* Resources */,
+				5B5FC83A2F648F8E00532B15 /* Embed ExtensionKit Extensions */,
+				5B5FC8692F64B32F00532B15 /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				5B5FC8342F648F8E00532B15 /* PBXTargetDependency */,
+				5B5FC8632F64B32F00532B15 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				5B33250B2F5C7A3200874430 /* Blueberry Cam */,
@@ -78,6 +226,50 @@
 			productName = "Blueberry Cam";
 			productReference = 5B3325092F5C7A3200874430 /* Blueberry Cam.app */;
 			productType = "com.apple.product-type.application";
+		};
+		5B5FC82B2F648F8E00532B15 /* BlueberryCamCapture */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 5B5FC8372F648F8E00532B15 /* Build configuration list for PBXNativeTarget "BlueberryCamCapture" */;
+			buildPhases = (
+				5B5FC8282F648F8E00532B15 /* Sources */,
+				5B5FC8292F648F8E00532B15 /* Frameworks */,
+				5B5FC82A2F648F8E00532B15 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				5B5FC82D2F648F8E00532B15 /* BlueberryCamCapture */,
+			);
+			name = BlueberryCamCapture;
+			packageProductDependencies = (
+			);
+			productName = BlueberryCamCapture;
+			productReference = 5B5FC82C2F648F8E00532B15 /* BlueberryCamCapture.appex */;
+			productType = "com.apple.product-type.extensionkit-extension";
+		};
+		5B5FC8502F64B32E00532B15 /* BlueberryCamWidgetExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 5B5FC8662F64B32F00532B15 /* Build configuration list for PBXNativeTarget "BlueberryCamWidgetExtension" */;
+			buildPhases = (
+				5B5FC84D2F64B32E00532B15 /* Sources */,
+				5B5FC84E2F64B32E00532B15 /* Frameworks */,
+				5B5FC84F2F64B32E00532B15 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				5B5FC8562F64B32E00532B15 /* BlueberryCamWidget */,
+			);
+			name = BlueberryCamWidgetExtension;
+			packageProductDependencies = (
+			);
+			productName = BlueberryCamWidgetExtension;
+			productReference = 5B5FC8512F64B32E00532B15 /* BlueberryCamWidgetExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
 		};
 /* End PBXNativeTarget section */
 
@@ -90,6 +282,12 @@
 				LastUpgradeCheck = 2630;
 				TargetAttributes = {
 					5B3325082F5C7A3200874430 = {
+						CreatedOnToolsVersion = 26.3;
+					};
+					5B5FC82B2F648F8E00532B15 = {
+						CreatedOnToolsVersion = 26.3;
+					};
+					5B5FC8502F64B32E00532B15 = {
 						CreatedOnToolsVersion = 26.3;
 					};
 				};
@@ -109,6 +307,8 @@
 			projectRoot = "";
 			targets = (
 				5B3325082F5C7A3200874430 /* Blueberry Cam */,
+				5B5FC82B2F648F8E00532B15 /* BlueberryCamCapture */,
+				5B5FC8502F64B32E00532B15 /* BlueberryCamWidgetExtension */,
 			);
 		};
 /* End PBXProject section */
@@ -123,6 +323,20 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		5B5FC82A2F648F8E00532B15 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		5B5FC84F2F64B32E00532B15 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
@@ -133,7 +347,34 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		5B5FC8282F648F8E00532B15 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		5B5FC84D2F64B32E00532B15 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		5B5FC8342F648F8E00532B15 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 5B5FC82B2F648F8E00532B15 /* BlueberryCamCapture */;
+			targetProxy = 5B5FC8332F648F8E00532B15 /* PBXContainerItemProxy */;
+		};
+		5B5FC8632F64B32F00532B15 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 5B5FC8502F64B32E00532B15 /* BlueberryCamWidgetExtension */;
+			targetProxy = 5B5FC8622F64B32F00532B15 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		5B3325122F5C7A3200874430 /* Debug */ = {
@@ -335,6 +576,126 @@
 			};
 			name = Release;
 		};
+		5B5FC8382F648F8E00532B15 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = WGJA24P7XU;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = BlueberryCamCapture/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = BlueberryCamCapture;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.jansari.rishi.Blueberry-Cam.BlueberryCamCapture";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		5B5FC8392F648F8E00532B15 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = WGJA24P7XU;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = BlueberryCamCapture/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = BlueberryCamCapture;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.jansari.rishi.Blueberry-Cam.BlueberryCamCapture";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		5B5FC8672F64B32F00532B15 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = WGJA24P7XU;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = BlueberryCamWidget/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = BlueberryCamWidget;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.jansari.rishi.Blueberry-Cam.BlueberryCamWidget";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		5B5FC8682F64B32F00532B15 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = WGJA24P7XU;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = BlueberryCamWidget/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = BlueberryCamWidget;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.jansari.rishi.Blueberry-Cam.BlueberryCamWidget";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -352,6 +713,24 @@
 			buildConfigurations = (
 				5B3325152F5C7A3200874430 /* Debug */,
 				5B3325162F5C7A3200874430 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		5B5FC8372F648F8E00532B15 /* Build configuration list for PBXNativeTarget "BlueberryCamCapture" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				5B5FC8382F648F8E00532B15 /* Debug */,
+				5B5FC8392F648F8E00532B15 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		5B5FC8662F64B32F00532B15 /* Build configuration list for PBXNativeTarget "BlueberryCamWidgetExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				5B5FC8672F64B32F00532B15 /* Debug */,
+				5B5FC8682F64B32F00532B15 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

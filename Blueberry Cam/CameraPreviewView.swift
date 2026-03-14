@@ -1,5 +1,5 @@
 import SwiftUI
-import AVFoundation
+internal import AVFoundation
 import AVKit
 
 struct CameraPreviewView: UIViewRepresentable {
