@@ -80,6 +80,8 @@ struct LockedCaptureView: View {
 struct LockedTopBarView: View {
     @Bindable var model: LockedCameraModel
     @Binding var selectedControl: ManualControl?
+    @State private var hapticTrigger = 0
+    @State private var hapticTriggerR = 0
     
     private func readoutColor(for control: ManualControl) -> Color {
         switch control {
@@ -120,11 +122,13 @@ struct LockedTopBarView: View {
                         )
                         .foregroundColor(readoutColor(for: control))
                         .onTapGesture(count: 2) {
+                            hapticTriggerR += 1
                             withAnimation(.spring(duration: 0.5)) {
                                 model.resetControl(for: control)
                             }
                         }
                         .onLongPressGesture {
+                            hapticTriggerR += 1
                             withAnimation(.spring(duration: 0.5)) {
                                 model.resetControl(for: control)
                             }
@@ -135,6 +139,7 @@ struct LockedTopBarView: View {
                         .disabled(control == ManualControl.f && model.isAutoFocus)
                         .disabled(control == ManualControl.wb && model.isAutoWhiteBalance)
                         .onTapGesture {
+                            hapticTrigger += 1
                             withAnimation(.spring(duration: 0.5)) {
                                 selectedControl = selectedControl == control ? nil : control
                             }
@@ -156,6 +161,7 @@ struct LockedTopBarView: View {
                 
                 // Flash
                 Button {
+                    hapticTrigger += 1
                     withAnimation(.bouncy) { model.cycleFlashMode() }
                 } label: {
                     HStack(spacing: 4) {
@@ -182,6 +188,7 @@ struct LockedTopBarView: View {
                     ForEach(model.availableResolutions) { opt in
                         let isSelected = model.selectedResolution?.id == opt.id
                         Button {
+                            hapticTrigger += 1
                             withAnimation(.spring(.bouncy)) { model.selectResolution(opt) }
                         } label: {
                             Text(opt.label)
@@ -202,6 +209,7 @@ struct LockedTopBarView: View {
                 HStack(spacing: 0) {
                     ForEach(model.availableFormats) { mode in
                         Button {
+                            hapticTrigger += 1
                             withAnimation(.spring(.bouncy)) { model.captureMode = mode }
                         } label: {
                             Text(mode.rawValue)
@@ -221,6 +229,8 @@ struct LockedTopBarView: View {
             .padding(.horizontal, 8)
         }
         .padding(.top, 8)
+        .sensoryFeedback(.impact, trigger: hapticTrigger)
+        .sensoryFeedback(.impact(flexibility: .soft), trigger: hapticTriggerR)
     }
 }
 
@@ -442,7 +452,7 @@ struct LockedManualControlsView: View {
 // Back cameras only — front cameras are unavailable on the lock screen.
 struct LockedLensSelectorView: View {
     @Bindable var model: LockedCameraModel
-    @State private var count = 0
+    @State private var hapticTrigger = 0
     
     private let lenses: [Lens] = [.ultraWide, .wide, .tele2x, .tele4x, .tele8x]
     
@@ -451,8 +461,8 @@ struct LockedLensSelectorView: View {
             ForEach(lenses, id: \.self) { lens in
                 let isActive = model.activeLens == lens
                 Button {
+                    hapticTrigger += 1
                     model.switchLens(to: lens)
-                    count += 1
                 } label: {
                     Text(lens.label)
                         .font(.system(size: 14, weight: isActive ? .bold : .regular, design: .monospaced))
@@ -461,13 +471,13 @@ struct LockedLensSelectorView: View {
                         .background(isActive ? Color.white.opacity(0.15) : Color.clear)
                         .clipShape(.circle)
                 }
-                .sensoryFeedback(.selection, trigger: count)
             }
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
         .background(Color.black.opacity(0.4))
         .clipShape(.capsule)
+        .sensoryFeedback(.impact, trigger: hapticTrigger)
     }
 }
 

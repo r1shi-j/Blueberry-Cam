@@ -2,8 +2,7 @@ import SwiftUI
 
 struct LensSelectorView: View {
     @Bindable var cameraModel: CameraModel
-    @State private var count = 0
-    @State private var count2 = 0
+    @State private var hapticTrigger = 0
     
     private let frontLenses: [Lens] = [.frontUltraWide, .front]
     private let backLenses: [Lens] = [.ultraWide, .wide, .tele2x, .tele4x, .tele8x]
@@ -12,16 +11,15 @@ struct LensSelectorView: View {
         HStack(spacing: 6) {
             // Flip camera button — always visible
             Button {
+                hapticTrigger += 1
                 let target: Lens = cameraModel.activeLens.isFront ? .wide : .front
                 cameraModel.switchLens(to: target)
-                count += 1
             } label: {
                 Image(systemName: "arrow.triangle.2.circlepath.camera")
                     .font(.system(size: 16))
                     .foregroundColor(.white.opacity(0.8))
                     .frame(width: 36, height: 36)
             }
-            .sensoryFeedback(.selection, trigger: count)
             
             Rectangle()
                 .fill(Color.white.opacity(0.2))
@@ -37,14 +35,15 @@ struct LensSelectorView: View {
         .padding(.vertical, 8)
         .background(Color.black.opacity(0.4))
         .clipShape(.capsule)
+        .sensoryFeedback(.impact, trigger: hapticTrigger)
     }
     
     @ViewBuilder
     private func lensButton(_ lens: Lens) -> some View {
         let isActive = cameraModel.activeLens == lens
         Button {
+            hapticTrigger += 1
             cameraModel.switchLens(to: lens)
-            count2 += 1
         } label: {
             Text(lens.label)
                 .font(.system(size: 14, weight: isActive ? .bold : .regular, design: .monospaced))
@@ -53,6 +52,5 @@ struct LensSelectorView: View {
                 .background(isActive ? Color.white.opacity(0.15) : Color.clear)
                 .clipShape(.circle)
         }
-        .sensoryFeedback(.selection, trigger: count2)
     }
 }

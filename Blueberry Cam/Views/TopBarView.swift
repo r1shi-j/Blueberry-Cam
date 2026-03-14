@@ -4,6 +4,8 @@ import SwiftUI
 struct TopBarView: View {
     @Bindable var cameraModel: CameraModel
     @Binding var selectedControl: ManualControl?
+    @State private var hapticTrigger = 0
+    @State private var hapticTriggerR = 0
     
     private func readoutColor(for control: ManualControl) -> Color {
         switch control {
@@ -48,11 +50,13 @@ struct TopBarView: View {
                         )
                         .foregroundColor(readoutColor(for: control))
                         .onTapGesture(count: 2) {
+                            hapticTriggerR += 1
                             withAnimation(.spring(duration: 0.5)) {
                                 cameraModel.resetControl(for: control)
                             }
                         }
                         .onLongPressGesture {
+                            hapticTriggerR += 1
                             withAnimation(.spring(duration: 0.5)) {
                                 cameraModel.resetControl(for: control)
                             }
@@ -63,6 +67,7 @@ struct TopBarView: View {
                         .disabled(control == ManualControl.f && cameraModel.isAutoFocus)
                         .disabled(control == ManualControl.wb && cameraModel.isAutoWhiteBalance)
                         .onTapGesture {
+                            hapticTrigger += 1
                             withAnimation(.spring(duration: 0.5)) {
                                 selectedControl = selectedControl == control ? nil : control
                             }
@@ -74,6 +79,7 @@ struct TopBarView: View {
             HStack(alignment: .center, spacing: 10) {
                 // Location geotag toggle
                 Button {
+                    hapticTrigger += 1
                     cameraModel.toggleLocationGeotag()
                 } label: {
                     Image(systemName: "location")
@@ -92,6 +98,7 @@ struct TopBarView: View {
                 
                 // Flash toggle
                 Button {
+                    hapticTrigger += 1
                     withAnimation(.bouncy) {
                         cameraModel.cycleFlashMode()
                     }
@@ -126,6 +133,7 @@ struct TopBarView: View {
                     ForEach(cameraModel.availableResolutions) { opt in
                         let isSelected = cameraModel.selectedResolution?.id == opt.id
                         Button {
+                            hapticTrigger += 1
                             withAnimation(.spring(.bouncy)) {
                                 cameraModel.selectResolution(opt)
                             }
@@ -147,6 +155,7 @@ struct TopBarView: View {
                 HStack(spacing: 0) {
                     ForEach(cameraModel.availableFormats) { mode in
                         Button {
+                            hapticTrigger += 1
                             withAnimation(.spring(.bouncy)) {
                                 cameraModel.captureMode = mode
                             }
@@ -174,5 +183,7 @@ struct TopBarView: View {
             }
             .padding(.horizontal, 8)
         }
+        .sensoryFeedback(.impact, trigger: hapticTrigger)
+        .sensoryFeedback(.impact(flexibility: .soft), trigger: hapticTriggerR)
     }
 }

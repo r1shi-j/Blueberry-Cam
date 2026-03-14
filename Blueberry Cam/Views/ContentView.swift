@@ -5,7 +5,7 @@ struct ContentView: View {
     @State private var cameraModel = CameraModel()
     @State private var levelModel  = LevelMotionModel()
     @State private var selectedControl: ManualControl?
-    @State private var count = 0
+    @State private var hapticTrigger = 0
     
     var body: some View {
         GeometryReader { geo in
@@ -21,13 +21,12 @@ struct ContentView: View {
                 .ignoresSafeArea()
                 .contentShape(.rect.path(in: previewRect))
                 .onTapGesture(count: 2) {
+                    hapticTrigger += 1
                     withAnimation(.bouncy) {
                         let target: Lens = cameraModel.activeLens.isFront ? .wide : .front
                         cameraModel.switchLens(to: target)
                     }
-                    count += 1
                 }
-                .sensoryFeedback(.selection, trigger: count)
                 
                 if !cameraModel.isCleanUI {
                     if cameraModel.showZebraStripes {
@@ -96,6 +95,7 @@ struct ContentView: View {
                             .padding(.horizontal, 20)
                             .padding(.bottom, 32)
                             .onTapGesture {
+                                hapticTrigger += 1
                                 cameraModel.cycleHistogramMode()
                             }
                         }
@@ -148,6 +148,7 @@ struct ContentView: View {
         } message: {
             Text(cameraModel.errorMessage)
         }
+        .sensoryFeedback(.impact, trigger: hapticTrigger)
     }
     
     private func makePreviewRect(in geo: GeometryProxy) -> CGRect {

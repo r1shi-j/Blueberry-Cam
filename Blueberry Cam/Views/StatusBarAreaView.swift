@@ -2,6 +2,7 @@ import SwiftUI
 
 struct StatusBarAreaView: View {
     @Bindable var cameraModel: CameraModel
+    @State private var hapticTrigger = 0
     
     var body: some View {
         VStack(spacing: 8) {
@@ -11,6 +12,7 @@ struct StatusBarAreaView: View {
                     if cameraModel.histogramSize == .large {
                         // disable button
                         Button {
+                            hapticTrigger += 1
                             cameraModel.showHistogram = false
                             cameraModel.histogramSize = .small
                             cameraModel.histogramMode = .luminance
@@ -35,12 +37,14 @@ struct StatusBarAreaView: View {
                             waveformData: cameraModel.waveformData
                         )
                         .onTapGesture {
+                            hapticTrigger += 1
                             cameraModel.cycleHistogramMode()
                         }
                     }
                 } else {
                     // enable button
                     Button {
+                        hapticTrigger += 1
                         cameraModel.showHistogram = true
                         // maybe force to small
                     } label: {
@@ -59,6 +63,7 @@ struct StatusBarAreaView: View {
                 HStack(alignment: .center, spacing: 12) {
                     // Zebra toggle
                     Button {
+                        hapticTrigger += 1
                         cameraModel.toggleZebraStripes()
                     } label: {
                         Text("Z")
@@ -72,6 +77,7 @@ struct StatusBarAreaView: View {
                     
                     // Highlight clipping toggle
                     Button {
+                        hapticTrigger += 1
                         cameraModel.toggleClipping()
                     } label: {
                         Text("P")
@@ -88,5 +94,6 @@ struct StatusBarAreaView: View {
         }
         .padding(.horizontal, 30)
         .frame(height: 30)
+        .sensoryFeedback(.impact, trigger: hapticTrigger)
     }
 }
