@@ -180,8 +180,6 @@ struct ManualControlsView: View {
                     if !cameraModel.isAutoFocus {
                         HStack {
                             Text("")
-                                .font(.system(size: 10, weight: .bold, design: .monospaced))
-                                .foregroundColor(.white.opacity(0.5))
                                 .tracking(2)
                                 .frame(width: 60, alignment: .leading)
                             Slider(value: $cameraModel.lensPosition, in: 0...1, onEditingChanged: { editing in

@@ -110,7 +110,7 @@ struct ContentView: View {
                     
                     if !cameraModel.isCleanUI {
                         LensSelectorView(cameraModel: cameraModel)
-                            .padding(.bottom, 30)
+                            .padding(.bottom, 20)
                     }
                     
                     BottomBarView(cameraModel: cameraModel, shutterCount: $shutterCount)

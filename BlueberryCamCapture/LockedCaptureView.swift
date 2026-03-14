@@ -11,7 +11,9 @@ struct LockedCaptureView: View {
     @State private var selectedControl: ManualControl?
     
     var body: some View {
-        GeometryReader { _ in
+        GeometryReader { geo in
+            let previewRect = makePreviewRect(in: geo)
+            
             ZStack {
                 Color.black.ignoresSafeArea()
                 
@@ -19,6 +21,7 @@ struct LockedCaptureView: View {
                     model.capturePhoto()
                 }
                 .ignoresSafeArea()
+                .contentShape(.rect.path(in: previewRect))
                 
                 // MARK: - UI Chrome
                 VStack(spacing: 0) {
@@ -32,15 +35,17 @@ struct LockedCaptureView: View {
                     }
                     
                     LockedLensSelectorView(model: model)
-                        .padding(.bottom, 23)
+                        .padding(.bottom, 20)
                     
                     LockedBottomBarView(model: model, lockedSession: lockedSession)
-                        .padding(.bottom, 23)
+                        .padding(.bottom, 28)
                 }
                 
                 // Capture flash
                 if model.isCapturing {
-                    Color.white.ignoresSafeArea().opacity(0.3)
+                    Color.white.opacity(0.3)
+                        .frame(width: previewRect.width, height: previewRect.height)
+                        .position(x: previewRect.midX, y: previewRect.midY)
                         .animation(.easeOut(duration: 0.15), value: model.isCapturing)
                 }
             }
@@ -56,12 +61,17 @@ struct LockedCaptureView: View {
         }
     }
     
-    private func makePreviewRect(in size: CGSize) -> CGRect {
+    private func makePreviewRect(in geo: GeometryProxy) -> CGRect {
+        let size = geo.size
+        let topInset = geo.safeAreaInsets.top
+        let botInset = geo.safeAreaInsets.bottom
+        let xHeight = (topInset - botInset) / 2
         let aspect = model.captureAspectRatio
         let previewW: CGFloat = aspect < size.width / size.height ? size.height * aspect : size.width
         let previewH: CGFloat = aspect < size.width / size.height ? size.height : size.width / aspect
-        return CGRect(x: (size.width - previewW) / 2, y: (size.height - previewH) / 2,
-                      width: previewW, height: previewH)
+        let previewX = (size.width - previewW) / 2
+        let previewY = (size.height - previewH) / 2
+        return CGRect(x: previewX, y: previewY - xHeight, width: previewW, height: previewH)
     }
 }
 
@@ -249,7 +259,8 @@ struct LockedManualControlsView: View {
                         HStack {
                             Text("EV")
                                 .font(.system(size: 10, weight: .bold, design: .monospaced))
-                                .foregroundColor(.white.opacity(0.5)).tracking(2)
+                                .foregroundColor(.white.opacity(0.5))
+                                .tracking(2)
                                 .frame(width: 60, alignment: .leading)
                             Slider(value: $model.exposureBias, in: -4.0...4.0, step: 0.1)
                                 .onChange(of: model.exposureBias) { _, _ in model.applyExposureBias() }
@@ -265,7 +276,8 @@ struct LockedManualControlsView: View {
                     HStack {
                         Text("EXPOSURE")
                             .font(.system(size: 10, weight: .bold, design: .monospaced))
-                            .foregroundColor(.white.opacity(0.5)).tracking(2)
+                            .foregroundColor(.white.opacity(0.5))
+                            .tracking(2)
                         Spacer()
                         Toggle("Auto", isOn: $model.isAutoExposure)
                             .labelsHidden().tint(.yellow)
@@ -286,7 +298,8 @@ struct LockedManualControlsView: View {
                         HStack {
                             Text("ISO")
                                 .font(.system(size: 10, weight: .bold, design: .monospaced))
-                                .foregroundColor(.white.opacity(0.5)).tracking(2)
+                                .foregroundColor(.white.opacity(0.5))
+                                .tracking(2)
                                 .frame(width: 60, alignment: .leading)
                             Slider(value: $model.iso, in: model.minISO...model.maxISO, step: 1)
                                 .onChange(of: model.iso) { _, _ in model.applyManualExposure() }
@@ -302,7 +315,8 @@ struct LockedManualControlsView: View {
                     HStack {
                         Text("EXPOSURE")
                             .font(.system(size: 10, weight: .bold, design: .monospaced))
-                            .foregroundColor(.white.opacity(0.5)).tracking(2)
+                            .foregroundColor(.white.opacity(0.5))
+                            .tracking(2)
                         Spacer()
                         Toggle("Auto", isOn: $model.isAutoExposure)
                             .labelsHidden().tint(.yellow)
@@ -323,7 +337,8 @@ struct LockedManualControlsView: View {
                         HStack {
                             Text("SHUTTER")
                                 .font(.system(size: 10, weight: .bold, design: .monospaced))
-                                .foregroundColor(.white.opacity(0.5)).tracking(2)
+                                .foregroundColor(.white.opacity(0.5))
+                                .tracking(2)
                                 .frame(width: 60, alignment: .leading)
                             Slider(
                                 value: Binding(
@@ -347,10 +362,12 @@ struct LockedManualControlsView: View {
                     HStack {
                         Text("FOCUS")
                             .font(.system(size: 10, weight: .bold, design: .monospaced))
-                            .foregroundColor(.white.opacity(0.5)).tracking(2)
+                            .foregroundColor(.white.opacity(0.5))
+                            .tracking(2)
                         Spacer()
                         Toggle("", isOn: $model.isAutoFocus)
-                            .labelsHidden().tint(.yellow)
+                            .labelsHidden()
+                            .tint(.yellow)
                             .disabled(!model.supportsManualFocus)
                             .onChange(of: model.isAutoFocus) { _, auto in
                                 if auto { model.setAutoFocus() } else { model.applyManualFocus() }
@@ -363,11 +380,12 @@ struct LockedManualControlsView: View {
                     
                     if !model.isAutoFocus {
                         HStack {
-                            Text("").frame(width: 60, alignment: .leading)
-                            Slider(value: $model.lensPosition, in: 0...1,
-                                   onEditingChanged: { editing in
+                            Text("")
+                                .tracking(2)
+                                .frame(width: 60, alignment: .leading)
+                            Slider(value: $model.lensPosition, in: 0...1, onEditingChanged: { editing in
                                 if editing { model.beginManualFocusAdjustment() }
-                                else       { model.endManualFocusAdjustment() }
+                                else { model.endManualFocusAdjustment() }
                             })
                             .onChange(of: model.lensPosition) { _, _ in model.applyManualFocus() }
                             .tint(.yellow)
@@ -382,7 +400,8 @@ struct LockedManualControlsView: View {
                     HStack {
                         Text("WHITE BALANCE")
                             .font(.system(size: 10, weight: .bold, design: .monospaced))
-                            .foregroundColor(.white.opacity(0.5)).tracking(2)
+                            .foregroundColor(.white.opacity(0.5))
+                            .tracking(2)
                         Spacer()
                         Toggle("", isOn: $model.isAutoWhiteBalance)
                             .labelsHidden().tint(.yellow)
@@ -394,7 +413,9 @@ struct LockedManualControlsView: View {
                     
                     if !model.isAutoWhiteBalance {
                         HStack {
-                            Text("").frame(width: 60, alignment: .leading)
+                            Text("")
+                                .tracking(2)
+                                .frame(width: 60, alignment: .leading)
                             Slider(value: $model.whiteBalanceTargetKelvin, in: 2000...10000, step: 100)
                                 .tint(.yellow)
                             Text("\(Int(model.whiteBalanceTargetKelvin))K")
