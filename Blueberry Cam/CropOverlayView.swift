@@ -66,10 +66,10 @@ struct CornerMarks: Shape {
     func path(in _: CGRect) -> Path {
         var p = Path()
         let corners: [(CGPoint, CGFloat, CGFloat)] = [
-            (rect.origin,                              1,  1),
-            (CGPoint(x: rect.maxX, y: rect.minY),    -1,  1),
-            (CGPoint(x: rect.minX, y: rect.maxY),     1, -1),
-            (CGPoint(x: rect.maxX, y: rect.maxY),    -1, -1),
+            (rect.origin, 1, 1),
+            (CGPoint(x: rect.maxX, y: rect.minY), -1, 1),
+            (CGPoint(x: rect.minX, y: rect.maxY), 1, -1),
+            (CGPoint(x: rect.maxX, y: rect.maxY), -1, -1),
         ]
         for (origin, dx, dy) in corners {
             p.move(to: CGPoint(x: origin.x + dx * len, y: origin.y))

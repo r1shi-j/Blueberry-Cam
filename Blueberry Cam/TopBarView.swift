@@ -1,5 +1,5 @@
-import SwiftUI
 internal import AVFoundation
+import SwiftUI
 
 struct TopBarView: View {
     @Bindable var cameraModel: CameraModel
@@ -7,11 +7,11 @@ struct TopBarView: View {
     
     private func readoutColor(for control: ManualControl) -> Color {
         switch control {
-            case .ev:  return .orange
+            case .ev: return .orange
             case .iso: return .yellow
-            case .ss:  return .white.opacity(0.8)
-            case .f:   return .green
-            case .wb:  return .cyan
+            case .ss: return .white.opacity(0.8)
+            case .f: return .green
+            case .wb: return .cyan
         }
     }
     

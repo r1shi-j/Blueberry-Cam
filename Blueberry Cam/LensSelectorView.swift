@@ -6,7 +6,7 @@ struct LensSelectorView: View {
     @State private var count2 = 0
     
     private let frontLenses: [Lens] = [.frontUltraWide, .front]
-    private let backLenses:  [Lens] = [.ultraWide, .wide, .tele2x, .tele4x, .tele8x]
+    private let backLenses: [Lens] = [.ultraWide, .wide, .tele2x, .tele4x, .tele8x]
     
     var body: some View {
         HStack(spacing: 6) {
@@ -50,11 +50,7 @@ struct LensSelectorView: View {
                 .font(.system(size: 14, weight: isActive ? .bold : .regular, design: .monospaced))
                 .foregroundColor(isActive ? .yellow : .white.opacity(0.7))
                 .frame(minWidth: 36, minHeight: 36)
-                .background(
-                    isActive
-                    ? Color.white.opacity(0.15)
-                    : Color.clear
-                )
+                .background(isActive ? Color.white.opacity(0.15) : Color.clear)
                 .clipShape(.circle)
         }
         .sensoryFeedback(.selection, trigger: count2)

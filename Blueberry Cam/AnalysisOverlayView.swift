@@ -38,14 +38,14 @@ struct AnalysisOverlayView: View {
                         )
                         
                         switch style {
-                        case .focusPeaking:
-                            let r = max(0.4, min(cellWidth, cellHeight) * 0.12)
-                            let dot = CGRect(x: rect.midX - r, y: rect.midY - r, width: r * 2, height: r * 2)
-                            context.fill(Path(ellipseIn: dot), with: .color(Color.green.opacity(0.9)))
-                        case .zebra:
-                            context.fill(Path(rect), with: .color(Color.white.opacity(0.45)))
-                        case .clipping:
-                            context.fill(Path(rect), with: .color(Color.red.opacity(0.6)))
+                            case .focusPeaking:
+                                let r = max(0.4, min(cellWidth, cellHeight) * 0.12)
+                                let dot = CGRect(x: rect.midX - r, y: rect.midY - r, width: r * 2, height: r * 2)
+                                context.fill(Path(ellipseIn: dot), with: .color(Color.green.opacity(0.9)))
+                            case .zebra:
+                                context.fill(Path(rect), with: .color(Color.white.opacity(0.45)))
+                            case .clipping:
+                                context.fill(Path(rect), with: .color(Color.red.opacity(0.6)))
                         }
                     }
                 }

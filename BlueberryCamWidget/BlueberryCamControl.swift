@@ -1,6 +1,6 @@
-import WidgetKit
-import SwiftUI
 import AppIntents
+import SwiftUI
+import WidgetKit
 
 @main
 struct BlueberryCamWidgetBundle: WidgetBundle {

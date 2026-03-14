@@ -1,7 +1,7 @@
 internal import AVFoundation
-import SwiftUI
-import Photos
 import LockedCameraCapture
+import Photos
+import SwiftUI
 
 // MARK: - LockedCameraModel
 //
@@ -100,9 +100,9 @@ class LockedCameraModel: NSObject {
     
     var flashLabel: (systemImage: String, label: String) {
         switch flashMode {
-            case .off:     return ("flashlight.slash", "")
-            case .auto:    return ("flashlight.on.fill", "A")
-            case .on:      return ("flashlight.on.fill", "ON")
+            case .off: return ("flashlight.slash", "")
+            case .auto: return ("flashlight.on.fill", "A")
+            case .on: return ("flashlight.on.fill", "ON")
             @unknown default: return ("flashlight.slash", "?")
         }
     }

@@ -1,5 +1,5 @@
-import SwiftUI
 import CoreMedia
+import SwiftUI
 
 struct ManualControlsView: View {
     @Bindable var cameraModel: CameraModel

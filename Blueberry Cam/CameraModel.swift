@@ -1,9 +1,9 @@
 internal import AVFoundation
-import SwiftUI
-import Photos
-import ImageIO
-import UniformTypeIdentifiers
 import CoreLocation
+import ImageIO
+import Photos
+import SwiftUI
+import UniformTypeIdentifiers
 
 @MainActor @Observable
 class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
@@ -91,14 +91,14 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
     var isAutoWhiteBalance: Bool = true {
         didSet {
             if oldValue != isAutoWhiteBalance {
-                if isAutoWhiteBalance { 
-                    setAutoWhiteBalance() 
-                } else { 
+                if isAutoWhiteBalance {
+                    setAutoWhiteBalance()
+                } else {
                     if let d = device {
                         let tnt = d.temperatureAndTintValues(for: d.deviceWhiteBalanceGains)
                         self.whiteBalanceTargetKelvin = tnt.temperature
                     }
-                    applyManualWhiteBalance() 
+                    applyManualWhiteBalance()
                 }
                 updateCameraControlsMode()
             }
@@ -480,7 +480,7 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
             ev.value = round(clampedEV * 10) / 10.0
         }
         
-        // For ISO and Shutter, we skip setting their .value here because their min/max 
+        // For ISO and Shutter, we skip setting their .value here because their min/max
         // bounds depend on the active device. switchLens() calls setupCameraControls()
         // right after this, which rebuilds the sliders with the correct bounds and seeds
         // their values safely. Setting them here on stale bounds causes crashes.
@@ -1266,7 +1266,7 @@ extension CameraModel {
         }
         self.wbControl = wb
         session.addControl(wb)
-           
+        
         updateCameraControlsMode()
     }
     

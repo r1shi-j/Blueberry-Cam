@@ -1,7 +1,7 @@
-import SwiftUI
-import LockedCameraCapture
-import UIKit
 internal import AVFoundation
+import LockedCameraCapture
+import SwiftUI
+import UIKit
 
 // MARK: - LockedCaptureView
 struct LockedCaptureView: View {
@@ -199,8 +199,7 @@ struct LockedTopBarView: View {
                                 .fontWidth(.expanded)
                                 .padding(.horizontal, 10)
                                 .padding(.vertical, 5)
-                                .background(model.captureMode == mode
-                                            ? Color.yellow : Color.white.opacity(0.15))
+                                .background(model.captureMode == mode ? Color.yellow : Color.white.opacity(0.15))
                                 .foregroundColor(model.captureMode == mode ? .black : .white)
                         }
                     }
@@ -435,9 +434,7 @@ struct LockedLensSelectorView: View {
                     count += 1
                 } label: {
                     Text(lens.label)
-                        .font(.system(size: 14,
-                                      weight: isActive ? .bold : .regular,
-                                      design: .monospaced))
+                        .font(.system(size: 14, weight: isActive ? .bold : .regular, design: .monospaced))
                         .foregroundColor(isActive ? .yellow : .white.opacity(0.7))
                         .frame(minWidth: 36, minHeight: 36)
                         .background(isActive ? Color.white.opacity(0.15) : Color.clear)
@@ -468,7 +465,6 @@ struct LockedBottomBarView: View {
                 Task {
                     let activity = NSUserActivity(activityType: "com.jansari.rishi.Blueberry-Cam.opencamera")
                     try? await lockedSession.openApplication(for: activity)
-                    
                 }
             } label: {
                 VStack(spacing: 4) {
@@ -492,18 +488,14 @@ struct LockedBottomBarView: View {
             ZStack {
                 Circle()
                     .frame(width: 82, height: 82)
-                    .glassEffect(
-                        .regular.tint(
-                            model.captureMode == .raw
-                            ? .blue.mix(with: .mint, by: 0.5).opacity(0.4)
-                            : .white.opacity(0.2)
-                        ).interactive()
-                    )
+                    .glassEffect(.regular.tint(model.captureMode == .raw ? .blue.mix(with: .mint, by: 0.5).opacity(0.4) : .white.opacity(0.2)).interactive())
                 Button {
                     model.capturePhoto()
                     count += 1
                 } label: {
-                    Circle().fill(Color.white).frame(width: 69, height: 69)
+                    Circle()
+                        .fill(Color.white)
+                        .frame(width: 69, height: 69)
                 }
                 .glassEffect(.regular.interactive())
                 .sensoryFeedback(.selection, trigger: count)

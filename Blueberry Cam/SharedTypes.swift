@@ -1,7 +1,7 @@
-import Foundation
-import Photos
 internal import AVFoundation
 import CoreMedia
+import Foundation
+import Photos
 
 // Simple thread-safe box for passing CaptureMode across isolation boundaries
 final class CaptureModeBox: @unchecked Sendable {
@@ -31,7 +31,7 @@ struct ResolutionOption: Identifiable, Equatable {
 enum CaptureMode: String, CaseIterable, Identifiable {
     case jpeg = "JPEG"
     case heif = "HEIF"
-    case raw  = "RAW"
+    case raw = "RAW"
     var id: String { rawValue }
 }
 
@@ -64,12 +64,12 @@ enum Lens: String, CaseIterable {
     var label: String {
         switch self {
             case .frontUltraWide: return "0.87"
-            case .front:          return "0.95"
-            case .ultraWide:      return "0.5"
-            case .wide:           return "1"
-            case .tele2x:         return "2"
-            case .tele4x:         return "4"
-            case .tele8x:         return "8"
+            case .front: return "0.95"
+            case .ultraWide: return "0.5"
+            case .wide: return "1"
+            case .tele2x: return "2"
+            case .tele4x: return "4"
+            case .tele8x: return "8"
         }
     }
     
@@ -77,11 +77,11 @@ enum Lens: String, CaseIterable {
     
     var deviceType: AVCaptureDevice.DeviceType {
         switch self {
-            case .frontUltraWide:      return .builtInUltraWideCamera
-            case .front:               return .builtInWideAngleCamera
-            case .ultraWide:           return .builtInUltraWideCamera
-            case .wide, .tele2x:       return .builtInWideAngleCamera
-            case .tele4x, .tele8x:     return .builtInTelephotoCamera
+            case .frontUltraWide: return .builtInUltraWideCamera
+            case .front: return .builtInWideAngleCamera
+            case .ultraWide: return .builtInUltraWideCamera
+            case .wide, .tele2x: return .builtInWideAngleCamera
+            case .tele4x, .tele8x: return .builtInTelephotoCamera
         }
     }
     
@@ -91,7 +91,7 @@ enum Lens: String, CaseIterable {
         switch self {
             case .tele2x: return 2.0
             case .tele8x: return 2.0
-            default:      return 1.0
+            default: return 1.0
         }
     }
 }

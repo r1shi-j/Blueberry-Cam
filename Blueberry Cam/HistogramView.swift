@@ -147,14 +147,14 @@ struct HistogramView: View {
         let cellW = sz.width  / CGFloat(clampedCols)
         let cellH = sz.height / CGFloat(wfRows)
         // Dot is slightly smaller than a cell — leaves a gap so dots are distinct
-        let dotW = max(1.0, cellW  * 0.72)
-        let dotH = max(0.6, cellH  * 0.72)
-        let padX = (cellW  - dotW) * 0.5
-        let padY = (cellH  - dotH) * 0.5
+        let dotW = max(1.0, cellW * 0.72)
+        let dotH = max(0.6, cellH * 0.72)
+        let padX = (cellW - dotW) * 0.5
+        let padY = (cellH - dotH) * 0.5
         
         for outCol in 0..<clampedCols {
             let srcStart = outCol * colStep
-            let srcEnd   = min(srcStart + colStep, wfCols)
+            let srcEnd = min(srcStart + colStep, wfCols)
             guard srcStart < srcEnd else { continue }
             
             // Merge source columns — keep max-density colour per row

@@ -4,8 +4,8 @@ struct ContentView: View {
     @Binding var shutterCount: Int
     @State private var cameraModel = CameraModel()
     @State private var levelModel  = LevelMotionModel()
-    @State private var count = 0
     @State private var selectedControl: ManualControl?
+    @State private var count = 0
     
     var body: some View {
         GeometryReader { geo in
