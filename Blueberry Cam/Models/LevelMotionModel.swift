@@ -32,7 +32,7 @@ final class LevelMotionModel {
     // MARK: - Private
     private let motionManager = CMMotionManager()
     private let updateInterval: TimeInterval = 1.0 / 30.0
-    private let impactGenerator = UIImpactFeedbackGenerator(style: .light)
+    private var impactGenerator = UIImpactFeedbackGenerator(style: .light)
     
     /// Phone is "nearly flat" when |gz| > this (cos 25° ≈ 0.906)
     private let flatGZThreshold: Double = 0.85
@@ -52,6 +52,7 @@ final class LevelMotionModel {
     func startUpdates() {
         guard motionManager.isDeviceMotionAvailable else { return }
         UIDevice.current.beginGeneratingDeviceOrientationNotifications()
+        impactGenerator = UIImpactFeedbackGenerator(style: .light)
         impactGenerator.prepare()
         motionManager.deviceMotionUpdateInterval = updateInterval
         motionManager.startDeviceMotionUpdates(to: .main) { [weak self] motion, _ in

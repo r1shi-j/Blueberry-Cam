@@ -159,9 +159,11 @@ extension CameraModel {
         if !isAutoExposure {
             if let prevDuration = previousShutterDuration, !shutterSpeeds.isEmpty {
                 let prevSecs = CMTimeGetSeconds(prevDuration)
+                isUpdatingHardwareControl = true
                 shutterIndex = shutterSpeeds.indices.min { a, b in
                     abs(CMTimeGetSeconds(shutterSpeeds[a]) - prevSecs) < abs(CMTimeGetSeconds(shutterSpeeds[b]) - prevSecs)
                 } ?? 0
+                isUpdatingHardwareControl = false
             }
             applyManualExposure()
         } else {

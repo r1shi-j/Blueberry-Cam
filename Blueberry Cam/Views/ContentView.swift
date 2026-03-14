@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct ContentView: View {
+    @Environment(\.scenePhase) private var scenePhase
     @Binding var shutterCount: Int
     @State private var cameraModel = CameraModel()
     @State private var levelModel  = LevelMotionModel()
@@ -142,6 +143,13 @@ struct ContentView: View {
         }
         .onDisappear {
             levelModel.stopUpdates()
+        }
+        .onChange(of: scenePhase) { _, newPhase in
+            if newPhase == .active {
+                levelModel.startUpdates()
+            } else {
+                levelModel.stopUpdates()
+            }
         }
         .alert("Error", isPresented: $cameraModel.showError) {
             Button("OK", role: .cancel) {}
