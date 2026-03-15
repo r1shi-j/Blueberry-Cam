@@ -15,18 +15,21 @@ extension CameraModel {
         // Final wipe of any orphans just in case
         session.controls.forEach { session.removeControl($0) }
         
-        // Clean UI Picker
-        let titles = ["On", "Off"]
-        let values = [true, false]
-        let cUI = AVCaptureIndexPicker("Clean UI", symbolName: "square.arrowtriangle.4.outward", localizedIndexTitles: titles)
-        cUI.setActionQueue(.main) { [weak self] index in
-            guard let self else { return }
-            guard index >= 0 else { return }
-            self.setCleanUI(to: values[index])
+        // Early Exit: If settings sheet is active, we don't want any camera controls visible
+        if self.appView == .settings {
+            return
         }
-        cUI.selectedIndex = self.isCleanUI ? 0 : 1
-        self.cleanUIControl = cUI
-        session.addControl(cUI)
+        
+        // App View Picker
+        let titles = AppView.allCases.map(\.rawValue) // ["Standard", "Clean", "Settings"]
+        let picker = AVCaptureIndexPicker("View", symbolName: "square.arrowtriangle.4.outward", localizedIndexTitles: titles)
+        picker.setActionQueue(.main) { [weak self] index in
+            guard let self else { return }
+            self.appView = AppView.fromIndex(index)
+        }
+        picker.selectedIndex = self.appView.index
+        self.cleanUIControl = picker
+        session.addControl(picker)
         
         // Lens Picker
         let availableLenses = Lens.allCases.filter { len in

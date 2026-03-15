@@ -8,7 +8,7 @@ struct BottomBarView: View {
         VStack() {
             HStack(alignment: .center, spacing: 0) {
                 // Photos app link
-                if !cameraModel.isCleanUI {
+                if !cameraModel.showSimpleView {
                     Button {
                         openPhotosApp()
                     } label: {
@@ -49,7 +49,7 @@ struct BottomBarView: View {
                 .frame(maxWidth: .infinity)
                 
                 // Manual controls toggle
-                if !cameraModel.isCleanUI {
+                if !cameraModel.showSimpleView {
                     Button {
                         
                     } label: {

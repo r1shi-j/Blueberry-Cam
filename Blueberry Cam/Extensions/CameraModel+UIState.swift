@@ -63,6 +63,11 @@ extension CameraModel {
             }
         }}
     }
+    
+    func toggleSelfie() {
+        let target: Lens = activeLens.isFront ? .wide : .front
+        switchLens(to: target)
+    }
 
     func resetControl(for control: ManualControl) {
         switch control {
@@ -149,10 +154,6 @@ extension CameraModel {
                 histogramSize = .small
                 histogramMode = .luminance
         }
-    }
-    
-    func setCleanUI(to value: Bool) {
-        isCleanUI = value
     }
     
     func reapplyManualSettingsAfterLensSwitch(previousShutterDuration: CMTime?) {

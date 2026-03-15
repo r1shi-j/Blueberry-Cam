@@ -100,6 +100,30 @@ enum Lens: String, CaseIterable {
     }
 }
 
+// MARK: - AppView
+enum AppView: String, CaseIterable, Hashable {
+    case clean = "Clean"
+    case standard = "Standard"
+    case settings = "Settings"
+    
+    var index: Int {
+        switch self {
+            case .clean:    return 0
+            case .standard: return 1
+            case .settings: return 2
+        }
+    }
+    
+    static func fromIndex(_ x: Int) -> AppView {
+        switch x {
+            case 0:  return .clean
+            case 1:  return .standard
+            case 2:  return .settings
+            default: return .standard
+        }
+    }
+}
+
 // MARK: - ResolveAlbumID -
 // Same resolveAlbumID logic as CameraModel — finds or creates "Blueberry Cam" album
 func resolveAlbumID() -> String? {

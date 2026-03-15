@@ -24,12 +24,11 @@ struct ContentView: View {
                 .onTapGesture(count: 2) {
                     hapticTrigger += 1
                     withAnimation(.bouncy) {
-                        let target: Lens = cameraModel.activeLens.isFront ? .wide : .front
-                        cameraModel.switchLens(to: target)
+                        cameraModel.toggleSelfie()
                     }
                 }
                 
-                if !cameraModel.isCleanUI {
+                if !cameraModel.showSimpleView {
                     if cameraModel.showZebraStripes {
                         AnalysisOverlayView(
                             mask: cameraModel.zebraMask,
@@ -59,29 +58,24 @@ struct ContentView: View {
                         .frame(width: previewRect.width, height: previewRect.height)
                         .position(x: previewRect.midX, y: previewRect.midY)
                     }
-                }
-                
-                // MARK: - Crop frame overlay
-                if !cameraModel.isCleanUI {
+                    
+                    // MARK: - Crop frame overlay
                     CropOverlayView(aspectRatio: cameraModel.captureAspectRatio)
                         .ignoresSafeArea()
                         .allowsHitTesting(false)
-                }
-                
-                // MARK: - Level / Horizon overlay
-                if !cameraModel.isCleanUI {
+                    
+                    // MARK: - Level / Horizon overlay
                     LevelOverlayView(model: levelModel)
                         .ignoresSafeArea()
                 }
                 
                 // MARK: - UI Overlays
                 VStack(spacing: 0) {
-                    if !cameraModel.isCleanUI {
+                    if !cameraModel.showSimpleView {
                         TopBarView(cameraModel: cameraModel, selectedControl: $selectedControl)
-                    }
-                    Spacer()
-                    
-                    if !cameraModel.isCleanUI {
+                        
+                        Spacer()
+                        
                         if cameraModel.showHistogram && cameraModel.histogramSize == .large {
                             HistogramView(
                                 mode: cameraModel.histogramMode,
@@ -100,18 +94,16 @@ struct ContentView: View {
                                 cameraModel.cycleHistogramMode()
                             }
                         }
-                    }
-                    
-                    if !cameraModel.isCleanUI {
+                        
                         if let selectedControl {
                             ManualControlsView(cameraModel: cameraModel, control: selectedControl)
                                 .padding(.bottom, 8)
                         }
-                    }
-                    
-                    if !cameraModel.isCleanUI {
+                        
                         LensSelectorView(cameraModel: cameraModel)
                             .padding(.bottom, 20)
+                    } else {
+                        Spacer()
                     }
                     
                     BottomBarView(cameraModel: cameraModel, shutterCount: $shutterCount)
@@ -128,7 +120,7 @@ struct ContentView: View {
             }
         }
         .safeAreaInset(edge: .top) {
-            if !cameraModel.isCleanUI {
+            if !cameraModel.showSimpleView {
                 StatusBarAreaView(cameraModel: cameraModel)
                     .padding()
                     .ignoresSafeArea()
@@ -157,6 +149,13 @@ struct ContentView: View {
             Text(cameraModel.errorMessage)
         }
         .sensoryFeedback(.impact, trigger: hapticTrigger)
+        .fullScreenCover(isPresented: Binding(get: {
+            cameraModel.appView == .settings
+        }, set: { _, _ in
+            cameraModel.appView = .standard
+        })) {
+            SettingsPlaceholderView(cameraModel: cameraModel)
+        }
     }
     
     private func makePreviewRect(in geo: GeometryProxy) -> CGRect {
@@ -170,5 +169,35 @@ struct ContentView: View {
         let previewX = (size.width - previewW) / 2
         let previewY = (size.height - previewH) / 2
         return CGRect(x: previewX, y: previewY - xHeight, width: previewW, height: previewH)
+    }
+}
+
+struct SettingsPlaceholderView: View {
+    let cameraModel: CameraModel
+    @Environment(\.dismiss) var dismiss
+    
+    var body: some View {
+        NavigationStack {
+            List {
+                Section("Information") {
+                    Text("Settings are currently under development.")
+                    Text("Blueberry Cam v1.0")
+                }
+                
+                Section("Help") {
+                    Text("Dismissing this sheet will re-enable Camera Control.")
+                }
+            }
+            .navigationTitle("Settings")
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Done") {
+                        dismiss()
+                    }
+                }
+            }
+        }
+        .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.visible)
     }
 }

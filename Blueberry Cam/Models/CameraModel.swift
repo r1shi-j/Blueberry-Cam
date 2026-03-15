@@ -157,7 +157,13 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
     var liveShutter: String = ""
     var liveWB: String = ""
     var liveFocus: String = ""
-    var isCleanUI: Bool = false
+    var appView: AppView = .standard {
+        didSet {
+            if oldValue != appView && (appView == .settings || oldValue == .settings) {
+                setupCameraControls()
+            }
+        }
+    }
     var histogramData: [Float] = Array(repeating: 0, count: 256)
     var redHistogram: [Float] = Array(repeating: 0, count: 256)
     var greenHistogram: [Float] = Array(repeating: 0, count: 256)
@@ -212,6 +218,10 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
     
     var locationLabel: String {
         shouldEmbedLocationData ? "location.fill" : "location.slash.fill"
+    }
+    
+    var showSimpleView: Bool {
+        appView == .clean
     }
     
     // MARK: - Configure
