@@ -35,10 +35,10 @@ struct LockedCaptureView: View {
                     }
                     
                     LockedLensSelectorView(model: model)
-                        .padding(.bottom, 20)
+                        .padding(.bottom, 30)
                     
                     LockedBottomBarView(model: model, lockedSession: lockedSession)
-                        .padding(.bottom, 28)
+                        .padding(.bottom, 30)
                 }
                 
                 // Capture flash
@@ -104,7 +104,7 @@ struct LockedTopBarView: View {
     }
     
     var body: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: 20) {
             // Row 1 — EXIF readouts
             HStack(alignment: .center, spacing: 22) {
                 ForEach(ManualControl.allCases, id: \.self) { control in
@@ -149,16 +149,7 @@ struct LockedTopBarView: View {
             .padding(.horizontal, 12)
             
             // Row 2 — controls strip
-            HStack(alignment: .center, spacing: 10) {
-                // GPS — shown but always disabled (not available in extension sandbox)
-                Image(systemName: "location.slash.fill")
-                    .font(.system(size: 11, weight: .bold))
-                    .foregroundColor(.white.opacity(0.3))
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 5)
-                    .background(Color.white.opacity(0.08))
-                    .clipShape(.capsule)
-                
+            HStack(alignment: .center, spacing: 16) {
                 // Flash
                 Button {
                     hapticTrigger += 1
@@ -493,27 +484,25 @@ struct LockedBottomBarView: View {
             // lockedSession.openApplication() is the approved way to launch
             // the main app from a LockedCameraCaptureExtension.
             Button {
-                Task {
-                    let activity = NSUserActivity(activityType: "com.jansari.rishi.Blueberry-Cam.opencamera")
-                    try? await lockedSession.openApplication(for: activity)
-                }
+                openMainApp()
             } label: {
-                VStack(spacing: 4) {
-                    Image("camera.blueberry")
-                        .font(.system(size: 20))
-                        .symbolRenderingMode(.palette)
-                        .foregroundStyle(Color.black, Color.blue, Color.green)
-                        .padding()
-                        .clipShape(.circle)
-                        .glassEffect(.regular.interactive().tint(.white.mix(with: .teal, by: 0.4)), in: .circle)
-                    Text("OPEN")
-                        .font(.caption)
-                        .fontWidth(.expanded)
-                        .foregroundColor(.white.opacity(0.6))
-                }
-                .padding(.top)
+                Image("camera.blueberry")
+                    .font(.system(size: 20))
+                    .symbolRenderingMode(.palette)
+                    .foregroundStyle(Color.black, Color.blue, Color.green)
+                    .padding()
+                    .clipShape(.circle)
+                    .glassEffect(.regular.interactive().tint(.white.mix(with: .teal, by: 0.4)), in: .circle)
             }
+            .frame(height: 82)
             .frame(maxWidth: .infinity)
+            .overlay {
+                Text("OPEN")
+                    .font(.caption)
+                    .fontWidth(.expanded)
+                    .foregroundColor(.white.opacity(0.6))
+                    .offset(y: 41)
+            }
             
             // Shutter button — same style as main app
             ZStack {
@@ -541,8 +530,16 @@ struct LockedBottomBarView: View {
                     .font(.system(size: 20))
                     .foregroundColor(.white.opacity(0.8))
             }
+            .frame(height: 82)
             .frame(maxWidth: .infinity)
             .disabled(true)
+        }
+    }
+    
+    private func openMainApp() {
+        Task {
+            let activity = NSUserActivity(activityType: "com.jansari.rishi.Blueberry-Cam.opencamera")
+            try? await lockedSession.openApplication(for: activity)
         }
     }
 }

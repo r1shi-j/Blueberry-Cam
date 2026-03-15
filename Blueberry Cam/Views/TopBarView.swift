@@ -28,7 +28,7 @@ struct TopBarView: View {
     }
     
     var body: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: 20) {
             HStack(alignment: .center, spacing: 22) {
                 // Live EXIF
                 // long press or double tap resets and enables auto
@@ -76,7 +76,7 @@ struct TopBarView: View {
             }
             .padding(.horizontal, 12)
             
-            HStack(alignment: .center, spacing: 14) {
+            HStack(alignment: .center, spacing: 16) {
                 // Flash toggle
                 Button {
                     hapticTrigger += 1

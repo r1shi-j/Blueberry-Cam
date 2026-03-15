@@ -105,7 +105,7 @@ struct ContentView: View {
                         }
                         
                         LensSelectorView(cameraModel: cameraModel)
-                            .padding(.bottom, 20)
+                            .padding(.bottom, 30)
                     } else {
                         Spacer()
                     }
@@ -130,9 +130,16 @@ struct ContentView: View {
                     .ignoresSafeArea()
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .frame(height: .zero)
+            } else {
+                Color.clear
+                    .padding()
+                    .ignoresSafeArea()
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .frame(height: .zero)
             }
         }
         .statusBarHidden()
+        .sensoryFeedback(.impact, trigger: hapticTrigger)
         .onAppear {
             cameraModel.configure()
             levelModel.startUpdates()
@@ -142,6 +149,13 @@ struct ContentView: View {
         }
         .onChange(of: cameraModel.shouldShowLevel) { _, new in
             if new {
+                levelModel.startUpdates()
+            } else {
+                levelModel.stopUpdates()
+            }
+        }
+        .onChange(of: cameraModel.appView) { _, new in
+            if new == AppView.standard {
                 levelModel.startUpdates()
             } else {
                 levelModel.stopUpdates()
@@ -159,7 +173,6 @@ struct ContentView: View {
         } message: {
             Text(cameraModel.errorMessage)
         }
-        .sensoryFeedback(.impact, trigger: hapticTrigger)
         .fullScreenCover(isPresented: Binding(get: {
             cameraModel.appView == .settings
         }, set: { _, _ in

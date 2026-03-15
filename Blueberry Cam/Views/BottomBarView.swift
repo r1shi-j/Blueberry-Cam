@@ -12,22 +12,23 @@ struct BottomBarView: View {
                     Button {
                         openPhotosApp()
                     } label: {
-                        VStack(spacing: 4) {
-                            Image(systemName: "photo.on.rectangle.angled.fill")
-                                .font(.system(size: 20))
-                                .symbolRenderingMode(.hierarchical)
-                                .tint(.primary)
-                                .padding()
-                                .clipShape(.circle)
-                                .glassEffect(.regular.interactive().tint(.black.mix(with: .white, by: 0.2)), in: .circle)
-                            Text(String(shutterCount))
-                                .font(.caption)
-                                .fontWidth(.expanded)
-                                .foregroundColor(.white.opacity(0.6))
-                        }
-                        .padding(.top)
+                        Image(systemName: "photo.on.rectangle.angled.fill")
+                            .font(.system(size: 20))
+                            .symbolRenderingMode(.hierarchical)
+                            .tint(.primary)
+                            .padding()
+                            .clipShape(.circle)
+                            .glassEffect(.regular.interactive().tint(.black.mix(with: .white, by: 0.2)), in: .circle)
                     }
+                    .frame(height: 82)
                     .frame(maxWidth: .infinity)
+                    .overlay {
+                        Text(String(shutterCount))
+                            .font(.caption)
+                            .fontWidth(.expanded)
+                            .foregroundColor(.white.opacity(0.6))
+                            .offset(y: 41)
+                    }
                 }
                 
                 // Shutter button
@@ -57,6 +58,7 @@ struct BottomBarView: View {
                             .font(.system(size: 20))
                             .foregroundColor(.white.opacity(0.8))
                     }
+                    .frame(height: 82)
                     .frame(maxWidth: .infinity)
                     .disabled(true)
                 }
