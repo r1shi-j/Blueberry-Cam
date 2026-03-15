@@ -76,26 +76,7 @@ struct TopBarView: View {
             }
             .padding(.horizontal, 12)
             
-            HStack(alignment: .center, spacing: 10) {
-                // Location geotag toggle
-                Button {
-                    hapticTrigger += 1
-                    cameraModel.toggleLocationGeotag()
-                } label: {
-                    Image(systemName: "location")
-                        .symbolVariant(cameraModel.shouldEmbedLocationData ? .fill : .slash.fill)
-                        .font(.system(size: 11, weight: .bold))
-                        .foregroundColor(
-                            cameraModel.shouldEmbedLocationData ? .black : .white.opacity(0.7)
-                        )
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 5)
-                        .background(
-                            cameraModel.shouldEmbedLocationData ? Color.yellow : Color.white.opacity(0.15)
-                        )
-                        .clipShape(.capsule)
-                }
-                
+            HStack(alignment: .center, spacing: 14) {
                 // Flash toggle
                 Button {
                     hapticTrigger += 1

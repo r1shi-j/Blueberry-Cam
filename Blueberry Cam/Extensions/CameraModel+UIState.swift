@@ -110,8 +110,7 @@ extension CameraModel {
     }
 
     func toggleLocationGeotag() {
-        shouldEmbedLocationData.toggle()
-        if shouldEmbedLocationData {
+        if shouldGeotagLocation {
             locationManager.delegate = self
             locationManager.desiredAccuracy = kCLLocationAccuracyBest
             locationManager.requestWhenInUseAuthorization()

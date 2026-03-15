@@ -29,6 +29,15 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
     /// Prevents Camera Control action callbacks from overwriting properties when we set ctrl.value programmatically
     var isUpdatingHardwareControl = false
     
+    // MARK: - Defaults (for settings)
+    var shouldGeotagLocation = false {
+        didSet {
+            toggleLocationGeotag()
+        }
+    }
+    var shouldShowGrid = true
+    var shouldShowLevel = true
+    
     // MARK: - Capture format
     var captureMode: CaptureMode = .raw {
         didSet {
@@ -181,7 +190,6 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
     // MARK: - Location
     let locationManager = CLLocationManager()
     var currentLocation: CLLocation?
-    var shouldEmbedLocationData: Bool = false
     
     // MARK: - Computed properties
     var captureAspectRatio: CGFloat { 3.0 / 4.0 }
@@ -216,17 +224,13 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
         !isAutoFocus
     }
     
-    var locationLabel: String {
-        shouldEmbedLocationData ? "location.fill" : "location.slash.fill"
-    }
-    
     var showSimpleView: Bool {
         appView == .clean
     }
     
     // MARK: - Configure
     func configure() {
-        if shouldEmbedLocationData {
+        if shouldGeotagLocation {
             locationManager.delegate = self
             locationManager.desiredAccuracy = kCLLocationAccuracyBest
             locationManager.requestWhenInUseAuthorization()

@@ -60,13 +60,17 @@ struct ContentView: View {
                     }
                     
                     // MARK: - Crop frame overlay
-                    CropOverlayView(aspectRatio: cameraModel.captureAspectRatio)
-                        .ignoresSafeArea()
-                        .allowsHitTesting(false)
+                    if cameraModel.shouldShowGrid {
+                        CropOverlayView(aspectRatio: cameraModel.captureAspectRatio)
+                            .ignoresSafeArea()
+                            .allowsHitTesting(false)
+                    }
                     
                     // MARK: - Level / Horizon overlay
-                    LevelOverlayView(model: levelModel)
-                        .ignoresSafeArea()
+                    if cameraModel.shouldShowLevel {
+                        LevelOverlayView(model: levelModel)
+                            .ignoresSafeArea()
+                    }
                 }
                 
                 // MARK: - UI Overlays
@@ -136,6 +140,13 @@ struct ContentView: View {
         .onDisappear {
             levelModel.stopUpdates()
         }
+        .onChange(of: cameraModel.shouldShowLevel) { _, new in
+            if new {
+                levelModel.startUpdates()
+            } else {
+                levelModel.stopUpdates()
+            }
+        }
         .onChange(of: scenePhase) { _, newPhase in
             if newPhase == .active {
                 levelModel.startUpdates()
@@ -154,7 +165,7 @@ struct ContentView: View {
         }, set: { _, _ in
             cameraModel.appView = .standard
         })) {
-            SettingsPlaceholderView(cameraModel: cameraModel)
+            SettingsView(cameraModel: cameraModel)
         }
     }
     
@@ -169,35 +180,5 @@ struct ContentView: View {
         let previewX = (size.width - previewW) / 2
         let previewY = (size.height - previewH) / 2
         return CGRect(x: previewX, y: previewY - xHeight, width: previewW, height: previewH)
-    }
-}
-
-struct SettingsPlaceholderView: View {
-    let cameraModel: CameraModel
-    @Environment(\.dismiss) var dismiss
-    
-    var body: some View {
-        NavigationStack {
-            List {
-                Section("Information") {
-                    Text("Settings are currently under development.")
-                    Text("Blueberry Cam v1.0")
-                }
-                
-                Section("Help") {
-                    Text("Dismissing this sheet will re-enable Camera Control.")
-                }
-            }
-            .navigationTitle("Settings")
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Done") {
-                        dismiss()
-                    }
-                }
-            }
-        }
-        .presentationDetents([.medium, .large])
-        .presentationDragIndicator(.visible)
     }
 }
