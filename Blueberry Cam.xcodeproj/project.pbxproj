@@ -516,6 +516,7 @@
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "To geotag the photo with the location where you took the photo.";
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "To save photos to your photo library.";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "To access the album to save the photos to.";
+				INFOPLIST_KEY_PHPhotoLibraryPreventAutomaticLimitedAccessAlert = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
@@ -556,6 +557,7 @@
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "To geotag the photo with the location where you took the photo.";
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "To save photos to your photo library.";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "To access the album to save the photos to.";
+				INFOPLIST_KEY_PHPhotoLibraryPreventAutomaticLimitedAccessAlert = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
