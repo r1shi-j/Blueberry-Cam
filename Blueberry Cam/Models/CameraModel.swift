@@ -30,13 +30,48 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
     var isUpdatingHardwareControl = false
     
     // MARK: - Defaults (for settings)
+    var selectedFileFormat: CaptureMode = .raw {
+        didSet {
+            UserDefaults.standard.set(selectedFileFormat.rawValue, forKey: "selectedFileFormat")
+            // When user changes their default preference, we immediately try to apply it
+            if availableFormats.contains(selectedFileFormat) {
+                captureMode = selectedFileFormat
+            }
+        }
+    }
+    var preferredResolution: ResolutionPreference = .max {
+        didSet {
+            UserDefaults.standard.set(preferredResolution.rawValue, forKey: "preferredResolution")
+            // Force apply the new preference immediately to the current selection
+            if !availableResolutions.isEmpty {
+                selectedResolution = preferredResolution == .max ? availableResolutions.last : availableResolutions.first
+            }
+        }
+    }
     var shouldGeotagLocation = false {
         didSet {
+            UserDefaults.standard.set(shouldGeotagLocation, forKey: "shouldGeotagLocation")
             toggleLocationGeotag()
         }
     }
-    var shouldShowGrid = true
-    var shouldShowLevel = true
+    var selectedHistogram: HistogramDefault = .none {
+        didSet {
+            UserDefaults.standard.set(selectedHistogram.rawValue, forKey: "selectedHistogram")
+            if selectedHistogram == .none {
+                showHistogram = false
+            } else {
+                showHistogram = true
+                histogramMode = selectedHistogram.mode
+                histogramSize = selectedHistogram.size
+            }
+        }
+    }
+    var shouldShowGrid = true {
+        didSet { UserDefaults.standard.set(shouldShowGrid, forKey: "shouldShowGrid") }
+    }
+    var shouldShowLevel = true {
+        didSet { UserDefaults.standard.set(shouldShowLevel, forKey: "shouldShowLevel") }
+    }
     
     // MARK: - Capture format
     var captureMode: CaptureMode = .raw {
@@ -230,6 +265,8 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
     
     // MARK: - Configure
     func configure() {
+        loadSettings()
+        
         if shouldGeotagLocation {
             locationManager.delegate = self
             locationManager.desiredAccuracy = kCLLocationAccuracyBest
@@ -337,11 +374,21 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
         if availableFormats != modes {
             availableFormats = modes
         }
-        if !modes.contains(captureMode) {
-            let nextMode: CaptureMode = modes.contains(.heif) ? .heif : .jpeg
-            if captureMode != nextMode {
-                captureMode = nextMode
-            }
+        
+        // SMART SWITCH: Prioritize user's 'selectedFileFormat' preference if it's available.
+        // This ensures if we fell back to JPEG because of a temporary state (like startup), 
+        // we bounce back to RAW as soon as it becomes available.
+        let targetMode: CaptureMode
+        if modes.contains(selectedFileFormat) {
+            targetMode = selectedFileFormat
+        } else if modes.contains(captureMode) {
+            targetMode = captureMode
+        } else {
+            targetMode = modes.contains(.heif) ? .heif : .jpeg
+        }
+        
+        if captureMode != targetMode {
+            captureMode = targetMode
         }
         
         let isCropLens = activeLens == .tele2x || activeLens == .tele8x
@@ -378,11 +425,10 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
                 }
             }
             // Always show 12MP + 48MP for back optical lenses
-            // RAW locks to 12MP only (48MP RAW not supported by AVFoundation)
-            // JPEG/HEIF allows both
             let smallest = deduped.first
             let largest  = deduped.last
             if captureMode == .raw {
+                // RAW is strictly 12MP in this app's pipeline (non-ProRAW)
                 options = smallest.map { [$0] } ?? []
             } else if let s = smallest, let l = largest, s.id != l.id {
                 options = [s, l]
@@ -391,19 +437,16 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
             }
         }
         
-        if availableResolutions != options {
-            availableResolutions = options
-        }
+        let sameOptions = availableResolutions.count == options.count &&
+                          zip(availableResolutions, options).allSatisfy { $0.id == $1.id }
         
-        // Preserve selection if still valid, otherwise default to highest
-        if options.isEmpty {
-            if selectedResolution != nil { selectedResolution = nil }
-        } else if let current = selectedResolution, options.contains(where: { $0.id == current.id }) {
-            // keep
-        } else {
-            if selectedResolution != options.last {
-                selectedResolution = options.last
-            }
+        if !sameOptions {
+            availableResolutions = options
+            // Options change (Format or Lens switch): re-apply resolution preference
+            selectedResolution = preferredResolution == .max ? options.last : options.first
+        } else if let current = selectedResolution, !options.contains(where: { $0.id == current.id }) {
+            // Current selection became invalid
+            selectedResolution = preferredResolution == .max ? options.last : options.first
         }
     }
     
@@ -590,5 +633,25 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
             .filter { $0.width <= outputMax.width && $0.height <= outputMax.height }
             .max { Int($0.width) * Int($0.height) < Int($1.width) * Int($1.height) }
         ?? outputMax
+    }
+    
+    private func loadSettings() {
+        let defaults = UserDefaults.standard
+        
+        if let format = defaults.string(forKey: "selectedFileFormat"), let mode = CaptureMode(rawValue: format) {
+            self.selectedFileFormat = mode
+        }
+        
+        self.shouldGeotagLocation = defaults.bool(forKey: "shouldGeotagLocation")
+        self.shouldShowGrid = defaults.object(forKey: "shouldShowGrid") as? Bool ?? true
+        self.shouldShowLevel = defaults.object(forKey: "shouldShowLevel") as? Bool ?? true
+        
+        if let res = defaults.string(forKey: "preferredResolution"), let rPref = ResolutionPreference(rawValue: res) {
+            self.preferredResolution = rPref
+        }
+        
+        if let hist = defaults.string(forKey: "selectedHistogram"), let hMode = HistogramDefault(rawValue: hist) {
+            self.selectedHistogram = hMode
+        }
     }
 }

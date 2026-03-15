@@ -8,16 +8,38 @@ struct SettingsView: View {
         NavigationStack {
             List {
                 Section {
+                    LabeledContent("Format ") {
+                        Picker("", selection: $cameraModel.selectedFileFormat) {
+                            ForEach(CaptureMode.allCases, id: \.self) { format in
+                                Text(format.rawValue)
+                                    .tag(format)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+                        .frame(maxWidth: 200)
+                    }
+                    
+                    LabeledContent("Resolution ") {
+                        Picker("", selection: $cameraModel.preferredResolution) {
+                            ForEach(ResolutionPreference.allCases, id: \.self) { pref in
+                                Text(pref.rawValue)
+                                    .tag(pref)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+                        .frame(maxWidth: 200)
+                    }
+                    
                     LabeledContent("Geotag Location ") {
                         Toggle("", isOn: $cameraModel.shouldGeotagLocation)
                     }
-                } header: { Text("Defaults") } footer: {
-                    VStack(alignment: .leading) {
-                        Text("If geotag location is on, the location will be automatically captured")
-                    }
+                } header: {
+                    Text("Image Defaults")
+                } footer: {
+                    Text("Preferred format and resolution will be applied automatically when supported by the lens.")
                 }
                 
-                Section("User Interface") {
+                Section {
                     LabeledContent("Show Grid ") {
                         Toggle("", isOn: $cameraModel.shouldShowGrid)
                     }
@@ -25,21 +47,34 @@ struct SettingsView: View {
                     LabeledContent("Show Level/Crosshair ") {
                         Toggle("", isOn: $cameraModel.shouldShowLevel)
                     }
+                    
+                    LabeledContent("Histogram ") {
+                        Picker("", selection: $cameraModel.selectedHistogram) {
+                            ForEach(HistogramDefault.allCases, id: \.self) { format in
+                                Text(format.rawValue)
+                                    .tag(format)
+                            }
+                        }
+                        .pickerStyle(.menu)
+                    }
+                } header: {
+                    Text("User Interface")
+                } footer : {
+                    Text("Tap the histogram to cycle through all histograms.")
                 }
                 
                 Section {
-                    Text("Some things that arent available in the LockedCaptureView")
-                    Text("Histograms, Zebras, Highlight Clipping, Focus Peaking, Level, Grid, Selfie Cameras, Embedding Location")
+                    Text("This app supports LockedCameraCapture which enables the app to be opened from camera control, control centre and from the lock screen action buttons. However when the app is opened from the lock screen some features arent available, these include: Histograms, Zebras, Highlight Clipping, Focus Peaking, Level, Grid, Selfie Cameras and Embedding Location")
                 } header: {
-                  Text("Help")
+                    Text("About")
                 } footer: {
-                    Text("Rishi Jansari")
+                    Text(" Rishi Jansari © 2026")
                 }
             }
             .navigationTitle("Settings")
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("Done") {
+                    Button("Close") {
                         dismiss()
                     }
                 }
@@ -47,7 +82,6 @@ struct SettingsView: View {
         }
     }
 }
-
 
 #Preview {
     @Previewable @State var cameraModel = CameraModel()

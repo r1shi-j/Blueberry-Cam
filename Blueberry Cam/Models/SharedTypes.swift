@@ -39,6 +39,12 @@ enum CaptureMode: String, CaseIterable, Identifiable {
     var id: String { rawValue }
 }
 
+enum ResolutionPreference: String, CaseIterable, Identifiable {
+    case efficient = "Efficient"
+    case max = "Max"
+    var id: String { rawValue }
+}
+
 // MARK: - Histograms
 enum HistogramMode: String, CaseIterable {
     case luminance = "LUMA"
@@ -49,6 +55,38 @@ enum HistogramMode: String, CaseIterable {
 
 enum HistogramSize: String, CaseIterable {
     case small, large
+}
+
+enum HistogramDefault: String, CaseIterable, Identifiable {
+    case none = "None"
+    case luminanceSmall = "Luma (Small)"
+    case colorSmall = "RGB (Small)"
+    case waveformSmall = "Waveform (Small)"
+    case paradeSmall = "Parade (Small)"
+    case luminanceLarge = "Luma (Large)"
+    case colorLarge = "RGB (Large)"
+    case waveformLarge = "Waveform (Large)"
+    case paradeLarge = "Parade (Large)"
+    
+    var id: String { rawValue }
+    
+    var mode: HistogramMode {
+        switch self {
+            case .none: return .luminance // fallback
+            case .luminanceSmall, .luminanceLarge: return .luminance
+            case .colorSmall, .colorLarge: return .color
+            case .waveformSmall, .waveformLarge: return .waveform
+            case .paradeSmall, .paradeLarge: return .parade
+        }
+    }
+    
+    var size: HistogramSize {
+        switch self {
+            case .none: return .small // fallback
+            case .luminanceSmall, .colorSmall, .waveformSmall, .paradeSmall: return .small
+            case .luminanceLarge, .colorLarge, .waveformLarge, .paradeLarge: return .large
+        }
+    }
 }
 
 enum WaveformConstants {
