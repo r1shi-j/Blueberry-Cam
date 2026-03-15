@@ -15,7 +15,7 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
     nonisolated let depthOutput = AVCaptureDepthDataOutput()
     private var synchronizer: AVCaptureDataOutputSynchronizer?
     nonisolated let sessionQueue = DispatchQueue(label: "com.blueberrycam.sessionQueue")
-    nonisolated private let _frameCounter = FrameCounter()
+    nonisolated let frameCounter = FrameCounter()
     let _pendingCaptureModeBox = CaptureModeBox()
     
     // MARK: - Camera Control (iOS 18)
@@ -142,6 +142,7 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
     var isAutoFocus: Bool = true {
         didSet {
             if oldValue != isAutoFocus {
+                peakingEnabledForAnalysis = !isAutoFocus
                 if !isAutoFocus, let d = device {
                     self.lensPosition = d.lensPosition
                 }
@@ -160,6 +161,10 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
     
     @ObservationIgnored
     nonisolated(unsafe) var lastLensPosition: Float = 1.0
+    @ObservationIgnored
+    nonisolated(unsafe) var peakingTemporalScores: [Float] = []
+    @ObservationIgnored
+    nonisolated(unsafe) var minimumFocusDistanceForAnalysis: Float = 0
     var focusPeakingHoldTask: Task<Void, Never>?
     
     var isAutoWhiteBalance: Bool = true {
@@ -189,9 +194,15 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
         }
     }
     
-    var showHistogram: Bool = false
-    var showClipping: Bool = false
-    var showZebraStripes: Bool = false
+    var showHistogram: Bool = false {
+        didSet { histogramEnabledForAnalysis = showHistogram }
+    }
+    var showClipping: Bool = false {
+        didSet { clippingEnabledForAnalysis = showClipping }
+    }
+    var showZebraStripes: Bool = false {
+        didSet { zebraEnabledForAnalysis = showZebraStripes }
+    }
     
     // MARK: - UI State
     var isCapturing: Bool = false
@@ -216,11 +227,23 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
     nonisolated static var wfCols: Int { WaveformConstants.wfCols }
     nonisolated static var wfRows: Int { WaveformConstants.wfRows }
     var histogramSize: HistogramSize = .small
-    var histogramMode: HistogramMode = .luminance
+    var histogramMode: HistogramMode = .luminance {
+        didSet { histogramModeForAnalysis = histogramMode }
+    }
     var analysisGridSize: CGSize = .zero
     var focusPeakingMask: [UInt8] = []
     var zebraMask: [UInt8] = []
     var clippingMask: [UInt8] = []
+    @ObservationIgnored
+    nonisolated(unsafe) var peakingEnabledForAnalysis: Bool = false
+    @ObservationIgnored
+    nonisolated(unsafe) var zebraEnabledForAnalysis: Bool = false
+    @ObservationIgnored
+    nonisolated(unsafe) var clippingEnabledForAnalysis: Bool = false
+    @ObservationIgnored
+    nonisolated(unsafe) var histogramEnabledForAnalysis: Bool = false
+    @ObservationIgnored
+    nonisolated(unsafe) var histogramModeForAnalysis: HistogramMode = .luminance
     
     // MARK: - Location
     let locationManager = CLLocationManager()
@@ -488,6 +511,7 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
         liveShutter = Self.formatShutter(d.exposureDuration)
         minExposureBias = d.minExposureTargetBias
         maxExposureBias = d.maxExposureTargetBias
+        minimumFocusDistanceForAnalysis = d.minimumFocusDistance > 0 ? Float(d.minimumFocusDistance) / 1000.0 : 0
         
         // Always clamp iso to the new device's valid range (handles lens switches where minISO changes)
         let newISO = max(minISO, min(maxISO, iso))

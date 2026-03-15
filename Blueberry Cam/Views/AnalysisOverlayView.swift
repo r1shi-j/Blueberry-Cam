@@ -26,7 +26,8 @@ struct AnalysisOverlayView: View {
                 for y in 0..<rows {
                     for x in 0..<cols {
                         let index = y * cols + x
-                        guard mask[index] > 0 else { continue }
+                        let intensity = mask[index]
+                        guard intensity > 0 else { continue }
                         
                         if style == .zebra, ((x + y) % 2 != 0) {
                             continue
@@ -41,9 +42,13 @@ struct AnalysisOverlayView: View {
                         
                         switch style {
                             case .focusPeaking:
-                                let r = max(1.5, min(cellWidth, cellHeight) * 0.25)
-                                let dot = CGRect(x: rect.midX - r, y: rect.midY - r, width: r * 2, height: r * 2)
-                                context.fill(Path(ellipseIn: dot), with: .color(Color.green.opacity(0.85)))
+                                let opacity = 0.25 + (Double(intensity) / 255.0) * 0.7
+                                let inset = max(0.2, min(cellWidth, cellHeight) * 0.1)
+                                let highlightRect = rect.insetBy(dx: inset, dy: inset)
+                                context.fill(
+                                    Path(roundedRect: highlightRect, cornerRadius: min(cellWidth, cellHeight) * 0.22),
+                                    with: .color(Color.green.opacity(opacity))
+                                )
                             case .zebra:
                                 let r = max(0.75, min(cellWidth, cellHeight) * 0.45)
                                 let dot = CGRect(x: rect.midX - r, y: rect.midY - r, width: r * 2, height: r * 2)
