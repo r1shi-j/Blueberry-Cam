@@ -11,11 +11,15 @@ struct HistogramView: View {
     
     private var cornerRadius: CGFloat { size == .small ? 3 : 6 }
     
+    private var backgroundOpacity: Double {
+        size == .large && mode == .waveform ? 0.72 : 0.55
+    }
+    
     var body: some View {
         GeometryReader { _ in
             ZStack(alignment: .bottomLeading) {
                 RoundedRectangle(cornerRadius: cornerRadius)
-                    .fill(Color.black.opacity(0.55))
+                    .fill(Color.black.opacity(backgroundOpacity))
                 
                 if size == .small {
                     Canvas { ctx, sz in
@@ -33,7 +37,7 @@ struct HistogramView: View {
                         switch mode {
                             case .luminance: drawBars(ctx, sz, channels: [(lumaData, .white)], buckets: nil, opacity: 0.78)
                             case .color: drawBars(ctx, sz, channels: rgbChannels, buckets: nil, opacity: 0.65)
-                            case .waveform: drawWaveform(ctx, sz, outCols: 256)
+                            case .waveform: drawWaveform(ctx, sz, outCols: WaveformConstants.wfCols)
                             case .parade: drawParade(ctx, sz, buckets: nil)
                         }
                     }
@@ -131,9 +135,9 @@ struct HistogramView: View {
     
     // MARK: - Waveform (shared for both sizes, parameterised by outCols)
     //
-    // Renders as a dense field of small dots — one dot per (col, brightnessRow) cell
-    // that has data. Point size is smaller than a cell so there is always a visible
-    // gap between dots, giving the oscilloscope-dot look Halide uses.
+    // Renders a density-weighted field of dots. The large waveform uses the full
+    // analysis resolution so it scales the small waveform up cleanly instead of
+    // exposing the intermediate column grid as visible vertical stripes.
     private func drawWaveform(_ ctx: GraphicsContext, _ sz: CGSize, outCols: Int) {
         let wfCols = WaveformConstants.wfCols
         let wfRows = WaveformConstants.wfRows
@@ -141,52 +145,63 @@ struct HistogramView: View {
         
         let clampedCols = min(outCols, wfCols)
         guard clampedCols > 0, wfRows > 0, sz.width > 0, sz.height > 0 else { return }
-        let colStep = max(1, wfCols / clampedCols)
         
-        // Cell size in points
         let cellW = sz.width  / CGFloat(clampedCols)
         let cellH = sz.height / CGFloat(wfRows)
-        // Dot is slightly smaller than a cell — leaves a gap so dots are distinct
-        let dotW = max(1.0, cellW * 0.72)
-        let dotH = max(0.6, cellH * 0.72)
+        let dotW = size == .small ? max(1.0, cellW * 0.72) : max(0.9, cellW * 1.35)
+        let dotH = size == .small ? max(0.6, cellH * 0.72) : max(0.75, cellH * 0.92)
         let padX = (cellW - dotW) * 0.5
         let padY = (cellH - dotH) * 0.5
+        let densityThreshold: Float = size == .small ? 0.018 : 0.010
+        let alphaScale: Double = size == .small ? 0.88 : 0.98
         
         for outCol in 0..<clampedCols {
-            let srcStart = outCol * colStep
-            let srcEnd = min(srcStart + colStep, wfCols)
+            let srcStart = Int((CGFloat(outCol) * CGFloat(wfCols) / CGFloat(clampedCols)).rounded(.down))
+            let srcEnd = min(
+                wfCols,
+                max(
+                    srcStart + 1,
+                    Int((CGFloat(outCol + 1) * CGFloat(wfCols) / CGFloat(clampedCols)).rounded(.up))
+                )
+            )
             guard srcStart < srcEnd else { continue }
             
-            // Merge source columns — keep max-density colour per row
-            var rowR = [Float](repeating: 0, count: wfRows)
-            var rowG = [Float](repeating: 0, count: wfRows)
-            var rowB = [Float](repeating: 0, count: wfRows)
-            var rowDensity = [Float](repeating: 0, count: wfRows)
+            var rowWeightedR = [Float](repeating: 0, count: wfRows)
+            var rowWeightedG = [Float](repeating: 0, count: wfRows)
+            var rowWeightedB = [Float](repeating: 0, count: wfRows)
+            var rowDensitySum = [Float](repeating: 0, count: wfRows)
+            var rowPeakDensity = [Float](repeating: 0, count: wfRows)
+            let sourceCount = Float(srcEnd - srcStart)
+            
             for srcCol in srcStart..<srcEnd {
                 for row in 0..<wfRows {
                     let base = (row * wfCols + srcCol) * 4
                     let d = waveformData[base + 3]
-                    guard d > rowDensity[row] else { continue }
-                    rowDensity[row] = d
-                    rowR[row] = waveformData[base]
-                    rowG[row] = waveformData[base + 1]
-                    rowB[row] = waveformData[base + 2]
+                    guard d > 0 else { continue }
+                    rowDensitySum[row] += d
+                    rowPeakDensity[row] = max(rowPeakDensity[row], d)
+                    rowWeightedR[row] += waveformData[base] * d
+                    rowWeightedG[row] += waveformData[base + 1] * d
+                    rowWeightedB[row] += waveformData[base + 2] * d
                 }
             }
             
             let cx = CGFloat(outCol) * cellW + padX
             
             for row in 0..<wfRows {
-                let d = rowDensity[row]
-                guard d > 0.018 else { continue }
-                // row 0 = bottom (black), row max = top (white)
+                let densitySum = rowDensitySum[row]
+                guard densitySum > 0 else { continue }
+                
+                let mergedDensity = max(rowPeakDensity[row], densitySum / sourceCount)
+                guard mergedDensity > densityThreshold else { continue }
+                
                 let cy = sz.height - CGFloat(row + 1) * cellH + padY
                 let rect = CGRect(x: cx, y: cy, width: dotW, height: dotH)
-                let alpha = Double(min(d, 1.0)) * 0.88
+                let alpha = pow(Double(min(mergedDensity, 1.0)), 0.78) * alphaScale
                 ctx.fill(Path(rect), with: .color(Color(
-                    red: Double(rowR[row]),
-                    green: Double(rowG[row]),
-                    blue: Double(rowB[row])
+                    red: Double(rowWeightedR[row] / densitySum),
+                    green: Double(rowWeightedG[row] / densitySum),
+                    blue: Double(rowWeightedB[row] / densitySum)
                 ).opacity(alpha)))
             }
         }

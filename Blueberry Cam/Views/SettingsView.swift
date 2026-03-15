@@ -64,7 +64,7 @@ struct SettingsView: View {
                 }
                 
                 Section {
-                    Text("This app supports LockedCameraCapture which enables the app to be opened from camera control, control centre and from the lock screen action buttons. However when the app is opened from the lock screen some features arent available, these include: Histograms, Zebras, Highlight Clipping, Focus Peaking, Level, Grid, Selfie Cameras and Embedding Location")
+                    Text("This app supports LockedCameraCapture which enables the app to be opened from camera control, control centre and from the lock screen action buttons. However when the app is opened from the lock screen some features arent available, these include: Histograms, Zebras, Highlight Clipping, Focus Peaking, Level, Grid, Selfie Cameras and Embedding Location. Additionally the default image format and resolution will not be applied, this required a paid Apple Developer account. The defaults used will be RAW Efficiency.")
                 } header: {
                     Text("About")
                 } footer: {
