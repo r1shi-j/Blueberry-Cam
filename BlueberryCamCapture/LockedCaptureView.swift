@@ -168,7 +168,7 @@ struct LockedTopBarView: View {
                     .padding(.horizontal, 8)
                     .padding(.vertical, 5)
                     .background(model.flashMode == .off || !model.supportsFlash
-                                ? Color.white.opacity(0.15) : Color.yellow)
+                                ? .white.opacity(0.15) : .yellow)
                     .clipShape(.capsule)
                 }
                 .opacity(model.supportsFlash ? 1.0 : 0.45)
@@ -187,14 +187,14 @@ struct LockedTopBarView: View {
                                 .fontWidth(.expanded)
                                 .padding(.horizontal, 10)
                                 .padding(.vertical, 5)
-                                .background(isSelected ? Color.yellow : Color.white.opacity(0.15))
+                                .background(isSelected ? .yellow : .white.opacity(0.15))
                                 .foregroundColor(isSelected ? .black : .white)
                         }
                     }
                 }
                 .clipShape(.rect(cornerRadius: 6))
                 .overlay(RoundedRectangle(cornerRadius: 6)
-                    .stroke(Color.white.opacity(0.2), lineWidth: 1))
+                    .stroke(.white.opacity(0.2), lineWidth: 1))
                 
                 // Format picker
                 HStack(spacing: 0) {
@@ -208,14 +208,14 @@ struct LockedTopBarView: View {
                                 .fontWidth(.expanded)
                                 .padding(.horizontal, 10)
                                 .padding(.vertical, 5)
-                                .background(model.captureMode == mode ? Color.yellow : Color.white.opacity(0.15))
+                                .background(model.captureMode == mode ? .yellow : .white.opacity(0.15))
                                 .foregroundColor(model.captureMode == mode ? .black : .white)
                         }
                     }
                 }
                 .clipShape(.rect(cornerRadius: 6))
                 .overlay(RoundedRectangle(cornerRadius: 6)
-                    .stroke(Color.white.opacity(0.2), lineWidth: 1))
+                    .stroke(.white.opacity(0.2), lineWidth: 1))
             }
             .padding(.horizontal, 8)
         }
@@ -430,9 +430,9 @@ struct LockedManualControlsView: View {
         .padding(.vertical, 12)
         .background(
             RoundedRectangle(cornerRadius: 12)
-                .fill(Color.black.opacity(0.65))
+                .fill(.black.opacity(0.65))
                 .overlay(RoundedRectangle(cornerRadius: 12)
-                    .stroke(Color.white.opacity(0.1), lineWidth: 1))
+                    .stroke(.white.opacity(0.1), lineWidth: 1))
         )
         .padding(.horizontal, 12)
         .transition(.move(edge: .bottom).combined(with: .opacity))
@@ -459,14 +459,14 @@ struct LockedLensSelectorView: View {
                         .font(.system(size: 14, weight: isActive ? .bold : .regular, design: .monospaced))
                         .foregroundColor(isActive ? .yellow : .white.opacity(0.7))
                         .frame(minWidth: 36, minHeight: 36)
-                        .background(isActive ? Color.white.opacity(0.15) : Color.clear)
+                        .background(isActive ? .white.opacity(0.15) : .clear)
                         .clipShape(.circle)
                 }
             }
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
-        .background(Color.black.opacity(0.4))
+        .background(.black.opacity(0.4))
         .clipShape(.capsule)
         .sensoryFeedback(.impact, trigger: hapticTrigger)
     }
@@ -489,7 +489,7 @@ struct LockedBottomBarView: View {
                 Image("camera.blueberry")
                     .font(.system(size: 20))
                     .symbolRenderingMode(.palette)
-                    .foregroundStyle(Color.black, Color.blue, Color.green)
+                    .foregroundStyle(.black, .blue, .green)
                     .padding()
                     .clipShape(.circle)
                     .glassEffect(.regular.interactive().tint(.white.mix(with: .teal, by: 0.4)), in: .circle)
@@ -514,7 +514,7 @@ struct LockedBottomBarView: View {
                     count += 1
                 } label: {
                     Circle()
-                        .fill(Color.white)
+                        .fill(.white)
                         .frame(width: 69, height: 69)
                 }
                 .glassEffect(.regular.interactive())

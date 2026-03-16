@@ -29,6 +29,7 @@ struct ContentView: View {
                     }
                 }
                 
+                // MARK: - Peaking/Clipping overlays
                 if !cameraModel.showSimpleView {
                     if cameraModel.showZebraStripes {
                         AnalysisOverlayView(
@@ -40,7 +41,7 @@ struct ContentView: View {
                         .position(x: previewRect.midX, y: previewRect.midY)
                     }
                     
-                    if cameraModel.shouldShowFocusPeakingOverlay {
+                    if !cameraModel.isAutoFocus {
                         AnalysisOverlayView(
                             mask: cameraModel.focusPeakingMask,
                             gridSize: cameraModel.analysisGridSize,
@@ -100,7 +101,7 @@ struct ContentView: View {
                             }
                             .onLongPressGesture {
                                 hapticTriggerR += 1
-                                cameraModel.histogramModeLarge = .none
+                                cameraModel.hideHistogram(for: .large)
                             }
                         }
                         
@@ -119,7 +120,7 @@ struct ContentView: View {
                         .padding(.bottom, 30)
                 }
                 
-                // Capture flash
+                // MARK: - Capture flash
                 if cameraModel.isCapturing {
                     Color.white.opacity(0.3)
                         .frame(width: previewRect.width, height: previewRect.height)
@@ -182,7 +183,7 @@ struct ContentView: View {
         .fullScreenCover(isPresented: Binding(get: {
             cameraModel.appView == .settings
         }, set: { _, _ in
-            cameraModel.appView = .standard
+            cameraModel.hideSettings()
         })) {
             SettingsView(cameraModel: cameraModel)
         }

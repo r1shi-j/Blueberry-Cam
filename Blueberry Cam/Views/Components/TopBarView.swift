@@ -1,12 +1,49 @@
 internal import AVFoundation
 import SwiftUI
 
-struct TopBarView: View {
-    @Bindable var cameraModel: CameraModel
-    @Binding var selectedControl: ManualControl?
-    @State private var hapticTrigger = 0
-    @State private var hapticTriggerR = 0
+extension CameraModel {
+    fileprivate var flashButtonForeground: Color {
+        flashMode == .off || !supportsFlash ? Colors.buttonText : .black
+    }
     
+    fileprivate var flashButtonBackground: Color {
+        flashMode == .off || !supportsFlash ? Colors.buttonBackground : .yellow
+    }
+    
+    fileprivate var flashButtonOpacity: Double {
+        (supportsFlash && isAutoExposure) ? 1.0 : 0.45
+    }
+    
+    fileprivate var isFlashButtonDisabled: Bool {
+        !(supportsFlash && isAutoExposure)
+    }
+    
+    fileprivate func resolutionForeground(for isSelected: Bool) -> Color {
+        isSelected ? .black : .white
+    }
+    
+    fileprivate func resolutionBackground(for isSelected: Bool) -> Color {
+        isSelected ? .yellow : Colors.buttonBackground
+    }
+    
+    fileprivate func formatForeground(for mode: CaptureMode) -> Color {
+        captureMode == mode ? .black : .white
+    }
+    
+    fileprivate func formatBackground(for mode: CaptureMode) -> Color {
+        captureMode == mode ? .yellow : Colors.buttonBackground
+    }
+    
+    fileprivate var formatOpacity: Double {
+        isAutoExposure ? 1.0 : 0.45
+    }
+    
+    fileprivate var isFormatDisabled: Bool {
+        !isAutoExposure
+    }
+}
+
+extension TopBarView {
     private func readoutColor(for control: ManualControl) -> Color {
         switch control {
             case .ev: return .orange
@@ -27,48 +64,55 @@ struct TopBarView: View {
         }
     }
     
+    private func isReadoutUnderlined(for control: ManualControl) -> Bool {
+        (control == ManualControl.ev && cameraModel.exposureBias != 0.0) ||
+        (control == ManualControl.iso && !cameraModel.isAutoExposure) ||
+        (control == ManualControl.ss && !cameraModel.isAutoExposure) ||
+        (control == ManualControl.f && !cameraModel.isAutoFocus) ||
+        (control == ManualControl.wb && !cameraModel.isAutoWhiteBalance)
+    }
+    
+    private func isReadoutDisabled(for control: ManualControl) -> Bool {
+        (control == ManualControl.ev && !cameraModel.isAutoExposure) ||
+        (control == ManualControl.iso && cameraModel.isAutoExposure) ||
+        (control == ManualControl.ss && cameraModel.isAutoExposure) ||
+        (control == ManualControl.f && cameraModel.isAutoFocus) ||
+        (control == ManualControl.wb && cameraModel.isAutoWhiteBalance)
+    }
+}
+
+struct TopBarView: View {
+    @Bindable var cameraModel: CameraModel
+    @Binding var selectedControl: ManualControl?
+    @State private var hapticTrigger = 0
+    @State private var hapticTriggerR = 0
+    
     var body: some View {
         VStack(spacing: 20) {
             HStack(alignment: .center, spacing: 22) {
-                // Live EXIF
-                // long press or double tap resets and enables auto
-                // one tap opens slider
+                // MARK: - Readout values
                 ForEach(ManualControl.allCases, id: \.self) { control in
                     Text(readoutTitle(for: control))
                         .padding(4)
-//                        .background {
-//                            Color.red.opacity(0.15)
-//                                .clipShape(.capsule)
-//                        }
                         .font(.system(size: 12, weight: selectedControl == control ? .black : .regular, design: .monospaced))
-                        .underline(
-                            (control == ManualControl.ev && cameraModel.exposureBias != 0.0) ||
-                            (control == ManualControl.iso && !cameraModel.isAutoExposure) ||
-                            (control == ManualControl.ss && !cameraModel.isAutoExposure) ||
-                            (control == ManualControl.f && !cameraModel.isAutoFocus) ||
-                            (control == ManualControl.wb && !cameraModel.isAutoWhiteBalance)
-                        )
+                        .underline(isReadoutUnderlined(for: control))
                         .foregroundColor(readoutColor(for: control))
                         .onTapGesture(count: 2) {
                             hapticTriggerR += 1
-                            withAnimation(.spring(duration: 0.5)) {
+                            withAnimation(.spring) {
                                 cameraModel.resetControl(for: control)
                             }
                         }
                         .onLongPressGesture {
                             hapticTriggerR += 1
-                            withAnimation(.spring(duration: 0.5)) {
+                            withAnimation(.spring) {
                                 cameraModel.resetControl(for: control)
                             }
                         }
-                        .disabled(control == ManualControl.ev && !cameraModel.isAutoExposure)
-                        .disabled(control == ManualControl.iso && cameraModel.isAutoExposure)
-                        .disabled(control == ManualControl.ss && cameraModel.isAutoExposure)
-                        .disabled(control == ManualControl.f && cameraModel.isAutoFocus)
-                        .disabled(control == ManualControl.wb && cameraModel.isAutoWhiteBalance)
+                        .disabled(isReadoutDisabled(for: control))
                         .onTapGesture {
                             hapticTrigger += 1
-                            withAnimation(.spring(duration: 0.5)) {
+                            withAnimation(.spring) {
                                 selectedControl = selectedControl == control ? nil : control
                             }
                         }
@@ -77,7 +121,7 @@ struct TopBarView: View {
             .padding(.horizontal, 12)
             
             HStack(alignment: .center, spacing: 16) {
-                // Flash toggle
+                // MARK: - Flash
                 Button {
                     hapticTrigger += 1
                     withAnimation(.bouncy) {
@@ -92,24 +136,16 @@ struct TopBarView: View {
                                 .font(.system(size: 11, weight: .bold, design: .monospaced))
                         }
                     }
-                    .foregroundColor(
-                        cameraModel.flashMode == .off || !cameraModel.supportsFlash
-                        ? .white.opacity(0.7)
-                        : .black
-                    )
+                    .foregroundColor(cameraModel.flashButtonForeground)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 5)
-                    .background(
-                        cameraModel.flashMode == .off || !cameraModel.supportsFlash
-                        ? Color.white.opacity(0.15)
-                        : Color.yellow
-                    )
+                    .background(cameraModel.flashButtonBackground)
                     .clipShape(.capsule)
                 }
-                .opacity(cameraModel.isFlashControlEnabled ? 1.0 : 0.45)
-                .disabled(!cameraModel.isFlashControlEnabled)
+                .opacity(cameraModel.flashButtonOpacity)
+                .disabled(cameraModel.isFlashButtonDisabled)
                 
-                // Resolution picker
+                // MARK: - Resolution picker
                 HStack(spacing: 0) {
                     ForEach(cameraModel.availableResolutions) { opt in
                         let isSelected = cameraModel.selectedResolution?.id == opt.id
@@ -124,21 +160,21 @@ struct TopBarView: View {
                                 .fontWidth(.expanded)
                                 .padding(.horizontal, 10)
                                 .padding(.vertical, 5)
-                                .background(isSelected ? Color.yellow : Color.white.opacity(0.15))
-                                .foregroundColor(isSelected ? .black : .white)
+                                .background(cameraModel.resolutionBackground(for: isSelected))
+                                .foregroundColor(cameraModel.resolutionForeground(for: isSelected))
                         }
                     }
                 }
                 .clipShape(.rect(cornerRadius: 6))
-                .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.white.opacity(0.2), lineWidth: 1))
+                .overlay(RoundedRectangle(cornerRadius: 6).stroke(.white.opacity(0.2), lineWidth: 1))
                 
-                // Format picker
+                // MARK: - Format picker
                 HStack(spacing: 0) {
                     ForEach(cameraModel.availableFormats) { mode in
                         Button {
                             hapticTrigger += 1
                             withAnimation(.spring(.bouncy)) {
-                                cameraModel.captureMode = mode
+                                cameraModel.changeCaptureFormat(to: mode)
                             }
                         } label: {
                             Text(mode.rawValue)
@@ -146,21 +182,15 @@ struct TopBarView: View {
                                 .fontWidth(.expanded)
                                 .padding(.horizontal, 10)
                                 .padding(.vertical, 5)
-                                .background(
-                                    cameraModel.captureMode == mode
-                                    ? Color.yellow
-                                    : Color.white.opacity(0.15)
-                                )
-                                .foregroundColor(
-                                    cameraModel.captureMode == mode ? .black : .white
-                                )
+                                .background(cameraModel.formatBackground(for: mode))
+                                .foregroundColor(cameraModel.formatForeground(for: mode))
                         }
                     }
                 }
-                .opacity(cameraModel.isFormatPickerEnabled ? 1.0 : 0.45)
-                .disabled(!cameraModel.isFormatPickerEnabled)
+                .opacity(cameraModel.formatOpacity)
+                .disabled(cameraModel.isFormatDisabled)
                 .clipShape(.rect(cornerRadius: 6))
-                .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.white.opacity(0.2), lineWidth: 1))
+                .overlay(RoundedRectangle(cornerRadius: 6).stroke(.white.opacity(0.2), lineWidth: 1))
             }
             .padding(.horizontal, 8)
         }

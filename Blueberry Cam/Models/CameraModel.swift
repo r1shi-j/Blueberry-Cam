@@ -81,8 +81,8 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
             }
         }
     }
-    var availableFormats: [CaptureMode] = []
-    var availableResolutions: [ResolutionOption] = []
+    private(set) var availableFormats: [CaptureMode] = []
+    private(set) var availableResolutions: [ResolutionOption] = []
     var selectedResolution: ResolutionOption? = nil
     var activeLens: Lens = .wide
     var flashMode: AVCaptureDevice.FlashMode = .off
@@ -115,9 +115,9 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
             }
         }
     }
-    var minISO: Float = 25
-    var maxISO: Float = 6400
-    var shutterSpeeds: [CMTime] = []
+    private(set) var minISO: Float = 25
+    private(set) var maxISO: Float = 6400
+    private(set) var shutterSpeeds: [CMTime] = []
     var shutterIndex: Int = 0 {
         didSet {
             if oldValue != shutterIndex {
@@ -134,8 +134,8 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
             }
         }
     }
-    var minExposureBias: Float = -8.0
-    var maxExposureBias: Float = 8.0
+    private(set) var minExposureBias: Float = -8.0
+    private(set) var maxExposureBias: Float = 8.0
     var exposureDebounceTask: Task<Void, Never>?
     
     var isAdjustingManualFocus: Bool = false
@@ -160,11 +160,11 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
     }
     
     @ObservationIgnored
-    nonisolated(unsafe) var lastLensPosition: Float = 1.0
+    nonisolated(unsafe) private(set) var lastLensPosition: Float = 1.0
     @ObservationIgnored
     nonisolated(unsafe) var peakingTemporalScores: [Float] = []
     @ObservationIgnored
-    nonisolated(unsafe) var minimumFocusDistanceForAnalysis: Float = 0
+    nonisolated(unsafe) private(set) var minimumFocusDistanceForAnalysis: Float = 0
     var focusPeakingHoldTask: Task<Void, Never>?
     
     var isAutoWhiteBalance: Bool = true {
@@ -207,7 +207,7 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
     }
     
     // MARK: - UI State
-    var isCapturing: Bool = false
+    private(set) var isCapturing: Bool = false
     var showError: Bool = false
     var errorMessage: String = ""
     var liveISO: Float = 0
@@ -233,15 +233,15 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
     var zebraMask: [UInt8] = []
     var clippingMask: [UInt8] = []
     @ObservationIgnored
-    nonisolated(unsafe) var peakingEnabledForAnalysis: Bool = false
+    nonisolated(unsafe) private(set) var peakingEnabledForAnalysis: Bool = false
     @ObservationIgnored
-    nonisolated(unsafe) var zebraEnabledForAnalysis: Bool = false
+    nonisolated(unsafe) private(set) var zebraEnabledForAnalysis: Bool = false
     @ObservationIgnored
-    nonisolated(unsafe) var clippingEnabledForAnalysis: Bool = false
+    nonisolated(unsafe) private(set) var clippingEnabledForAnalysis: Bool = false
     @ObservationIgnored
-    nonisolated(unsafe) var histogramModeForAnalysisSmall: HistogramMode = .luminance
+    nonisolated(unsafe) private(set) var histogramModeForAnalysisSmall: HistogramMode = .luminance
     @ObservationIgnored
-    nonisolated(unsafe) var histogramModeForAnalysisLarge: HistogramMode = .luminance
+    nonisolated(unsafe) private(set) var histogramModeForAnalysisLarge: HistogramMode = .luminance
     
     // MARK: - Location
     let locationManager = CLLocationManager()
@@ -259,14 +259,6 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
         return !photoOutput.supportedFlashModes.isEmpty
     }
     
-    var isFlashControlEnabled: Bool {
-        supportsFlash && isAutoExposure
-    }
-    
-    var isFormatPickerEnabled: Bool {
-        isAutoExposure
-    }
-    
     var flashLabel: (systemImage: String, label: String) {
         switch flashMode {
             case .off: return ("flashlight.slash", "")
@@ -276,10 +268,6 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
         }
     }
     
-    var shouldShowFocusPeakingOverlay: Bool {
-        !isAutoFocus
-    }
-    
     var showSimpleView: Bool {
         appView == .clean
     }
@@ -287,13 +275,7 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
     // MARK: - Configure
     func configure() {
         loadSettings()
-        
-        if shouldGeotagLocation {
-            locationManager.delegate = self
-            locationManager.desiredAccuracy = kCLLocationAccuracyBest
-            locationManager.requestWhenInUseAuthorization()
-            locationManager.startUpdatingLocation()
-        }
+        toggleLocationGeotag()
         
         switch AVCaptureDevice.authorizationStatus(for: .video) {
             case .authorized:
@@ -377,6 +359,30 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
                 self.normalizeFlashModeForCurrentDevice()
                 self.enforceExposureModeConstraints()
             }
+        }
+    }
+    
+    private func loadSettings() {
+        let defaults = UserDefaults.standard
+        
+        if let format = defaults.string(forKey: "selectedFileFormat"), let mode = CaptureMode(rawValue: format) {
+            self.selectedFileFormat = mode
+        }
+        
+        self.shouldGeotagLocation = defaults.bool(forKey: "shouldGeotagLocation")
+        self.shouldShowGrid = defaults.object(forKey: "shouldShowGrid") as? Bool ?? true
+        self.shouldShowLevel = defaults.object(forKey: "shouldShowLevel") as? Bool ?? true
+        
+        if let res = defaults.string(forKey: "preferredResolution"), let rPref = ResolutionPreference(rawValue: res) {
+            self.preferredResolution = rPref
+        }
+        
+        if let histSmall = defaults.string(forKey: "defaultHistogramSmall"), let hMode = HistogramMode(rawValue: histSmall) {
+            self.defaultHistogramSmall = hMode
+        }
+        
+        if let histLarge = defaults.string(forKey: "defaultHistogramLarge"), let hMode = HistogramMode(rawValue: histLarge) {
+            self.defaultHistogramLarge = hMode
         }
     }
     
@@ -655,29 +661,5 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
             .filter { $0.width <= outputMax.width && $0.height <= outputMax.height }
             .max { Int($0.width) * Int($0.height) < Int($1.width) * Int($1.height) }
         ?? outputMax
-    }
-    
-    private func loadSettings() {
-        let defaults = UserDefaults.standard
-        
-        if let format = defaults.string(forKey: "selectedFileFormat"), let mode = CaptureMode(rawValue: format) {
-            self.selectedFileFormat = mode
-        }
-        
-        self.shouldGeotagLocation = defaults.bool(forKey: "shouldGeotagLocation")
-        self.shouldShowGrid = defaults.object(forKey: "shouldShowGrid") as? Bool ?? true
-        self.shouldShowLevel = defaults.object(forKey: "shouldShowLevel") as? Bool ?? true
-        
-        if let res = defaults.string(forKey: "preferredResolution"), let rPref = ResolutionPreference(rawValue: res) {
-            self.preferredResolution = rPref
-        }
-        
-        if let histSmall = defaults.string(forKey: "defaultHistogramSmall"), let hMode = HistogramMode(rawValue: histSmall) {
-            self.defaultHistogramSmall = hMode
-        }
-        
-        if let histLarge = defaults.string(forKey: "defaultHistogramLarge"), let hMode = HistogramMode(rawValue: histLarge) {
-            self.defaultHistogramLarge = hMode
-        }
     }
 }

@@ -27,7 +27,7 @@ struct CropOverlayView: View {
                 
                 // Rule-of-thirds grid (2 vertical + 2 horizontal inner lines only)
                 Canvas { ctx, _ in
-                    let lineColor = Color.white.opacity(0.25)
+                    let lineColor: Color = .white.opacity(0.25)
                     let style = StrokeStyle(lineWidth: 0.75)
                     let thirdW = cropW / 3
                     let thirdH = cropH / 3
@@ -52,7 +52,7 @@ struct CropOverlayView: View {
                 
                 // Corner marks (inset slightly so they don't bleed off the screen edge)
                 CornerMarks(rect: cropRect.insetBy(dx: 0.4, dy: 0.5))
-                    .stroke(Color.white.opacity(0.75), lineWidth: 1.0)
+                    .stroke(.white.opacity(0.75), lineWidth: 1.0)
             }
         }
     }

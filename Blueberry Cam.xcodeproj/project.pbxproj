@@ -81,7 +81,7 @@
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Models/SharedTypes.swift,
-				Views/CameraPreviewView.swift,
+				Views/Components/CameraPreviewView.swift,
 			);
 			target = 5B5FC82B2F648F8E00532B15 /* BlueberryCamCapture */;
 		};

@@ -51,7 +51,7 @@ struct LevelOverlayView: View {
         
         let aligned = model.isAligned
         let barColor: Color = aligned ? .yellow : .white
-        let tickColor: Color = .white.opacity(0.7)
+        let tickColor: Color = Colors.buttonText
         
         // Ticks rotate to the NEAREST cardinal (0°, 90°, 180°, 270°),
         // tracking the bar's axis regardless of device orientation.

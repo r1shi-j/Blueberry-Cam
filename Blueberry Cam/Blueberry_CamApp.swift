@@ -29,7 +29,11 @@ struct Blueberry_CamApp: App {
 }
 
 // MARK: - TODO
+// Cleanup code
+/// Make LockedCameraModel and LockedCaptureCamera same structure as CameraModel...
+
 // Localise for all iPhones iOS 26+
+// Add tips and welcome screen with tutorials
 // Improve memory/cpu usage, quicker camera switching
 // Move lens picker to bottom right?
 // Click on any readout -> shows vertical slider right side screen like halide

@@ -47,16 +47,16 @@ struct AnalysisOverlayView: View {
                                 let highlightRect = rect.insetBy(dx: inset, dy: inset)
                                 context.fill(
                                     Path(roundedRect: highlightRect, cornerRadius: min(cellWidth, cellHeight) * 0.22),
-                                    with: .color(Color.green.opacity(opacity))
+                                    with: .color(.green.opacity(opacity))
                                 )
                             case .zebra:
                                 let r = max(0.75, min(cellWidth, cellHeight) * 0.45)
                                 let dot = CGRect(x: rect.midX - r, y: rect.midY - r, width: r * 2, height: r * 2)
-                                context.fill(Path(dot), with: .color(Color.gray.opacity(0.6)))
+                                context.fill(Path(dot), with: .color(.gray.opacity(0.6)))
                             case .clipping:
                                 let r = max(0.6, min(cellWidth, cellHeight) * 0.3)
                                 let dot = CGRect(x: rect.midX - r, y: rect.midY - r, width: r * 2, height: r * 2)
-                                context.fill(Path(ellipseIn: dot), with: .color(Color.red.opacity(0.9)))
+                                context.fill(Path(ellipseIn: dot), with: .color(.red.opacity(0.9)))
                         }
                     }
                 }

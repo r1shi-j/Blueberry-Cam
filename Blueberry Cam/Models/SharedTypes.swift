@@ -2,6 +2,18 @@ internal import AVFoundation
 import CoreMedia
 import Foundation
 import Photos
+import SwiftUI
+
+enum Colors {
+    static let buttonBackground: Color = .white.opacity(0.15)
+    static let buttonText: Color = .white.opacity(0.7)
+    static let manualLabel: Color = .white.opacity(0.5)
+}
+
+enum Fonts {
+    static let manualLabel: Font = .system(size: 10, weight: .bold, design: .monospaced)
+    static let manualValue: Font = .system(size: 12, weight: .medium, design: .monospaced)
+}
 
 // Simple thread-safe box for passing CaptureMode across isolation boundaries
 final class CaptureModeBox: @unchecked Sendable {

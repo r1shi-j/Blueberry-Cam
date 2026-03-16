@@ -6,3 +6,18 @@ extension CameraModel: CLLocationManagerDelegate {
         currentLocation = locations.last
     }
 }
+
+extension CameraModel {
+    func toggleLocationGeotag() {
+        if shouldGeotagLocation {
+            locationManager.delegate = self
+            locationManager.desiredAccuracy = kCLLocationAccuracyBest
+            locationManager.requestWhenInUseAuthorization()
+            locationManager.startUpdatingLocation()
+        } else {
+            locationManager.stopUpdatingLocation()
+            locationManager.delegate = nil
+            currentLocation = nil
+        }
+    }
+}

@@ -1,5 +1,22 @@
 import SwiftUI
 
+extension CameraModel {
+    fileprivate var shutterTint: Color {
+        captureMode == .raw ? .blue.mix(with: .mint, by: 0.5).opacity(0.4) : .white.opacity(0.2)
+    }
+}
+
+extension BottomBarView {
+    private var photosLinkSymbolName: String {
+        "photo.on.rectangle.angled.fill"
+    }
+    
+    private func openPhotosApp() {
+        guard let url = URL(string: "photos-redirect://") else { return }
+        UIApplication.shared.open(url)
+    }
+}
+
 struct BottomBarView: View {
     @Bindable var cameraModel: CameraModel
     @Binding var shutterCount: Int
@@ -7,12 +24,10 @@ struct BottomBarView: View {
     var body: some View {
         VStack() {
             HStack(alignment: .center, spacing: 0) {
-                // Photos app link
+                // MARK: - Photos app shortcut
                 if !cameraModel.showSimpleView {
-                    Button {
-                        openPhotosApp()
-                    } label: {
-                        Image(systemName: "photo.on.rectangle.angled.fill")
+                    Button(action: openPhotosApp) {
+                        Image(systemName: photosLinkSymbolName)
                             .font(.system(size: 20))
                             .symbolRenderingMode(.hierarchical)
                             .tint(.primary)
@@ -31,17 +46,17 @@ struct BottomBarView: View {
                     }
                 }
                 
-                // Shutter button
+                // MARK: - Shutter button
                 ZStack {
                     Circle()
                         .frame(width: 82, height: 82)
-                        .glassEffect(.regular.tint(cameraModel.captureMode == .raw ? .blue.mix(with: .mint, by: 0.5).opacity(0.4) : .white.opacity(0.2)).interactive())
+                        .glassEffect(.regular.tint(cameraModel.shutterTint).interactive())
                     Button {
                         cameraModel.capturePhoto()
                         shutterCount += 1
                     } label: {
                         Circle()
-                            .fill(Color.white)
+                            .fill(.white)
                             .frame(width: 69, height: 69)
                     }
                     .glassEffect(.regular.interactive())
@@ -49,7 +64,7 @@ struct BottomBarView: View {
                 }
                 .frame(maxWidth: .infinity)
                 
-                // Manual controls toggle
+                // MARK: - Manual controls toggle
                 if !cameraModel.showSimpleView {
                     Button {
                         
@@ -64,10 +79,5 @@ struct BottomBarView: View {
                 }
             }
         }
-    }
-    
-    private func openPhotosApp() {
-        guard let url = URL(string: "photos-redirect://") else { return }
-        UIApplication.shared.open(url)
     }
 }

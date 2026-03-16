@@ -1,58 +1,10 @@
 import SwiftUI
 
-struct HistogramView: View {
-    let mode: HistogramMode
-    let size: HistogramSize
-    let lumaData: [Float]
-    let redData: [Float]
-    let greenData: [Float]
-    let blueData: [Float]
-    let waveformData: [Float]
-    
+extension HistogramView {
     private var cornerRadius: CGFloat { size == .small ? 3 : 6 }
     
     private var backgroundOpacity: Double {
         size == .large && mode == .waveform ? 0.72 : 0.55
-    }
-    
-    var body: some View {
-        GeometryReader { _ in
-            ZStack(alignment: .bottomLeading) {
-                RoundedRectangle(cornerRadius: cornerRadius)
-                    .fill(Color.black.opacity(backgroundOpacity))
-                
-                if size == .small {
-                    Canvas { ctx, sz in
-                        switch mode {
-                            case .luminance: drawBars(ctx, sz, channels: [(lumaData, .white)], buckets: 64,  opacity: 0.85)
-                            case .color: drawBars(ctx, sz, channels: rgbChannels, buckets: 64,  opacity: 0.72)
-                            case .waveform: drawWaveform(ctx, sz, outCols: 80)
-                            case .parade: drawParade(ctx, sz, buckets: 32)
-                            case .none: return
-                        }
-                    }
-                    .clipShape(.rect(cornerRadius: cornerRadius))
-                    .frame(width: 80, height: 30)
-                } else {
-                    Canvas { ctx, sz in
-                        switch mode {
-                            case .luminance: drawBars(ctx, sz, channels: [(lumaData, .white)], buckets: nil, opacity: 0.78)
-                            case .color: drawBars(ctx, sz, channels: rgbChannels, buckets: nil, opacity: 0.65)
-                            case .waveform: drawWaveform(ctx, sz, outCols: WaveformConstants.wfCols)
-                            case .parade: drawParade(ctx, sz, buckets: nil)
-                            case .none: return
-                        }
-                    }
-                    .clipShape(.rect(cornerRadius: cornerRadius))
-                    
-                    Text(mode.rawValue.uppercased())
-                        .font(.system(size: 8, weight: .bold, design: .monospaced))
-                        .foregroundColor(.white.opacity(0.45))
-                        .padding(.horizontal, 6)
-                        .padding(.bottom, 3)
-                }
-            }
-        }
     }
     
     // MARK: - Bar histogram (luminance + color)
@@ -130,13 +82,12 @@ struct HistogramView: View {
             }
             if panelIdx < 2 {
                 ctx.fill(Path(CGRect(x: offsetX + panelW - 0.5, y: 0, width: 0.5, height: sz.height)),
-                         with: .color(Color.white.opacity(0.12)))
+                         with: .color(.white.opacity(0.12)))
             }
         }
     }
     
     // MARK: - Waveform (shared for both sizes, parameterised by outCols)
-    //
     // Renders a density-weighted field of dots. The large waveform uses the full
     // analysis resolution so it scales the small waveform up cleanly instead of
     // exposing the intermediate column grid as visible vertical stripes.
@@ -222,6 +173,56 @@ struct HistogramView: View {
             let start = b * step
             let end   = min(start + step, data.count)
             return data[start..<end].reduce(0, +)
+        }
+    }
+}
+
+struct HistogramView: View {
+    let mode: HistogramMode
+    let size: HistogramSize
+    let lumaData: [Float]
+    let redData: [Float]
+    let greenData: [Float]
+    let blueData: [Float]
+    let waveformData: [Float]
+    
+    var body: some View {
+        GeometryReader { _ in
+            ZStack(alignment: .bottomLeading) {
+                RoundedRectangle(cornerRadius: cornerRadius)
+                    .fill(.black.opacity(backgroundOpacity))
+                
+                if size == .small {
+                    Canvas { ctx, sz in
+                        switch mode {
+                            case .luminance: drawBars(ctx, sz, channels: [(lumaData, .white)], buckets: 64,  opacity: 0.85)
+                            case .color: drawBars(ctx, sz, channels: rgbChannels, buckets: 64,  opacity: 0.72)
+                            case .waveform: drawWaveform(ctx, sz, outCols: 80)
+                            case .parade: drawParade(ctx, sz, buckets: 32)
+                            case .none: return
+                        }
+                    }
+                    .clipShape(.rect(cornerRadius: cornerRadius))
+                    .frame(width: 80, height: 30)
+                } else {
+                    Canvas { ctx, sz in
+                        switch mode {
+                            case .luminance: drawBars(ctx, sz, channels: [(lumaData, .white)], buckets: nil, opacity: 0.78)
+                            case .color: drawBars(ctx, sz, channels: rgbChannels, buckets: nil, opacity: 0.65)
+                            case .waveform: drawWaveform(ctx, sz, outCols: WaveformConstants.wfCols)
+                            case .parade: drawParade(ctx, sz, buckets: nil)
+                            case .none: return
+                        }
+                    }
+                    .clipShape(.rect(cornerRadius: cornerRadius))
+                    
+                    Text(mode.rawValue.uppercased())
+                        .font(.system(size: 8, weight: .bold, design: .monospaced))
+                        .foregroundColor(.white.opacity(0.45))
+                        .padding(.horizontal, 6)
+                        .padding(.bottom, 3)
+                }
+            }
         }
     }
 }

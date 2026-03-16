@@ -14,20 +14,20 @@ final class LevelMotionModel {
     // MARK: - Published state
     /// Angle (degrees) of gravity projected onto the screen plane.
     /// 0° = portrait level, ±90° = landscape level.
-    var tiltAngleDeg: Double = 0
+    private(set) var tiltAngleDeg: Double = 0
     /// Smoothed gravity X component (for flat-mode crosshair X offset)
-    var gravityX: Double = 0
+    private(set) var gravityX: Double = 0
     /// Smoothed gravity Y component (for flat-mode crosshair Y offset)
-    var gravityY: Double = 0
-    var displayMode: LevelDisplayMode = .hidden
+    private(set) var gravityY: Double = 0
+    private(set) var displayMode: LevelDisplayMode = .hidden
     /// True when the horizon bar is within the snap threshold of a cardinal angle
-    var isAligned: Bool = false
+    private(set) var isAligned: Bool = false
     /// True when the phone is nearly perfectly flat (crosshair aligned)
-    var isCrosshairAligned: Bool = false
+    private(set) var isCrosshairAligned: Bool = false
     /// Gravity projected onto the current SCREEN's XY plane (for crosshair offset).
     /// Accounts for device rotation so the crosshair always tracks the correct direction.
-    var screenGravityX: Double = 0
-    var screenGravityY: Double = 0
+    private(set) var screenGravityX: Double = 0
+    private(set) var screenGravityY: Double = 0
     
     // MARK: - Private
     private let motionManager = CMMotionManager()

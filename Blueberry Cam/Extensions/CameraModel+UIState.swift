@@ -4,6 +4,10 @@ import Foundation
 
 extension CameraModel {
     // MARK: - UI Controls
+    func hideSettings() {
+        appView = .standard
+    }
+    
     func switchLens(to lens: Lens) {
         guard lens != activeLens else { return }
         activeLens = lens
@@ -64,93 +68,6 @@ extension CameraModel {
         }}
     }
     
-    func toggleSelfie() {
-        let target: Lens = activeLens.isFront ? .wide : .front
-        switchLens(to: target)
-    }
-
-    func resetControl(for control: ManualControl) {
-        switch control {
-            case .ev:
-                if isAutoExposure {
-                    exposureBias = 0.0
-                    applyExposureBias()
-                }
-            case .iso:
-                isAutoExposure = true
-            case .ss:
-                isAutoExposure = true
-            case .f:
-                isAutoFocus = true
-                setAutoFocus()
-            case .wb:
-                isAutoWhiteBalance = true
-        }
-    }
-
-    func cycleFlashMode() {
-        guard supportsFlash, isAutoExposure else {
-            flashMode = .off
-            return
-        }
-        
-        let supported = photoOutput.supportedFlashModes
-        let order: [AVCaptureDevice.FlashMode] = [.off, .auto, .on]
-        let currentIndex = order.firstIndex(of: flashMode) ?? 0
-        
-        for offset in 1...order.count {
-            let candidate = order[(currentIndex + offset) % order.count]
-            if supported.contains(candidate) {
-                flashMode = candidate
-                return
-            }
-        }
-        
-        flashMode = .off
-    }
-
-    func toggleLocationGeotag() {
-        if shouldGeotagLocation {
-            locationManager.delegate = self
-            locationManager.desiredAccuracy = kCLLocationAccuracyBest
-            locationManager.requestWhenInUseAuthorization()
-            locationManager.startUpdatingLocation()
-        } else {
-            locationManager.stopUpdatingLocation()
-            locationManager.delegate = nil
-            currentLocation = nil
-        }
-    }
-
-    func selectResolution(_ opt: ResolutionOption) {
-        selectedResolution = opt
-        // No format switching needed — selectedResolution is used directly in captureDimensions()
-        // The active format already supports this dim (it came from activeFormat.supportedMaxPhotoDimensions)
-    }
-
-    func toggleClipping() { showClipping.toggle() }
-
-    func toggleZebraStripes() { showZebraStripes.toggle() }
-
-    func cycleHistogramMode(mode: inout HistogramMode, size: HistogramSize? = nil) {
-        switch mode {
-            case .luminance:
-                mode = .color
-            case .color:
-                mode = .waveform
-            case .waveform:
-                mode = .parade
-            case .parade:
-                mode = .luminance
-            case .none:
-                if let size {
-                    size == .small ? (mode = defaultHistogramSmall) : (mode = defaultHistogramLarge)
-                } else {
-                    mode = .luminance
-                }
-        }
-    }
-    
     func reapplyManualSettingsAfterLensSwitch(previousShutterDuration: CMTime?) {
         if !isAutoExposure {
             if let prevDuration = previousShutterDuration, !shutterSpeeds.isEmpty {
@@ -177,5 +94,94 @@ extension CameraModel {
         } else {
             setAutoWhiteBalance()
         }
+    }
+    
+    func toggleSelfie() {
+        let target: Lens = activeLens.isFront ? .wide : .front
+        switchLens(to: target)
+    }
+    
+    func resetEV() {
+        exposureBias = 0.0
+    }
+    
+    func setCustomShutter(to val: Int) {
+        manualShutterDenominator = 0
+        shutterIndex = val
+    }
+
+    func resetControl(for control: ManualControl) {
+        switch control {
+            case .ev:
+                if isAutoExposure {
+                    exposureBias = 0.0
+                    applyExposureBias()
+                }
+            case .iso:
+                isAutoExposure = true
+            case .ss:
+                isAutoExposure = true
+            case .f:
+                isAutoFocus = true
+                setAutoFocus()
+            case .wb:
+                isAutoWhiteBalance = true
+        }
+    }
+    
+    func cycleFlashMode() {
+        guard supportsFlash, isAutoExposure else {
+            flashMode = .off
+            return
+        }
+        
+        let supported = photoOutput.supportedFlashModes
+        let order: [AVCaptureDevice.FlashMode] = [.off, .auto, .on]
+        let currentIndex = order.firstIndex(of: flashMode) ?? 0
+        
+        for offset in 1...order.count {
+            let candidate = order[(currentIndex + offset) % order.count]
+            if supported.contains(candidate) {
+                flashMode = candidate
+                return
+            }
+        }
+        
+        flashMode = .off
+    }
+    
+    func selectResolution(_ opt: ResolutionOption) {
+        selectedResolution = opt
+    }
+    
+    func changeCaptureFormat(to mode: CaptureMode) {
+        captureMode = mode
+    }
+
+    func toggleClipping() { showClipping.toggle() }
+
+    func toggleZebraStripes() { showZebraStripes.toggle() }
+
+    func cycleHistogramMode(mode: inout HistogramMode, size: HistogramSize? = nil) {
+        switch mode {
+            case .luminance:
+                mode = .color
+            case .color:
+                mode = .waveform
+            case .waveform:
+                mode = .parade
+            case .parade:
+                mode = .luminance
+            case .none:
+                if let size {
+                    size == .small ? (mode = defaultHistogramSmall) : (mode = defaultHistogramLarge)
+                } else {
+                    mode = .luminance
+                }
+        }
+    }
+    
+    func hideHistogram(for mode: HistogramSize) {
+        mode == .small ? (histogramModeSmall = .none) : (histogramModeLarge = .none)
     }
 }
