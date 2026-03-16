@@ -36,7 +36,7 @@ struct SettingsView: View {
                 } header: {
                     Text("Image Defaults")
                 } footer: {
-                    Text("Preferred format and resolution will be applied automatically when supported by the lens.")
+                    Text("Preferred format and resolution will be automatically selected when supported by the lens.")
                 }
                 
                 Section {
@@ -48,9 +48,19 @@ struct SettingsView: View {
                         Toggle("", isOn: $cameraModel.shouldShowLevel)
                     }
                     
-                    LabeledContent("Histogram ") {
-                        Picker("", selection: $cameraModel.selectedHistogram) {
-                            ForEach(HistogramDefault.allCases, id: \.self) { format in
+                    LabeledContent("Small Histogram ") {
+                        Picker("", selection: $cameraModel.defaultHistogramSmall) {
+                            ForEach(HistogramMode.allCases, id: \.self) { format in
+                                Text(format.rawValue)
+                                    .tag(format)
+                            }
+                        }
+                        .pickerStyle(.menu)
+                    }
+                    
+                    LabeledContent("Large Histogram ") {
+                        Picker("", selection: $cameraModel.defaultHistogramLarge) {
+                            ForEach(HistogramMode.allCases, id: \.self) { format in
                                 Text(format.rawValue)
                                     .tag(format)
                             }
@@ -58,7 +68,7 @@ struct SettingsView: View {
                         .pickerStyle(.menu)
                     }
                 } header: {
-                    Text("User Interface")
+                    Text("User Interface Defaults")
                 } footer : {
                     Text("Tap the histogram to cycle through all histograms.")
                 }

@@ -7,6 +7,7 @@ struct ContentView: View {
     @State private var levelModel  = LevelMotionModel()
     @State private var selectedControl: ManualControl?
     @State private var hapticTrigger = 0
+    @State private var hapticTriggerR = 0
     
     var body: some View {
         GeometryReader { geo in
@@ -80,10 +81,10 @@ struct ContentView: View {
                         
                         Spacer()
                         
-                        if cameraModel.showHistogram && cameraModel.histogramSize == .large {
+                        if cameraModel.histogramModeLarge != .none {
                             HistogramView(
-                                mode: cameraModel.histogramMode,
-                                size: cameraModel.histogramSize,
+                                mode: cameraModel.histogramModeLarge,
+                                size: .large,
                                 lumaData: cameraModel.histogramData,
                                 redData: cameraModel.redHistogram,
                                 greenData: cameraModel.greenHistogram,
@@ -95,7 +96,11 @@ struct ContentView: View {
                             .padding(.bottom, 8)
                             .onTapGesture {
                                 hapticTrigger += 1
-                                cameraModel.cycleHistogramMode()
+                                cameraModel.cycleHistogramMode(mode: &cameraModel.histogramModeLarge)
+                            }
+                            .onLongPressGesture {
+                                hapticTriggerR += 1
+                                cameraModel.histogramModeLarge = .none
                             }
                         }
                         
@@ -140,6 +145,7 @@ struct ContentView: View {
         }
         .statusBarHidden()
         .sensoryFeedback(.impact, trigger: hapticTrigger)
+        .sensoryFeedback(.impact(flexibility: .soft), trigger: hapticTriggerR)
         .onAppear {
             cameraModel.configure()
             levelModel.startUpdates()

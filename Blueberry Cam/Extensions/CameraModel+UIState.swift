@@ -132,26 +132,22 @@ extension CameraModel {
 
     func toggleZebraStripes() { showZebraStripes.toggle() }
 
-    func cycleHistogramMode() {
-        switch (histogramSize, histogramMode) {
-            case (.small, .luminance):
-                histogramMode = .color
-            case (.small, .color):
-                histogramMode = .waveform
-            case (.small, .waveform):
-                histogramMode = .parade
-            case (.small, .parade):
-                histogramSize = .large
-                histogramMode = .luminance
-            case (.large, .luminance):
-                histogramMode = .color
-            case (.large, .color):
-                histogramMode = .waveform
-            case (.large, .waveform):
-                histogramMode = .parade
-            case (.large, .parade):
-                histogramSize = .small
-                histogramMode = .luminance
+    func cycleHistogramMode(mode: inout HistogramMode, size: HistogramSize? = nil) {
+        switch mode {
+            case .luminance:
+                mode = .color
+            case .color:
+                mode = .waveform
+            case .waveform:
+                mode = .parade
+            case .parade:
+                mode = .luminance
+            case .none:
+                if let size {
+                    size == .small ? (mode = defaultHistogramSmall) : (mode = defaultHistogramLarge)
+                } else {
+                    mode = .luminance
+                }
         }
     }
     

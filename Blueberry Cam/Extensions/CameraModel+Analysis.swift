@@ -42,11 +42,13 @@ extension CameraModel: AVCaptureDataOutputSynchronizerDelegate, AVCaptureVideoDa
         let wantsPeaking = peakingEnabledForAnalysis
         let wantsZebra = zebraEnabledForAnalysis
         let wantsClipping = clippingEnabledForAnalysis
-        let wantsHistogram = histogramEnabledForAnalysis
-        let histogramMode = histogramModeForAnalysis
-        let wantsWaveform = wantsHistogram && (histogramMode == .waveform || histogramMode == .parade)
-        let wantsColorHistogram = wantsHistogram && histogramMode == .color
-        let wantsAnyAnalysis = wantsPeaking || wantsZebra || wantsClipping || wantsHistogram
+        let modeSmall = histogramModeForAnalysisSmall
+        let modeLarge = histogramModeForAnalysisLarge
+        let wantsHistogramSmall = modeSmall != .none
+        let wantsHistogramLarge = modeLarge != .none
+        let wantsWaveform = modeSmall == .waveform || modeLarge == .waveform
+        let wantsColorHistogram = modeSmall == .color || modeSmall == .parade || modeLarge == .color || modeLarge == .parade
+        let wantsAnyAnalysis = wantsPeaking || wantsZebra || wantsClipping || wantsHistogramSmall || wantsHistogramLarge
         
         guard wantsAnyAnalysis else {
             if !peakingTemporalScores.isEmpty {
@@ -66,7 +68,7 @@ extension CameraModel: AVCaptureDataOutputSynchronizerDelegate, AVCaptureVideoDa
         let width = CVPixelBufferGetWidth(pixelBuffer)
         let height = CVPixelBufferGetHeight(pixelBuffer)
         
-        var hist = wantsHistogram ? [Float](repeating: 0, count: 256) : []
+        var hist = (wantsHistogramSmall || wantsHistogramLarge) ? [Float](repeating: 0, count: 256) : []
         var rHist = wantsColorHistogram ? [Float](repeating: 0, count: 256) : []
         var gHist = wantsColorHistogram ? [Float](repeating: 0, count: 256) : []
         var bHist = wantsColorHistogram ? [Float](repeating: 0, count: 256) : []
@@ -126,7 +128,7 @@ extension CameraModel: AVCaptureDataOutputSynchronizerDelegate, AVCaptureVideoDa
                 if wantsClipping {
                     clipping[idx] = (r >= 250 || g >= 250 || b >= 250) ? 1 : 0
                 }
-                if wantsHistogram {
+                if wantsHistogramSmall || wantsHistogramLarge {
                     hist[min(Int(luma), 255)] += 1
                     count += 1
                 }
@@ -263,7 +265,7 @@ extension CameraModel: AVCaptureDataOutputSynchronizerDelegate, AVCaptureVideoDa
             peakingTemporalScores = []
         }
         
-        let normalizedHistogram: [Float]? = wantsHistogram && count > 0 ? hist.map  { $0 / count } : nil
+        let normalizedHistogram: [Float]? = (wantsHistogramSmall || wantsHistogramLarge) && count > 0 ? hist.map  { $0 / count } : nil
         let normR = wantsColorHistogram && count > 0 ? rHist.map { $0 / count } : nil
         let normG = wantsColorHistogram && count > 0 ? gHist.map { $0 / count } : nil
         let normB = wantsColorHistogram && count > 0 ? bHist.map { $0 / count } : nil

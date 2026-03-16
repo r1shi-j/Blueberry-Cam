@@ -28,6 +28,7 @@ struct HistogramView: View {
                             case .color: drawBars(ctx, sz, channels: rgbChannels, buckets: 64,  opacity: 0.72)
                             case .waveform: drawWaveform(ctx, sz, outCols: 80)
                             case .parade: drawParade(ctx, sz, buckets: 32)
+                            case .none: return
                         }
                     }
                     .clipShape(.rect(cornerRadius: cornerRadius))
@@ -39,11 +40,12 @@ struct HistogramView: View {
                             case .color: drawBars(ctx, sz, channels: rgbChannels, buckets: nil, opacity: 0.65)
                             case .waveform: drawWaveform(ctx, sz, outCols: WaveformConstants.wfCols)
                             case .parade: drawParade(ctx, sz, buckets: nil)
+                            case .none: return
                         }
                     }
                     .clipShape(.rect(cornerRadius: cornerRadius))
                     
-                    Text(mode.rawValue)
+                    Text(mode.rawValue.uppercased())
                         .font(.system(size: 8, weight: .bold, design: .monospaced))
                         .foregroundColor(.white.opacity(0.45))
                         .padding(.horizontal, 6)

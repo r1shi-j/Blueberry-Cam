@@ -54,16 +54,16 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
             toggleLocationGeotag()
         }
     }
-    var selectedHistogram: HistogramDefault = .none {
+    var defaultHistogramSmall: HistogramMode = .none {
         didSet {
-            UserDefaults.standard.set(selectedHistogram.rawValue, forKey: "selectedHistogram")
-            if selectedHistogram == .none {
-                showHistogram = false
-            } else {
-                showHistogram = true
-                histogramMode = selectedHistogram.mode
-                histogramSize = selectedHistogram.size
-            }
+            UserDefaults.standard.set(defaultHistogramSmall.rawValue, forKey: "defaultHistogramSmall")
+            histogramModeSmall = defaultHistogramSmall
+        }
+    }
+    var defaultHistogramLarge: HistogramMode = .none {
+        didSet {
+            UserDefaults.standard.set(defaultHistogramLarge.rawValue, forKey: "defaultHistogramLarge")
+            histogramModeLarge = defaultHistogramLarge
         }
     }
     var shouldShowGrid = true {
@@ -193,9 +193,11 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
             }
         }
     }
-    
-    var showHistogram: Bool = false {
-        didSet { histogramEnabledForAnalysis = showHistogram }
+    var histogramModeSmall: HistogramMode = .none {
+        didSet { histogramModeForAnalysisSmall = histogramModeSmall }
+    }
+    var histogramModeLarge: HistogramMode = .none {
+        didSet { histogramModeForAnalysisLarge = histogramModeLarge }
     }
     var showClipping: Bool = false {
         didSet { clippingEnabledForAnalysis = showClipping }
@@ -226,10 +228,6 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
     var waveformData: [Float] = []
     nonisolated static var wfCols: Int { WaveformConstants.wfCols }
     nonisolated static var wfRows: Int { WaveformConstants.wfRows }
-    var histogramSize: HistogramSize = .small
-    var histogramMode: HistogramMode = .luminance {
-        didSet { histogramModeForAnalysis = histogramMode }
-    }
     var analysisGridSize: CGSize = .zero
     var focusPeakingMask: [UInt8] = []
     var zebraMask: [UInt8] = []
@@ -241,9 +239,9 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
     @ObservationIgnored
     nonisolated(unsafe) var clippingEnabledForAnalysis: Bool = false
     @ObservationIgnored
-    nonisolated(unsafe) var histogramEnabledForAnalysis: Bool = false
+    nonisolated(unsafe) var histogramModeForAnalysisSmall: HistogramMode = .luminance
     @ObservationIgnored
-    nonisolated(unsafe) var histogramModeForAnalysis: HistogramMode = .luminance
+    nonisolated(unsafe) var histogramModeForAnalysisLarge: HistogramMode = .luminance
     
     // MARK: - Location
     let locationManager = CLLocationManager()
@@ -674,8 +672,12 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
             self.preferredResolution = rPref
         }
         
-        if let hist = defaults.string(forKey: "selectedHistogram"), let hMode = HistogramDefault(rawValue: hist) {
-            self.selectedHistogram = hMode
+        if let histSmall = defaults.string(forKey: "defaultHistogramSmall"), let hMode = HistogramMode(rawValue: histSmall) {
+            self.defaultHistogramSmall = hMode
+        }
+        
+        if let histLarge = defaults.string(forKey: "defaultHistogramLarge"), let hMode = HistogramMode(rawValue: histLarge) {
+            self.defaultHistogramLarge = hMode
         }
     }
 }
