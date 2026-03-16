@@ -4,6 +4,7 @@ import Foundation
 import Photos
 import SwiftUI
 
+// MARK: Constants
 enum Colors {
     static let buttonBackground: Color = .white.opacity(0.15)
     static let buttonText: Color = .white.opacity(0.7)
@@ -15,6 +16,7 @@ enum Fonts {
     static let manualValue: Font = .system(size: 12, weight: .medium, design: .monospaced)
 }
 
+// MARK: Thread-safe
 // Simple thread-safe box for passing CaptureMode across isolation boundaries
 final class CaptureModeBox: @unchecked Sendable {
     nonisolated(unsafe) var value: CaptureMode = .jpeg

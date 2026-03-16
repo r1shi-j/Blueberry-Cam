@@ -33,8 +33,9 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
     var selectedFileFormat: CaptureMode = .raw {
         didSet {
             UserDefaults.standard.set(selectedFileFormat.rawValue, forKey: "selectedFileFormat")
-            // When user changes their default preference, we immediately try to apply it
-            if availableFormats.contains(selectedFileFormat) {
+            // Always try to apply the preference to the active mode immediately.
+            // Enforcement (fallbacks) will be handled by buildAvailableFormats() once hardware is ready.
+            if captureMode != selectedFileFormat {
                 captureMode = selectedFileFormat
             }
         }
@@ -269,7 +270,7 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
     }
     
     var showSimpleView: Bool {
-        appView == .clean
+        appView == .clean || appView == .settings
     }
     
     // MARK: - Configure
@@ -367,6 +368,8 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
         
         if let format = defaults.string(forKey: "selectedFileFormat"), let mode = CaptureMode(rawValue: format) {
             self.selectedFileFormat = mode
+            // Prime the active mode immediately so the UI reflects the saved state during launch.
+            self.captureMode = mode
         }
         
         self.shouldGeotagLocation = defaults.bool(forKey: "shouldGeotagLocation")
@@ -388,6 +391,9 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
     
     // MARK: - Formats & ranges
     func buildAvailableFormats() {
+        // We only enforce this logic if the device is ready.
+        guard device != nil else { return }
+
         let zoomBlocksRAW = (device?.videoZoomFactor ?? 1.0) > 1.0
         let isFront = activeLens.isFront
         
@@ -402,14 +408,12 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
             availableFormats = modes
         }
         
-        // SMART SWITCH: Prioritize user's 'selectedFileFormat' preference if it's available.
-        // This ensures if we fell back to JPEG because of a temporary state (like startup), 
-        // we bounce back to RAW as soon as it becomes available.
+        // SMART SWITCH: Keep the current selection if valid, else fallback to preference, else base fallback.
         let targetMode: CaptureMode
-        if modes.contains(selectedFileFormat) {
-            targetMode = selectedFileFormat
-        } else if modes.contains(captureMode) {
+        if modes.contains(captureMode) {
             targetMode = captureMode
+        } else if modes.contains(selectedFileFormat) {
+            targetMode = selectedFileFormat
         } else {
             targetMode = modes.contains(.heif) ? .heif : .jpeg
         }
