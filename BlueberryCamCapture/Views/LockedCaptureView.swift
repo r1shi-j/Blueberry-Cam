@@ -1,7 +1,24 @@
 import LockedCameraCapture
 import SwiftUI
 
-// MARK: - LockedCaptureView
+extension LockedCaptureView {
+    private var errorString: String { "Error" }
+    private var okButtonString: String { "OK" }
+    
+    private func makePreviewRect(in geo: GeometryProxy) -> CGRect {
+        let size = geo.size
+        let topInset = geo.safeAreaInsets.top
+        let botInset = geo.safeAreaInsets.bottom
+        let xHeight = (topInset - botInset) / 2
+        let aspect = cameraModel.captureAspectRatio
+        let previewW: CGFloat = aspect < size.width / size.height ? size.height * aspect : size.width
+        let previewH: CGFloat = aspect < size.width / size.height ? size.height : size.width / aspect
+        let previewX = (size.width - previewW) / 2
+        let previewY = (size.height - previewH) / 2
+        return CGRect(x: previewX, y: previewY - xHeight, width: previewW, height: previewH)
+    }
+}
+
 struct LockedCaptureView: View {
     let lockedSession: LockedCameraCaptureSession
     
@@ -58,23 +75,10 @@ struct LockedCaptureView: View {
         .onAppear {
             cameraModel.configure(with: lockedSession)
         }
-        .alert("Error", isPresented: $cameraModel.showError) {
-            Button("OK", role: .cancel) {}
+        .alert(errorString, isPresented: $cameraModel.showError) {
+            Button(okButtonString, role: .cancel) {}
         } message: {
             Text(cameraModel.errorMessage)
         }
-    }
-    
-    private func makePreviewRect(in geo: GeometryProxy) -> CGRect {
-        let size = geo.size
-        let topInset = geo.safeAreaInsets.top
-        let botInset = geo.safeAreaInsets.bottom
-        let xHeight = (topInset - botInset) / 2
-        let aspect = cameraModel.captureAspectRatio
-        let previewW: CGFloat = aspect < size.width / size.height ? size.height * aspect : size.width
-        let previewH: CGFloat = aspect < size.width / size.height ? size.height : size.width / aspect
-        let previewX = (size.width - previewW) / 2
-        let previewY = (size.height - previewH) / 2
-        return CGRect(x: previewX, y: previewY - xHeight, width: previewW, height: previewH)
     }
 }

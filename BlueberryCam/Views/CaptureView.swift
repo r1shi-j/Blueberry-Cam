@@ -1,5 +1,54 @@
 import SwiftUI
 
+extension CameraModel {
+    fileprivate func resetURL() {
+        detectedCodeURL = nil
+        detectedCodeString = nil
+    }
+    
+    fileprivate func ignoreCurrentCode() {
+        if let code = detectedCodeString {
+            ignoredCodes[code] = Date()
+        }
+        resetURL()
+    }
+    
+    fileprivate func clearIgnoredCodes() {
+        ignoredCodes.removeAll()
+    }
+}
+
+extension CaptureView {
+    private var copiedString: String { "Copied to clipboard!" }
+    private var closeLinkTitle: String { "Close" }
+    private var closeSymbolName: String { "xmark.square" }
+    private var linkSymbolName: String { "link" }
+    private var backupURLName: String { "Open Link" }
+    private var errorString: String { "Error" }
+    private var okButtonString: String { "OK" }
+    
+    private func changeLevelMonitoring(_ condition: Bool) {
+        if condition {
+            levelModel.startUpdates()
+        } else {
+            levelModel.stopUpdates()
+        }
+    }
+    
+    private func makePreviewRect(in geo: GeometryProxy) -> CGRect {
+        let size = geo.size
+        let topInset = geo.safeAreaInsets.top
+        let botInset = geo.safeAreaInsets.bottom
+        let xHeight = (topInset - botInset) / 2
+        let aspect = cameraModel.captureAspectRatio
+        let previewW: CGFloat = aspect < size.width / size.height ? size.height * aspect : size.width
+        let previewH: CGFloat = aspect < size.width / size.height ? size.height : size.width / aspect
+        let previewX = (size.width - previewW) / 2
+        let previewY = (size.height - previewH) / 2
+        return CGRect(x: previewX, y: previewY - xHeight, width: previewW, height: previewH)
+    }
+}
+
 struct CaptureView: View {
     @Environment(\.scenePhase) private var scenePhase
     @Binding var shutterCount: Int
@@ -78,6 +127,45 @@ struct CaptureView: View {
                         LevelOverlayView(model: levelModel)
                             .ignoresSafeArea()
                     }
+                }
+                
+                // MARK: - QR Code
+                if let url = cameraModel.detectedCodeURL {
+                    VStack(spacing: 4) {
+                        Text(copiedString)
+                            .font(.system(size: 10, weight: .bold))
+                            .fontWidth(.expanded)
+                            .foregroundStyle(.yellow.opacity(0.8))
+                            .padding(8)
+                            .glassEffect()
+                        Button {
+                            if let raw = cameraModel.detectedCodeString {
+                                UIPasteboard.general.string = raw
+                            }
+                            hapticTriggerR += 1
+                            UIApplication.shared.open(url)
+                            cameraModel.ignoreCurrentCode()
+                        } label: {
+                            HStack(spacing: 8) {
+                                Image(systemName: linkSymbolName)
+                                Text(url.host ?? backupURLName)
+                                    .lineLimit(1)
+                            }
+                            .font(.system(size: 14, weight: .bold))
+                            .fontWidth(.expanded)
+                        }
+                        .buttonStyle(.glass)
+                        
+                        Button(closeLinkTitle, systemImage: closeSymbolName) {
+                            cameraModel.ignoreCurrentCode()
+                        }
+                        .font(.system(size: 10, weight: .bold))
+                        .fontWidth(.expanded)
+                        .foregroundStyle(.yellow.opacity(0.8))
+                        .buttonStyle(.glass)
+                    }
+                    .position(x: previewRect.midX, y: previewRect.midY)
+                    .animation(.bouncy, value: cameraModel.detectedCodeURL)
                 }
                 
                 // MARK: - UI Overlays
@@ -160,28 +248,29 @@ struct CaptureView: View {
             levelModel.stopUpdates()
         }
         .onChange(of: cameraModel.shouldShowLevel) { _, new in
-            if new {
-                levelModel.startUpdates()
-            } else {
-                levelModel.stopUpdates()
-            }
+            changeLevelMonitoring(new)
         }
         .onChange(of: cameraModel.appView) { _, new in
-            if new == AppView.standard {
-                levelModel.startUpdates()
-            } else {
-                levelModel.stopUpdates()
-            }
+            changeLevelMonitoring(new == AppView.standard)
         }
         .onChange(of: scenePhase) { _, newPhase in
-            if newPhase == .active {
-                levelModel.startUpdates()
-            } else {
-                levelModel.stopUpdates()
+            changeLevelMonitoring(newPhase == .active)
+            if newPhase == .background {
+                cameraModel.clearIgnoredCodes()
             }
         }
-        .alert("Error", isPresented: $cameraModel.showError) {
-            Button("OK", role: .cancel) {}
+        .onReceive(NotificationCenter.default.publisher(for: UIDevice.deviceDidShakeNotification)) { _ in
+            if let url = cameraModel.detectedCodeURL {
+                if let raw = cameraModel.detectedCodeString {
+                    UIPasteboard.general.string = raw
+                }
+                hapticTriggerR += 1
+                UIApplication.shared.open(url)
+                cameraModel.ignoreCurrentCode()
+            }
+        }
+        .alert(errorString, isPresented: $cameraModel.showError) {
+            Button(okButtonString, role: .cancel) {}
         } message: {
             Text(cameraModel.errorMessage)
         }
@@ -192,18 +281,5 @@ struct CaptureView: View {
         })) {
             SettingsView(cameraModel: cameraModel)
         }
-    }
-    
-    private func makePreviewRect(in geo: GeometryProxy) -> CGRect {
-        let size = geo.size
-        let topInset = geo.safeAreaInsets.top
-        let botInset = geo.safeAreaInsets.bottom
-        let xHeight = (topInset - botInset) / 2
-        let aspect = cameraModel.captureAspectRatio
-        let previewW: CGFloat = aspect < size.width / size.height ? size.height * aspect : size.width
-        let previewH: CGFloat = aspect < size.width / size.height ? size.height : size.width / aspect
-        let previewX = (size.width - previewW) / 2
-        let previewY = (size.height - previewH) / 2
-        return CGRect(x: previewX, y: previewY - xHeight, width: previewW, height: previewH)
     }
 }

@@ -15,6 +15,30 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
     nonisolated let frameCounter = FrameCounter()
     let _pendingCaptureModeBox = CaptureModeBox()
     
+    // MARK: - Barcode Detection
+    nonisolated let metadataOutput = AVCaptureMetadataOutput()
+    var recognizeBarcodes: Bool = true {
+        didSet {
+            UserDefaults.standard.set(recognizeBarcodes, forKey: "recognizeBarcodes")
+            updateMetadataOutputStatus()
+        }
+    }
+    var detectedCodeURL: URL? = nil
+    var detectedCodeString: String? = nil
+    var ignoredCodes: [String: Date] = [:]
+    var barcodeResetTask: Task<Void, Never>?
+    
+    var supportedMetadataTypes: [AVMetadataObject.ObjectType] {
+        [
+            .qr, .microQR,
+            .ean13, .ean8, .upce,
+            .code128, .code39, .code39Mod43, .code93,
+            .itf14, .interleaved2of5,
+            .dataMatrix, .pdf417, .microPDF417, .aztec,
+            .codabar, .gs1DataBar, .gs1DataBarExpanded, .gs1DataBarLimited
+        ]
+    }
+    
     // MARK: - Camera Control (iOS 18)
     var cleanUIControl: AVCaptureIndexPicker?
     var lensControl: AVCaptureIndexPicker?
@@ -339,6 +363,16 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
             depthOutput.isFilteringEnabled = true
         }
         
+        if session.canAddOutput(metadataOutput) {
+            session.addOutput(metadataOutput)
+            metadataOutput.setMetadataObjectsDelegate(self, queue: .main)
+            let available = metadataOutput.availableMetadataObjectTypes
+            let toSet = supportedMetadataTypes.filter { available.contains($0) }
+            if !toSet.isEmpty {
+                metadataOutput.metadataObjectTypes = toSet
+            }
+        }
+        
         // Keep analysis output orientation aligned with preview from first launch.
         let isFront = activeLens.isFront
         let rotationAngle: CGFloat = isFront ? 0 : 90
@@ -389,6 +423,7 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
         }
         
         self.shouldGeotagLocation = defaults.bool(forKey: "shouldGeotagLocation")
+        self.recognizeBarcodes = defaults.object(forKey: "recognizeBarcodes") as? Bool ?? true
         self.shouldShowGrid = defaults.object(forKey: "shouldShowGrid") as? Bool ?? true
         self.shouldShowLevel = defaults.object(forKey: "shouldShowLevel") as? Bool ?? true
         

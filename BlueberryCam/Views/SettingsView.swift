@@ -33,6 +33,10 @@ struct SettingsView: View {
                     LabeledContent("Geotag Location ") {
                         Toggle("", isOn: $cameraModel.shouldGeotagLocation)
                     }
+                    
+                    LabeledContent("Recognize Barcodes ") {
+                        Toggle("", isOn: $cameraModel.recognizeBarcodes)
+                    }
                 } header: {
                     Text("Image Defaults")
                 } footer: {
@@ -74,7 +78,7 @@ struct SettingsView: View {
                 }
                 
                 Section {
-                    Text("This app supports LockedCameraCapture which enables the app to be opened from camera control, control centre and from the lock screen action buttons. However when the app is opened from the lock screen some features arent available, these include: Histograms, Zebras, Highlight Clipping, Focus Peaking, Level, Grid, Selfie Cameras and Embedding Location. Additionally the default image format and resolution will not be applied, this required a paid Apple Developer account. The defaults used will be RAW Efficiency.")
+                    Text("This app supports LockedCameraCapture which enables the app to be opened from camera control, control centre and from the lock screen action buttons. However when the app is opened from the lock screen some features arent available, these include: Histograms, Zebras, Highlight Clipping, Focus Peaking, Level, Grid, Selfie Cameras, Embedding Location and Recognising Barcodes. Additionally the default image format and resolution will not be applied, this required a paid Apple Developer account. The defaults used will be RAW Efficiency.")
                     Text("Photos library usage is only required to search for the album to save photos taken with this app, you can set it to limited access and select no photos, the app still work.")
                 } header: {
                     Text("About")
