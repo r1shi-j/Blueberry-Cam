@@ -279,7 +279,9 @@ struct CaptureView: View {
         }, set: { _, _ in
             cameraModel.hideSettings()
         })) {
-            SettingsView(cameraModel: cameraModel)
+            SettingsView(cameraModel: cameraModel) {
+                shutterCount = 0
+            }
         }
     }
 }
