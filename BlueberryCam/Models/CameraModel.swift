@@ -318,16 +318,40 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
         loadSettings()
         toggleLocationGeotag()
         
-        switch AVCaptureDevice.authorizationStatus(for: .video) {
-            case .authorized:
-                sessionQueue.async { Task { @MainActor in self.setupSession() } }
-            case .notDetermined:
-                AVCaptureDevice.requestAccess(for: .video) { granted in
-                    if granted { self.sessionQueue.async { Task { @MainActor in self.setupSession() } } }
-                }
-            default:
-                errorMessage = "Camera access denied. Please enable in Settings."
-                showError = true
+        Task.detached(priority: .userInitiated) { @MainActor in
+            switch AVCaptureDevice.authorizationStatus(for: .video) {
+                case .authorized:
+                    self.setupSession()
+                    self.startSession()
+                case .notDetermined:
+                    AVCaptureDevice.requestAccess(for: .video) { granted in
+                        if granted {
+                            Task { @MainActor in
+                                self.setupSession()
+                                self.startSession()
+                            }
+                        }
+                    }
+                default:
+                    self.errorMessage = "Camera access denied. Please enable in Settings."
+                    self.showError = true
+            }
+        }
+    }
+    
+    func startSession() {
+        sessionQueue.async {
+            if !self.session.isRunning {
+                self.session.startRunning()
+            }
+        }
+    }
+    
+    func stopSession() {
+        sessionQueue.async {
+            if self.session.isRunning {
+                self.session.stopRunning()
+            }
         }
     }
     
@@ -396,21 +420,17 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
             videoOutput.setSampleBufferDelegate(self, queue: syncQueue)
         }
         
-        Task.detached(priority: .userInitiated) {
-            self.session.startRunning()
-            Task { @MainActor in
-                self.device = cam
-                if let largest = cam.activeFormat.supportedMaxPhotoDimensions.max(by: {
-                    Int($0.width) * Int($0.height) < Int($1.width) * Int($1.height)
-                }) {
-                    self.photoOutput.maxPhotoDimensions = largest
-                }
-                self.buildAvailableFormats()
-                self.updateDeviceRanges()
-                self.normalizeFlashModeForCurrentDevice()
-                self.enforceExposureModeConstraints()
-            }
+        // Restoration of hardware defaults and state
+        self.device = cam
+        if let largest = cam.activeFormat.supportedMaxPhotoDimensions.max(by: {
+            Int($0.width) * Int($0.height) < Int($1.width) * Int($1.height)
+        }) {
+            self.photoOutput.maxPhotoDimensions = largest
         }
+        self.buildAvailableFormats()
+        self.updateDeviceRanges()
+        self.normalizeFlashModeForCurrentDevice()
+        self.enforceExposureModeConstraints()
     }
     
     private func loadSettings() {

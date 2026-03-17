@@ -74,6 +74,8 @@ struct CaptureView: View {
                         }
                     }
                 }
+                .blur(radius: scenePhase != .active ? 20 : 0)
+                .animation(.easeInOut, value: scenePhase)
                 .ignoresSafeArea()
                 .contentShape(.rect.path(in: previewRect))
                 .onTapGesture(count: 2) {
@@ -252,9 +254,15 @@ struct CaptureView: View {
             changeLevelMonitoring(new == AppView.standard)
         }
         .onChange(of: scenePhase) { _, newPhase in
-            changeLevelMonitoring(newPhase == .active)
-            if newPhase == .background {
-                cameraModel.clearIgnoredCodes()
+            if newPhase == .active {
+                cameraModel.startSession()
+                changeLevelMonitoring(cameraModel.shouldShowLevel && cameraModel.appView == .standard)
+            } else {
+                cameraModel.stopSession()
+                levelModel.stopUpdates()
+                if newPhase == .background {
+                    cameraModel.clearIgnoredCodes()
+                }
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: UIDevice.deviceDidShakeNotification)) { _ in
