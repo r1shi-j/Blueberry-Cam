@@ -201,8 +201,10 @@ extension CameraModel {
             case .parade:
                 mode = .luminance
             case .none:
-                if let size {
-                    size == .small ? (mode = defaultHistogramSmall) : (mode = defaultHistogramLarge)
+                if size == .small {
+                    mode = defaultHistogramSmall == .none ? .waveform : defaultHistogramSmall
+                } else if size == .large {
+                    mode = defaultHistogramLarge == .none ? .luminance : defaultHistogramLarge
                 } else {
                     mode = .luminance
                 }
