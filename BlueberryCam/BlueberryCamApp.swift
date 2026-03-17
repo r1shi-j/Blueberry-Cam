@@ -5,8 +5,6 @@
 //  Created by Rishi Jansari on 07/03/2026.
 //
 
-import LockedCameraCapture
-import Photos
 import SwiftUI
 
 @main

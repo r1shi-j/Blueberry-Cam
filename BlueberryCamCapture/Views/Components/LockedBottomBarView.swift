@@ -54,7 +54,12 @@ struct LockedBottomBarView: View {
                         .frame(width: 82, height: 82)
                         .glassEffect(.regular.tint(cameraModel.shutterTint).interactive())
                     Button {
-                        cameraModel.capturePhoto()
+                        cameraModel.capturePhoto {
+                            withAnimation { cameraModel.changeCapturingState(to: true) }
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                                withAnimation { cameraModel.changeCapturingState(to: false) }
+                            }
+                        }
                         hapticTrigger += 1
                     } label: {
                         Circle()

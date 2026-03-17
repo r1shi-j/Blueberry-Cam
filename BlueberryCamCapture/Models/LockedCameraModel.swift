@@ -1,7 +1,6 @@
 internal import AVFoundation
 import LockedCameraCapture
 import Photos
-import SwiftUI
 
 @MainActor @Observable
 class LockedCameraModel: NSObject {
@@ -320,11 +319,12 @@ class LockedCameraModel: NSObject {
     }
     
     // MARK: - Capture
-    func capturePhoto() {
-        withAnimation { isCapturing = true }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-            withAnimation { self.isCapturing = false }
-        }
+    func changeCapturingState(to new: Bool) {
+        isCapturing = new
+    }
+    
+    func capturePhoto(onCapture: () -> ()) {
+        onCapture()
         
         exposureDebounceTask?.cancel()
         _pendingCaptureModeBox.value = captureMode
