@@ -114,13 +114,15 @@ extension CameraModel {
         switch control {
             case .ev:
                 if isAutoExposure {
-                    exposureBias = 0.0
+                    resetEV()
                     applyExposureBias()
                 }
             case .iso:
                 isAutoExposure = true
+                setAutoExposure()
             case .ss:
                 isAutoExposure = true
+                setAutoExposure()
             case .f:
                 isAutoFocus = true
                 setAutoFocus()

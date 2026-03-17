@@ -1,0 +1,96 @@
+{
+  "fill" : {
+    "linear-gradient" : [
+      "display-p3:0.71781,0.79934,1.00000,1.00000",
+      "srgb:0.00000,0.60145,0.77807,1.00000"
+    ],
+    "orientation" : {
+      "start" : {
+        "x" : 0.5,
+        "y" : 0
+      },
+      "stop" : {
+        "x" : 0.5,
+        "y" : 0.7
+      }
+    }
+  },
+  "groups" : [
+    {
+      "blur-material" : null,
+      "layers" : [
+        {
+          "blend-mode" : "normal",
+          "glass" : true,
+          "image-name" : "Blueberry.svg",
+          "name" : "Blueberry",
+          "position" : {
+            "scale" : 0.47,
+            "translation-in-points" : [
+              -1.8610217011882924e-07,
+              154.90558803419026
+            ]
+          }
+        },
+        {
+          "blend-mode" : "normal",
+          "fill-specializations" : [
+            {
+              "value" : "automatic"
+            },
+            {
+              "appearance" : "dark",
+              "value" : {
+                "linear-gradient" : [
+                  "display-p3:0.84378,0.80777,0.80227,1.00000",
+                  "display-p3:0.86423,0.89610,0.94783,1.00000"
+                ],
+                "orientation" : {
+                  "start" : {
+                    "x" : 0.5,
+                    "y" : 1
+                  },
+                  "stop" : {
+                    "x" : 0.5,
+                    "y" : 0.3
+                  }
+                }
+              }
+            },
+            {
+              "appearance" : "tinted",
+              "value" : {
+                "solid" : "gray:0.62777,1.00000"
+              }
+            }
+          ],
+          "image-name" : "Regular-S.svg",
+          "name" : "Regular-S",
+          "position" : {
+            "scale" : 6.6,
+            "translation-in-points" : [
+              0.2560799999999972,
+              -71.06429433398637
+            ]
+          }
+        }
+      ],
+      "lighting" : "individual",
+      "shadow" : {
+        "kind" : "none",
+        "opacity" : 0.34
+      },
+      "specular" : true,
+      "translucency" : {
+        "enabled" : true,
+        "value" : 0.31
+      }
+    }
+  ],
+  "supported-platforms" : {
+    "circles" : [
+      "watchOS"
+    ],
+    "squares" : "shared"
+  }
+}

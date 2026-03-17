@@ -19,7 +19,7 @@
                BlueprintIdentifier = "5B5FC8502F64B32E00532B15"
                BuildableName = "BlueberryCamWidgetExtension.appex"
                BlueprintName = "BlueberryCamWidgetExtension"
-               ReferencedContainer = "container:Blueberry Cam.xcodeproj">
+               ReferencedContainer = "container:BlueberryCam.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
          <BuildActionEntry
@@ -31,9 +31,9 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "5B3325082F5C7A3200874430"
-               BuildableName = "Blueberry Cam.app"
-               BlueprintName = "Blueberry Cam"
-               ReferencedContainer = "container:Blueberry Cam.xcodeproj">
+               BuildableName = "BlueberryCam.app"
+               BlueprintName = "BlueberryCam"
+               ReferencedContainer = "container:BlueberryCam.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
       </BuildActionEntries>
@@ -65,16 +65,16 @@
             BlueprintIdentifier = "5B5FC8502F64B32E00532B15"
             BuildableName = "BlueberryCamWidgetExtension.appex"
             BlueprintName = "BlueberryCamWidgetExtension"
-            ReferencedContainer = "container:Blueberry Cam.xcodeproj">
+            ReferencedContainer = "container:BlueberryCam.xcodeproj">
          </BuildableReference>
       </RemoteRunnable>
       <MacroExpansion>
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "5B3325082F5C7A3200874430"
-            BuildableName = "Blueberry Cam.app"
-            BlueprintName = "Blueberry Cam"
-            ReferencedContainer = "container:Blueberry Cam.xcodeproj">
+            BuildableName = "BlueberryCam.app"
+            BlueprintName = "BlueberryCam"
+            ReferencedContainer = "container:BlueberryCam.xcodeproj">
          </BuildableReference>
       </MacroExpansion>
       <EnvironmentVariables>
@@ -108,9 +108,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "5B3325082F5C7A3200874430"
-            BuildableName = "Blueberry Cam.app"
-            BlueprintName = "Blueberry Cam"
-            ReferencedContainer = "container:Blueberry Cam.xcodeproj">
+            BuildableName = "BlueberryCam.app"
+            BlueprintName = "BlueberryCam"
+            ReferencedContainer = "container:BlueberryCam.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </ProfileAction>

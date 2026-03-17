@@ -10,13 +10,13 @@ import Photos
 import SwiftUI
 
 @main
-struct Blueberry_CamApp: App {
+struct BlueberryCamApp: App {
     @Environment(\.scenePhase) private var scenePhase
     @AppStorage("shutterCount") var shutterCount = 0
     
     var body: some Scene {
         WindowGroup {
-            ContentView(shutterCount: $shutterCount)
+            CaptureView(shutterCount: $shutterCount)
                 .task { await detectLockedCaptureSessions() }
                 .onChange(of: scenePhase) { _, newPhase in
                     if newPhase == .active {
@@ -29,9 +29,6 @@ struct Blueberry_CamApp: App {
 }
 
 // MARK: - TODO
-// Cleanup code
-/// Make LockedCameraModel and LockedCaptureCamera same structure as CameraModel...
-
 // Localise for all iPhones iOS 26+
 // Add tips and welcome screen with tutorials
 // Improve memory/cpu usage, quicker camera switching

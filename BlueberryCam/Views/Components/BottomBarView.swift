@@ -64,7 +64,7 @@ struct BottomBarView: View {
                 }
                 .frame(maxWidth: .infinity)
                 
-                // MARK: - Manual controls toggle
+                // MARK: - Placeholder
                 if !cameraModel.showSimpleView {
                     Button {
                         

@@ -1,9 +1,7 @@
 internal import AVFoundation
 internal import CoreLocation
-import ImageIO
 import Photos
 import SwiftUI
-import UniformTypeIdentifiers
 
 @MainActor @Observable
 class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
@@ -642,11 +640,7 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
     }
     
     private func applyFlashModeIfSupported(to settings: AVCapturePhotoSettings) {
-        guard isAutoExposure else {
-            settings.flashMode = .off
-            return
-        }
-        guard supportsFlash else {
+        guard isAutoExposure, supportsFlash else {
             settings.flashMode = .off
             return
         }

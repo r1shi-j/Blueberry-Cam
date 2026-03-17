@@ -1,6 +1,6 @@
 import SwiftUI
 
-struct ContentView: View {
+struct CaptureView: View {
     @Environment(\.scenePhase) private var scenePhase
     @Binding var shutterCount: Int
     @State private var cameraModel = CameraModel()
@@ -16,7 +16,7 @@ struct ContentView: View {
             ZStack {
                 Color.black.ignoresSafeArea()
                 
-                // MARK: - Viewfinder (resizeAspect — matches exact capture FOV)
+                // MARK: - Viewfinder
                 CameraPreviewView(session: cameraModel.session) {
                     cameraModel.capturePhoto()
                 }

@@ -2,7 +2,7 @@ import Foundation
 import LockedCameraCapture
 import Photos
 
-extension Blueberry_CamApp {
+extension BlueberryCamApp {
     func detectLockedCaptureSessions() async {
         for await update in LockedCameraCaptureManager.shared.sessionContentUpdates {
             if case .added(let url) = update {

@@ -1,4 +1,3 @@
-import CoreMedia
 import SwiftUI
 
 extension CameraModel {
@@ -219,7 +218,7 @@ struct ManualControlsView: View {
                                     cameraModel.endManualFocusAdjustment()
                                 }
                             })
-                            .onChange(of: cameraModel.lensPosition) { _, _ in
+                            .onChange(of: cameraModel.lensPosition) {
                                 cameraModel.applyManualFocus()
                             }
                             .tint(.yellow)
