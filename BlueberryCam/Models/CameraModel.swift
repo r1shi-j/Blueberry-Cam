@@ -84,6 +84,14 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
     var selectedResolution: ResolutionOption? = nil
     var activeLens: Lens = .wide
     var flashMode: AVCaptureDevice.FlashMode = .off
+    var isMacroEnabled: Bool = false {
+        didSet {
+            if oldValue != isMacroEnabled {
+                applyMacroMode()
+                buildAvailableFormats()
+            }
+        }
+    }
     
     // MARK: - Manual controls
     var isAutoExposure: Bool = true {
@@ -252,6 +260,17 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
         device?.isLockingFocusWithCustomLensPositionSupported ?? false
     }
     
+    var supportsMacro: Bool {
+        // Macro is typically supported on Pro models with AF on Ultra Wide.
+        // We look for a back camera that can focus closer than 15cm (150mm).
+        let discovery = AVCaptureDevice.DiscoverySession(
+            deviceTypes: [.builtInUltraWideCamera, .builtInWideAngleCamera],
+            mediaType: .video,
+            position: .back
+        )
+        return discovery.devices.contains { $0.minimumFocusDistance > 0 && $0.minimumFocusDistance <= 150 }
+    }
+    
     var supportsFlash: Bool {
         guard device?.hasFlash == true else { return false }
         return !photoOutput.supportedFlashModes.isEmpty
@@ -398,7 +417,7 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
         if photoOutput.availablePhotoCodecTypes.contains(.hevc) {
             modes.append(.heif)
         }
-        if !photoOutput.availableRawPhotoPixelFormatTypes.isEmpty && !zoomBlocksRAW {
+        if !photoOutput.availableRawPhotoPixelFormatTypes.isEmpty && !zoomBlocksRAW && !isMacroEnabled {
             modes.append(.raw)
         }
         if availableFormats != modes {
@@ -424,7 +443,7 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
         let options: [ResolutionOption]
         if isFront {
             options = []
-        } else if isCropLens {
+        } else if isCropLens || isMacroEnabled {
             let outputMax = photoOutput.maxPhotoDimensions
             let allDims = (device?.activeFormat.supportedMaxPhotoDimensions ?? [])
                 .filter { $0.width <= outputMax.width && $0.height <= outputMax.height }
@@ -659,5 +678,41 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
             .filter { $0.width <= outputMax.width && $0.height <= outputMax.height }
             .max { Int($0.width) * Int($0.height) < Int($1.width) * Int($1.height) }
         ?? outputMax
+    }
+    
+    func applyMacroMode() {
+        if isMacroEnabled {
+            // 1. Switch to Ultra Wide if it's not already active
+            if activeLens != .ultraWide {
+                // We use the internal switchLens but skip the recursive applyMacroMode
+                // This will be handled by the UI toggle
+            }
+            
+            guard let d = device else { return }
+            try? d.lockForConfiguration()
+            
+            // 2. Apply "Macro" zoom (typically 2.0x on UW to match 1x FOV)
+            if activeLens == .ultraWide {
+                d.videoZoomFactor = 2.0
+            }
+            
+            // 3. Optimize focus for near objects if supported
+            if d.isAutoFocusRangeRestrictionSupported {
+                d.autoFocusRangeRestriction = .near
+            }
+            
+            d.unlockForConfiguration()
+        } else {
+            guard let d = device else { return }
+            try? d.lockForConfiguration()
+            if d.isAutoFocusRangeRestrictionSupported {
+                d.autoFocusRangeRestriction = .none
+            }
+            // Reset zoom if we were in the macro-zoom state
+            if activeLens == .ultraWide && d.videoZoomFactor == 2.0 {
+                d.videoZoomFactor = 1.0
+            }
+            d.unlockForConfiguration()
+        }
     }
 }

@@ -2,6 +2,22 @@ internal import AVFoundation
 import SwiftUI
 
 extension CameraModel {
+    fileprivate var macroButtonSymbol: String {
+        isMacroEnabled ? "camera.macro" : "camera.macro.slash"
+    }
+    
+    fileprivate var macroButtonForeground: Color {
+        isMacroEnabled ? .black : Colors.buttonText
+    }
+    
+    fileprivate var macroButtonBackground: Color {
+        isMacroEnabled ? .yellow : Colors.buttonBackground
+    }
+    
+    fileprivate var macroButtonOpacity: Double {
+        supportsMacro ? 1.0 : 0.45
+    }
+    
     fileprivate var flashButtonForeground: Color {
         flashMode == .off || !supportsFlash ? Colors.buttonText : .black
     }
@@ -99,20 +115,20 @@ struct TopBarView: View {
                         .foregroundColor(readoutColor(for: control))
                         .onTapGesture(count: 2) {
                             hapticTriggerR += 1
-                            withAnimation(.spring) {
+                            withAnimation(.bouncy) {
                                 cameraModel.resetControl(for: control)
                             }
                         }
                         .onLongPressGesture {
                             hapticTriggerR += 1
-                            withAnimation(.spring) {
+                            withAnimation(.bouncy) {
                                 cameraModel.resetControl(for: control)
                             }
                         }
                         .disabled(isReadoutDisabled(for: control))
                         .onTapGesture {
                             hapticTrigger += 1
-                            withAnimation(.spring) {
+                            withAnimation(.bouncy) {
                                 selectedControl = selectedControl == control ? nil : control
                             }
                         }
@@ -120,7 +136,26 @@ struct TopBarView: View {
             }
             .padding(.horizontal, 12)
             
-            HStack(alignment: .center, spacing: 16) {
+            HStack(alignment: .center, spacing: cameraModel.supportsMacro ? 10 : 16) {
+                // MARK: - Macro
+                if cameraModel.supportsMacro {
+                    Button {
+                        hapticTrigger += 1
+                        withAnimation(.bouncy) {
+                            cameraModel.toggleMacroMode()
+                        }
+                    } label: {
+                        Image(systemName: cameraModel.macroButtonSymbol)
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundColor(cameraModel.macroButtonForeground)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 5)
+                            .background(cameraModel.macroButtonBackground)
+                            .clipShape(.capsule)
+                    }
+                    .opacity(cameraModel.macroButtonOpacity)
+                }
+
                 // MARK: - Flash
                 Button {
                     hapticTrigger += 1
@@ -151,7 +186,7 @@ struct TopBarView: View {
                         let isSelected = cameraModel.selectedResolution?.id == opt.id
                         Button {
                             hapticTrigger += 1
-                            withAnimation(.spring(.bouncy)) {
+                            withAnimation(.bouncy) {
                                 cameraModel.selectResolution(opt)
                             }
                         } label: {
@@ -173,7 +208,7 @@ struct TopBarView: View {
                     ForEach(cameraModel.availableFormats) { mode in
                         Button {
                             hapticTrigger += 1
-                            withAnimation(.spring(.bouncy)) {
+                            withAnimation(.bouncy) {
                                 cameraModel.changeCaptureFormat(to: mode)
                             }
                         } label: {

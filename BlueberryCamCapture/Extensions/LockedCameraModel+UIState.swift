@@ -48,6 +48,17 @@ extension LockedCameraModel {
             self.updateDeviceRanges()
             self.normalizeFlashModeForCurrentDevice()
             self.enforceExposureModeConstraints()
+            
+            // Turn off macro mode if switching to any lens other than Ultra Wide
+            if self.isMacroEnabled && lens != .ultraWide {
+                self.isMacroEnabled = false
+            }
+            
+            // Re-apply macro settings if we just switched to Ultra Wide and macro is enabled
+            if self.isMacroEnabled && lens == .ultraWide {
+                self.applyMacroMode()
+            }
+            
             // Re-apply all active manual settings to the new device
             self.reapplyManualSettingsAfterLensSwitch(previousShutterDuration: previousShutterDuration)
             
@@ -110,6 +121,21 @@ extension LockedCameraModel {
                 setAutoFocus()
             case .wb:
                 isAutoWhiteBalance = true
+        }
+    }
+    
+    func toggleMacroMode() {
+        guard supportsMacro else { return }
+        
+        if !isMacroEnabled {
+            // Enabling macro: switch to Ultra Wide first
+            if activeLens != .ultraWide {
+                switchLens(to: .ultraWide)
+            }
+            isMacroEnabled = true
+        } else {
+            // Disabling macro
+            isMacroEnabled = false
         }
     }
     
