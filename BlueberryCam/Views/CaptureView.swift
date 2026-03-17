@@ -139,9 +139,6 @@ struct CaptureView: View {
                             .padding(8)
                             .glassEffect()
                         Button {
-                            if let raw = cameraModel.detectedCodeString {
-                                UIPasteboard.general.string = raw
-                            }
                             hapticTriggerR += 1
                             UIApplication.shared.open(url)
                             cameraModel.ignoreCurrentCode()
@@ -155,6 +152,7 @@ struct CaptureView: View {
                             .fontWidth(.expanded)
                         }
                         .buttonStyle(.glass)
+                        .padding(.horizontal)
                         
                         Button(closeLinkTitle, systemImage: closeSymbolName) {
                             cameraModel.ignoreCurrentCode()
@@ -261,9 +259,6 @@ struct CaptureView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: UIDevice.deviceDidShakeNotification)) { _ in
             if let url = cameraModel.detectedCodeURL {
-                if let raw = cameraModel.detectedCodeString {
-                    UIPasteboard.general.string = raw
-                }
                 hapticTriggerR += 1
                 UIApplication.shared.open(url)
                 cameraModel.ignoreCurrentCode()

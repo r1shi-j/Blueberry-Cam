@@ -40,6 +40,7 @@ extension CameraModel: AVCaptureMetadataOutputObjectsDelegate {
                 if self.detectedCodeURL != finalURL {
                     self.detectedCodeURL = finalURL
                     self.detectedCodeString = stringValue
+                    UIPasteboard.general.string = stringValue
                     let generator = UIImpactFeedbackGenerator(style: .light)
                     generator.impactOccurred()
                 }
