@@ -12,10 +12,10 @@ struct BlueberryCamWidgetBundle: WidgetBundle {
 struct BlueberryCamControl: ControlWidget {
     var body: some ControlWidgetConfiguration {
         StaticControlConfiguration(
-            kind: "com.blueberrycam.cameracontrol"
+            kind: "\(BundleIDs.appID).cameracontrol"
         ) {
             ControlWidgetButton(action: BlueberryCamCaptureIntent()) {
-                Label("Blueberry Cam", image: "camera.blueberry.reversed")
+                Label(BundleIDs.appName, image: BundleIDs.appSymbolReversedName)
             }
         }
         .displayName("Blueberry Cam")

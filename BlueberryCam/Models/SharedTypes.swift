@@ -1,6 +1,5 @@
 internal import AVFoundation
 import CoreMedia
-import Foundation
 import Photos
 import SwiftUI
 
@@ -150,7 +149,7 @@ enum AppView: String, CaseIterable, Hashable {
 // MARK: - ResolveAlbumID -
 // Same resolveAlbumID logic as CameraModel — finds or creates "Blueberry Cam" album
 func resolveAlbumID() -> String? {
-    let key = "blueberryCamAlbumID"
+    let key = BundleIDs.photoAlbumStorageKey
     let defaults = UserDefaults.standard
     
     // Check for a cached ID first
@@ -166,7 +165,7 @@ func resolveAlbumID() -> String? {
     let fetch = PHAssetCollection.fetchAssetCollections(with: .album, subtype: .albumRegular, options: nil)
     var foundID: String?
     fetch.enumerateObjects { col, _, stop in
-        if col.localizedTitle == "Blueberry Cam" {
+        if col.localizedTitle == BundleIDs.appName {
             foundID = col.localIdentifier
             stop.pointee = true
         }
@@ -179,7 +178,7 @@ func resolveAlbumID() -> String? {
     // Create a brand new album
     var newID: String?
     try? PHPhotoLibrary.shared().performChangesAndWait {
-        let createReq = PHAssetCollectionChangeRequest.creationRequestForAssetCollection(withTitle: "Blueberry Cam")
+        let createReq = PHAssetCollectionChangeRequest.creationRequestForAssetCollection(withTitle: BundleIDs.appName)
         newID = createReq.placeholderForCreatedAssetCollection.localIdentifier
     }
     

@@ -36,7 +36,7 @@ extension CameraModel: AVCapturePhotoCaptureDelegate {
             
             PHPhotoLibrary.shared().performChanges({
                 let opts = PHAssetResourceCreationOptions()
-                opts.uniformTypeIdentifier = isDNG ? "com.adobe.raw-image" : (isHEIF ? "public.heic" : "public.jpeg")
+                opts.uniformTypeIdentifier = BundleIDs.UTI(isDNG: isDNG, isHEIF: isHEIF)
                 let req = PHAssetCreationRequest.forAsset()
                 if let loc = location {
                     req.location = loc

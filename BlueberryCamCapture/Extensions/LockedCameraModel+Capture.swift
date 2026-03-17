@@ -47,7 +47,7 @@ extension LockedCameraModel: AVCapturePhotoCaptureDelegate {
             var placeholderID: String?
             PHPhotoLibrary.shared().performChanges({
                 let opts = PHAssetResourceCreationOptions()
-                opts.uniformTypeIdentifier = isDNG ? "com.adobe.raw-image" : (isHEIF ? "public.heic" : "public.jpeg")
+                opts.uniformTypeIdentifier = BundleIDs.UTI(isDNG: isDNG, isHEIF: isHEIF)
                 let req = PHAssetCreationRequest.forAsset()
                 req.addResource(with: .photo, data: data, options: opts)
                 placeholderID = req.placeholderForCreatedAsset?.localIdentifier

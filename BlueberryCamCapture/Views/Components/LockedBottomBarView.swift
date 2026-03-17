@@ -8,17 +8,13 @@ extension LockedCameraModel {
 }
 
 extension LockedBottomBarView {
-    private var mainAppLinkSymbolName: String {
-        "camera.blueberry"
-    }
-    
     private var openString: String {
         "Open"
     }
     
     private func openMainApp() {
         Task {
-            let activity = NSUserActivity(activityType: "com.jansari.rishi.Blueberry-Cam.opencamera")
+            let activity = NSUserActivity(activityType: "\(BundleIDs.fullBundleID).opencamera")
             try? await lockedSession.openApplication(for: activity)
         }
     }
@@ -34,7 +30,7 @@ struct LockedBottomBarView: View {
             HStack(alignment: .center, spacing: 0) {
                 // MARK: - Main app shortcut
                 Button(action: openMainApp) {
-                    Image(systemName: mainAppLinkSymbolName)
+                    Image(BundleIDs.appSymbolName)
                         .font(.system(size: 20))
                         .symbolRenderingMode(.palette)
                         .foregroundStyle(.black, .blue, .green)

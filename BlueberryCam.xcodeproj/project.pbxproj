@@ -70,6 +70,13 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		5B152EA62F6941640057691D /* Exceptions for "BlueberryCam" folder in "BlueberryCamWidgetExtension" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Models/SharedIDs.swift,
+			);
+			target = 5B5FC8502F64B32E00532B15 /* BlueberryCamWidgetExtension */;
+		};
 		5B5FC8362F648F8E00532B15 /* Exceptions for "BlueberryCamCapture" folder in "BlueberryCamCapture" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
@@ -80,6 +87,7 @@
 		5B5FC8432F64A9D700532B15 /* Exceptions for "BlueberryCam" folder in "BlueberryCamCapture" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
+				Models/SharedIDs.swift,
 				Models/SharedTypes.swift,
 				Views/Components/CameraPreviewView.swift,
 			);
@@ -113,6 +121,7 @@
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
 				5B5FC8432F64A9D700532B15 /* Exceptions for "BlueberryCam" folder in "BlueberryCamCapture" target */,
+				5B152EA62F6941640057691D /* Exceptions for "BlueberryCam" folder in "BlueberryCamWidgetExtension" target */,
 			);
 			path = BlueberryCam;
 			sourceTree = "<group>";

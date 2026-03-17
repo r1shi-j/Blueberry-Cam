@@ -12,7 +12,7 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
     nonisolated let videoOutput = AVCaptureVideoDataOutput()
     nonisolated let depthOutput = AVCaptureDepthDataOutput()
     private var synchronizer: AVCaptureDataOutputSynchronizer?
-    nonisolated let sessionQueue = DispatchQueue(label: "com.blueberrycam.sessionQueue")
+    nonisolated let sessionQueue = DispatchQueue(label: "\(BundleIDs.appID).sessionQueue")
     nonisolated let frameCounter = FrameCounter()
     let _pendingCaptureModeBox = CaptureModeBox()
     
@@ -335,7 +335,7 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
         session.commitConfiguration()
         
         // Safely setup synchronizer or fallback
-        let syncQueue = DispatchQueue(label: "com.blueberrycam.analysisQueue")
+        let syncQueue = DispatchQueue(label: "\(BundleIDs.appID).analysisQueue")
         if depthOutput.connection(with: .depthData) != nil && videoOutput.connection(with: .video) != nil {
             synchronizer = AVCaptureDataOutputSynchronizer(dataOutputs: [videoOutput, depthOutput])
             synchronizer?.setDelegate(self, queue: syncQueue)

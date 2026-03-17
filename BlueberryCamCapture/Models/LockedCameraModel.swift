@@ -12,7 +12,7 @@ class LockedCameraModel: NSObject {
     var device: AVCaptureDevice?
     nonisolated let photoOutput = AVCapturePhotoOutput()
     nonisolated let videoOutput = AVCaptureVideoDataOutput()
-    nonisolated let sessionQueue = DispatchQueue(label: "com.blueberrycam.locked.sessionQueue")
+    nonisolated let sessionQueue = DispatchQueue(label: "\(BundleIDs.appID).locked.sessionQueue")
     let _pendingCaptureModeBox = CaptureModeBox()
     nonisolated let _sessionContentURLBox = SessionURLBox()
     
@@ -151,7 +151,7 @@ class LockedCameraModel: NSObject {
             session.addOutput(photoOutput)
         }
         
-        videoOutput.setSampleBufferDelegate(self, queue: DispatchQueue(label: "com.blueberrycam.locked.videoQueue"))
+        videoOutput.setSampleBufferDelegate(self, queue: DispatchQueue(label: "\(BundleIDs.appID).locked.videoQueue"))
         videoOutput.alwaysDiscardsLateVideoFrames = true
         if session.canAddOutput(videoOutput) {
             session.addOutput(videoOutput)
