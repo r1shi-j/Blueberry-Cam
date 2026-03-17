@@ -30,12 +30,21 @@ struct BlueberryCamApp: App {
 // Localise for all iPhones iOS 26+
 // Add tips and welcome screen with tutorials
 // Improve memory/cpu usage, quicker camera switching
+// Swift 6
 
 // Move lens picker to bottom right?
 // Click on any readout -> shows vertical slider right side screen like halide
 /// slider shows the auto value constantly updating, manually changing it turns on manual mode, for ss/iso have left iso right ss?
+
+// Front and rear photos simultaneously
 // Show proper selfie cameras
 // Tap to focus with focus EV
 
-// Front and rear photos simultaneously
-// QR codes - shake to open
+// Focus Loupe
+// ProRaw
+// Burst
+// Timer
+// Photographic styles
+// Portraits
+// Digital zoom
+// View outside frame
