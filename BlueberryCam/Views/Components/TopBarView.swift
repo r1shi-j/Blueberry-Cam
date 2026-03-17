@@ -202,6 +202,7 @@ struct TopBarView: View {
                 }
                 .clipShape(.rect(cornerRadius: 6))
                 .overlay(RoundedRectangle(cornerRadius: 6).stroke(.white.opacity(0.2), lineWidth: 1))
+                .animation(.spring(duration: 0.3), value: cameraModel.availableResolutions)
                 
                 // MARK: - Format picker
                 HStack(spacing: 0) {
@@ -226,6 +227,7 @@ struct TopBarView: View {
                 .disabled(cameraModel.isFormatDisabled)
                 .clipShape(.rect(cornerRadius: 6))
                 .overlay(RoundedRectangle(cornerRadius: 6).stroke(.white.opacity(0.2), lineWidth: 1))
+                .animation(.spring(duration: 0.3), value: cameraModel.availableFormats)
             }
             .padding(.horizontal, 8)
         }

@@ -31,6 +31,11 @@ final class PreviewUIView: UIView {
         set {
             previewLayer.session = newValue
             previewLayer.videoGravity = .resizeAspect
+            
+            if let conn = previewLayer.connection, conn.isVideoMirroringSupported {
+                conn.automaticallyAdjustsVideoMirroring = true
+            }
+            
             setupInteraction()
         }
     }

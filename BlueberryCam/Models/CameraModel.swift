@@ -107,6 +107,7 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
     private(set) var availableResolutions: [ResolutionOption] = []
     var selectedResolution: ResolutionOption? = nil
     var activeLens: Lens = .wide
+    var flipRotation: Double = 0
     var flashMode: AVCaptureDevice.FlashMode = .off
     var isMacroEnabled: Bool = false {
         didSet {
@@ -409,6 +410,9 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
         }
         
         session.commitConfiguration()
+        
+        // Match initial flip to lens
+        self.flipRotation = activeLens.isFront ? 180 : 0
         
         // Safely setup synchronizer or fallback
         let syncQueue = DispatchQueue(label: "\(BundleIDs.appID).analysisQueue")

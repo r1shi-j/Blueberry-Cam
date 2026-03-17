@@ -27,9 +27,7 @@ struct LockedLensSelectorView: View {
                 let isActive = cameraModel.activeLens == lens
                 Button {
                     hapticTrigger += 1
-                    withAnimation(.bouncy) {
-                        cameraModel.switchLens(to: lens)
-                    }
+                    cameraModel.switchLens(to: lens)
                 } label: {
                     Text(lens.label)
                         .font(lensIconFont(isActive: isActive))

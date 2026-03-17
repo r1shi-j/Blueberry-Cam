@@ -25,6 +25,10 @@ struct LockedCaptureView: View {
     @State private var cameraModel = LockedCameraModel()
     @State private var selectedControl: ManualControl?
     
+    // Transitions
+    @State private var visualZoomScale: CGFloat = 1.0
+    @State private var visualOpacity: CGFloat = 1.0
+    
     var body: some View {
         GeometryReader { geo in
             let previewRect = makePreviewRect(in: geo)
@@ -41,6 +45,8 @@ struct LockedCaptureView: View {
                         }
                     }
                 }
+                .scaleEffect(visualZoomScale)
+                .opacity(visualOpacity)
                 .ignoresSafeArea()
                 .contentShape(.rect.path(in: previewRect))
                 
@@ -55,8 +61,11 @@ struct LockedCaptureView: View {
                             .padding(.bottom, 8)
                     }
                     
-                    LockedLensSelectorView(cameraModel: cameraModel)
-                        .padding(.bottom, 30)
+                    ZStack {
+                        LockedLensSelectorView(cameraModel: cameraModel)
+                            .padding(.bottom, 30)
+                    }
+                    .animation(.bouncy, value: cameraModel.activeLens)
                     
                     LockedBottomBarView(cameraModel: cameraModel, lockedSession: lockedSession)
                         .padding(.bottom, 30)
@@ -74,6 +83,27 @@ struct LockedCaptureView: View {
         .environment(\.scenePhase, .active)
         .onAppear {
             cameraModel.configure(with: lockedSession)
+        }
+        .onChange(of: cameraModel.activeLens) { oldLens, newLens in
+            // Handle visual "zoom" bump to mask lens hardware switch
+            if oldLens.isFront == newLens.isFront {
+                // Handle visual "zoom" bump and opacity dip to mask lens hardware switch
+                let oldVal = Double(oldLens.label) ?? 1.0
+                let newVal = Double(newLens.label) ?? 1.0
+                let isZoomIn = newVal > oldVal
+                let targetScale: CGFloat = isZoomIn ? 1.05 : 0.95
+                
+                withAnimation(.easeIn(duration: 0.1)) {
+                    visualZoomScale = targetScale
+                    visualOpacity = 0.5
+                }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    withAnimation(.easeOut(duration: 0.25)) {
+                        visualZoomScale = 1.0
+                        visualOpacity = 1.0
+                    }
+                }
+            }
         }
         .alert(errorString, isPresented: $cameraModel.showError) {
             Button(okButtonString, role: .cancel) {}

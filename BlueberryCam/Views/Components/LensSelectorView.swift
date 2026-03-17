@@ -22,9 +22,7 @@ extension LensSelectorView {
             let isActive = cameraModel.activeLens == lens
             Button {
                 hapticTrigger += 1
-                withAnimation(.bouncy) {
-                    cameraModel.switchLens(to: lens)
-                }
+                cameraModel.switchLens(to: lens)
             } label: {
                 Text(lens.label)
                     .font(lensIconFont(isActive: isActive))
@@ -49,9 +47,7 @@ struct LensSelectorView: View {
             // MARK: - Flip camera button — always visible
             Button {
                 hapticTrigger += 1
-                withAnimation(.bouncy) {
-                    cameraModel.toggleSelfie()
-                }
+                cameraModel.toggleSelfie()
             } label: {
                 Image(systemName: flipLensSymbolName)
                     .font(.system(size: 16))

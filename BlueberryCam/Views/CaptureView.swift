@@ -58,6 +58,11 @@ struct CaptureView: View {
     @State private var hapticTrigger = 0
     @State private var hapticTriggerR = 0
     
+    // Transitions
+    @State private var visualZoomScale: CGFloat = 1.0
+    @State private var visualBlur: CGFloat = 0
+    @State private var visualOpacity: CGFloat = 1.0
+    
     var body: some View {
         GeometryReader { geo in
             let previewRect = makePreviewRect(in: geo)
@@ -74,6 +79,10 @@ struct CaptureView: View {
                         }
                     }
                 }
+                .scaleEffect(visualZoomScale)
+                .rotation3DEffect(.degrees(cameraModel.flipRotation), axis: (x: 0, y: 1, z: 0))
+                .blur(radius: visualBlur)
+                .opacity(visualOpacity)
                 .blur(radius: scenePhase != .active ? 20 : 0)
                 .animation(.easeInOut, value: scenePhase)
                 .ignoresSafeArea()
@@ -132,41 +141,44 @@ struct CaptureView: View {
                 }
                 
                 // MARK: - QR Code
-                if let url = cameraModel.detectedCodeURL {
-                    VStack(spacing: 4) {
-                        Text(copiedString)
+                ZStack {
+                    if let url = cameraModel.detectedCodeURL {
+                        VStack(spacing: 4) {
+                            Text(copiedString)
+                                .font(.system(size: 10, weight: .bold))
+                                .fontWidth(.expanded)
+                                .foregroundStyle(.yellow.opacity(0.8))
+                                .padding(8)
+                                .glassEffect()
+                            Button {
+                                hapticTriggerR += 1
+                                UIApplication.shared.open(url)
+                                cameraModel.ignoreCurrentCode()
+                            } label: {
+                                HStack(spacing: 8) {
+                                    Image(systemName: linkSymbolName)
+                                    Text(url.host ?? backupURLName)
+                                        .lineLimit(1)
+                                }
+                                .font(.system(size: 14, weight: .bold))
+                                .fontWidth(.expanded)
+                            }
+                            .buttonStyle(.glass)
+                            .padding(.horizontal)
+                            
+                            Button(closeLinkTitle, systemImage: closeSymbolName) {
+                                cameraModel.ignoreCurrentCode()
+                            }
                             .font(.system(size: 10, weight: .bold))
                             .fontWidth(.expanded)
                             .foregroundStyle(.yellow.opacity(0.8))
-                            .padding(8)
-                            .glassEffect()
-                        Button {
-                            hapticTriggerR += 1
-                            UIApplication.shared.open(url)
-                            cameraModel.ignoreCurrentCode()
-                        } label: {
-                            HStack(spacing: 8) {
-                                Image(systemName: linkSymbolName)
-                                Text(url.host ?? backupURLName)
-                                    .lineLimit(1)
-                            }
-                            .font(.system(size: 14, weight: .bold))
-                            .fontWidth(.expanded)
+                            .buttonStyle(.glass)
                         }
-                        .buttonStyle(.glass)
-                        .padding(.horizontal)
-                        
-                        Button(closeLinkTitle, systemImage: closeSymbolName) {
-                            cameraModel.ignoreCurrentCode()
-                        }
-                        .font(.system(size: 10, weight: .bold))
-                        .fontWidth(.expanded)
-                        .foregroundStyle(.yellow.opacity(0.8))
-                        .buttonStyle(.glass)
+                        .position(x: previewRect.midX, y: previewRect.midY)
+                        .transition(.scale(scale: 0.5, anchor: .center).combined(with: .opacity))
                     }
-                    .position(x: previewRect.midX, y: previewRect.midY)
-                    .animation(.bouncy, value: cameraModel.detectedCodeURL)
                 }
+                .animation(.bouncy, value: cameraModel.detectedCodeURL)
                 
                 // MARK: - UI Overlays
                 VStack(spacing: 0) {
@@ -175,36 +187,43 @@ struct CaptureView: View {
                         
                         Spacer()
                         
-                        if cameraModel.histogramModeLarge != .none {
-                            HistogramView(
-                                mode: cameraModel.histogramModeLarge,
-                                size: .large,
-                                lumaData: cameraModel.histogramData,
-                                redData: cameraModel.redHistogram,
-                                greenData: cameraModel.greenHistogram,
-                                blueData: cameraModel.blueHistogram,
-                                waveformData: cameraModel.waveformData
-                            )
-                            .frame(height: 60)
-                            .padding(.horizontal, 20)
-                            .padding(.bottom, 8)
-                            .onTapGesture {
-                                hapticTrigger += 1
-                                cameraModel.cycleHistogramMode(mode: &cameraModel.histogramModeLarge)
-                            }
-                            .onLongPressGesture {
-                                hapticTriggerR += 1
-                                cameraModel.hideHistogram(for: .large)
+                        ZStack {
+                            if cameraModel.histogramModeLarge != .none {
+                                HistogramView(
+                                    mode: cameraModel.histogramModeLarge,
+                                    size: .large,
+                                    lumaData: cameraModel.histogramData,
+                                    redData: cameraModel.redHistogram,
+                                    greenData: cameraModel.greenHistogram,
+                                    blueData: cameraModel.blueHistogram,
+                                    waveformData: cameraModel.waveformData
+                                )
+                                .frame(height: 60)
+                                .padding(.horizontal, 20)
+                                .padding(.bottom, 8)
+                                .onTapGesture {
+                                    hapticTrigger += 1
+                                    cameraModel.cycleHistogramMode(mode: &cameraModel.histogramModeLarge)
+                                }
+                                .onLongPressGesture {
+                                    hapticTriggerR += 1
+                                    cameraModel.hideHistogram(for: .large)
+                                }
+                                .transition(.scale(scale: 1.5, anchor: .center).combined(with: .opacity))
                             }
                         }
-                        
+                        .animation(.bouncy, value: cameraModel.histogramModeLarge)
+                       
                         if let selectedControl {
                             ManualControlsView(cameraModel: cameraModel, control: selectedControl)
                                 .padding(.bottom, 8)
                         }
                         
-                        LensSelectorView(cameraModel: cameraModel)
-                            .padding(.bottom, 30)
+                        ZStack {
+                            LensSelectorView(cameraModel: cameraModel)
+                                .padding(.bottom, 30)
+                        }
+                        .animation(.bouncy, value: cameraModel.activeLens)
                     } else {
                         Spacer()
                     }
@@ -249,6 +268,40 @@ struct CaptureView: View {
         }
         .onChange(of: cameraModel.shouldShowLevel) { _, new in
             changeLevelMonitoring(new)
+        }
+        .onChange(of: cameraModel.activeLens) { oldLens, newLens in
+            // Handle visual "zoom" bump to mask lens hardware switch
+            if oldLens.isFront == newLens.isFront {
+                // Handle visual "zoom" bump and opacity dip to mask lens hardware switch
+                let oldVal = Double(oldLens.label) ?? 1.0
+                let newVal = Double(newLens.label) ?? 1.0
+                let isZoomIn = newVal > oldVal
+                let targetScale: CGFloat = isZoomIn ? 1.05 : 0.95
+                
+                withAnimation(.easeIn(duration: 0.1)) {
+                    visualZoomScale = targetScale
+                    visualOpacity = 0.5
+                }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    withAnimation(.easeOut(duration: 0.25)) {
+                        visualZoomScale = 1.0
+                        visualOpacity = 1.0
+                    }
+                }
+            } else {
+                // Bidirectional 180 / -180 Flip with motion blur and opacity dip
+                visualOpacity = 0.1
+                visualBlur = 20
+                cameraModel.flipRotation = (newLens.isFront) ? 180 : -180
+              
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
+                        cameraModel.flipRotation = 0
+                        visualBlur = 0
+                        visualOpacity = 1.0
+                    }
+                }
+            }
         }
         .onChange(of: cameraModel.appView) { _, new in
             changeLevelMonitoring(new == AppView.standard)

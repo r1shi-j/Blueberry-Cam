@@ -10,9 +10,15 @@ extension CameraModel {
     
     func switchLens(to lens: Lens) {
         guard lens != activeLens else { return }
-        activeLens = lens
         
-        sessionQueue.async { Task { @MainActor in
+        // 1. Instant UI update to trigger animations and selection state
+        self.activeLens = lens
+        self.flipRotation = 0
+        
+        // 2. Heavy hardware reconfiguration in background
+        sessionQueue.async { [weak self] in
+            guard let self else { return }
+            
             self.session.beginConfiguration()
             for input in self.session.inputs { self.session.removeInput(input) }
             
@@ -23,16 +29,18 @@ extension CameraModel {
                 return
             }
             self.session.addInput(input)
-            self.device = cam
             
-            // Crop zoom for 2x / 8x back lenses
+            // Internal state that is non-observable can be set here
+            // But 'device' and others are @Observable, so move to MainActor Task
+            
+            // Zoom Factor (Hardware)
             if lens.zoomFactor > 1.0 {
                 try? cam.lockForConfiguration()
                 cam.videoZoomFactor = lens.zoomFactor
                 cam.unlockForConfiguration()
             }
             
-            // Portrait rotation + mirror
+            // Connection properties (Hardware)
             let isFront = lens.isFront
             let rotationAngle: CGFloat = isFront ? 0 : 90
             for conn in [self.photoOutput.connection(with: .video),
@@ -45,38 +53,37 @@ extension CameraModel {
             
             self.session.commitConfiguration()
             
-            // Set output max to largest the active format supports
-            if let largest = cam.activeFormat.supportedMaxPhotoDimensions.max(by: {
-                Int($0.width) * Int($0.height) < Int($1.width) * Int($1.height)
-            }) {
-                self.photoOutput.maxPhotoDimensions = largest
+            // 3. Final synchronization back to UI state
+            Task { @MainActor in
+                self.device = cam
+                
+                if let largest = cam.activeFormat.supportedMaxPhotoDimensions.max(by: {
+                    Int($0.width) * Int($0.height) < Int($1.width) * Int($1.height)
+                }) {
+                    self.photoOutput.maxPhotoDimensions = largest
+                }
+                
+                self.buildAvailableFormats()
+                let previousShutterDuration: CMTime? = (!self.isAutoExposure && self.shutterSpeeds.indices.contains(self.shutterIndex)) ? self.shutterSpeeds[self.shutterIndex] : nil
+                self.updateDeviceRanges()
+                self.normalizeFlashModeForCurrentDevice()
+                self.enforceExposureModeConstraints()
+                
+                if self.isMacroEnabled && lens != .ultraWide {
+                    self.isMacroEnabled = false
+                }
+                if self.isMacroEnabled && lens == .ultraWide {
+                    self.applyMacroMode()
+                }
+                
+                self.reapplyManualSettingsAfterLensSwitch(previousShutterDuration: previousShutterDuration)
+                self.setupCameraControls()
+                
+                if !cam.isLockingFocusWithCustomLensPositionSupported {
+                    self.isAutoFocus = true
+                }
             }
-            
-            self.buildAvailableFormats()
-            let previousShutterDuration: CMTime? = (!self.isAutoExposure && self.shutterSpeeds.indices.contains(self.shutterIndex)) ? self.shutterSpeeds[self.shutterIndex] : nil
-            self.updateDeviceRanges()
-            self.normalizeFlashModeForCurrentDevice()
-            self.enforceExposureModeConstraints()
-            
-            // Turn off macro mode if switching to any lens other than Ultra Wide
-            if self.isMacroEnabled && lens != .ultraWide {
-                self.isMacroEnabled = false
-            }
-            
-            // Re-apply macro settings if we just switched to Ultra Wide and macro is enabled
-            if self.isMacroEnabled && lens == .ultraWide {
-                self.applyMacroMode()
-            }
-            
-            // Re-apply all active manual settings to the new device
-            self.reapplyManualSettingsAfterLensSwitch(previousShutterDuration: previousShutterDuration)
-            // Recreate camera controls with new device's ISO/SS bounds
-            self.setupCameraControls()
-            
-            if !cam.isLockingFocusWithCustomLensPositionSupported {
-                self.isAutoFocus = true
-            }
-        }}
+        }
     }
     
     func reapplyManualSettingsAfterLensSwitch(previousShutterDuration: CMTime?) {
