@@ -155,7 +155,7 @@ struct TopBarView: View {
                     }
                     .opacity(cameraModel.macroButtonOpacity)
                 }
-
+                
                 // MARK: - Flash
                 Button {
                     hapticTrigger += 1

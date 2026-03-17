@@ -8,7 +8,7 @@ extension CameraModel {
         applyManualWhiteBalanceLocked()
         d.unlockForConfiguration()
     }
-
+    
     private func applyManualWhiteBalanceLocked() {
         guard let d = device else { return }
         // Expanded bounding from 2000K (very cool/blue) to 10000K (very warm/orange)
@@ -25,7 +25,7 @@ extension CameraModel {
         
         d.setWhiteBalanceModeLocked(with: clampedGains, completionHandler: nil)
     }
-
+    
     func setAutoWhiteBalance() {
         guard let d = device else { return }
         try? d.lockForConfiguration()

@@ -225,7 +225,7 @@ class LockedCameraModel: NSObject {
         }
         
         let isCropLens = activeLens == .tele2x || activeLens == .tele8x
-    
+        
         let outputMax = photoOutput.maxPhotoDimensions
         let allDims = (device?.activeFormat.supportedMaxPhotoDimensions ?? [])
             .filter { $0.width <= outputMax.width && $0.height <= outputMax.height }

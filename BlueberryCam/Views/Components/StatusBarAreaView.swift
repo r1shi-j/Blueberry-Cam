@@ -99,7 +99,7 @@ struct StatusBarAreaView: View {
                         .padding(.leading)
                     }
                 }
-                        
+                
                 Spacer()
                 
                 HStack(alignment: .center, spacing: 12) {

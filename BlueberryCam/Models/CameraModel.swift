@@ -444,7 +444,7 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
     func buildAvailableFormats() {
         // We only enforce this logic if the device is ready.
         guard device != nil else { return }
-
+        
         let zoomBlocksRAW = (device?.videoZoomFactor ?? 1.0) > 1.0
         let isFront = activeLens.isFront
         
@@ -520,7 +520,7 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
         }
         
         let sameOptions = availableResolutions.count == options.count &&
-                          zip(availableResolutions, options).allSatisfy { $0.id == $1.id }
+        zip(availableResolutions, options).allSatisfy { $0.id == $1.id }
         
         if !sameOptions {
             availableResolutions = options
