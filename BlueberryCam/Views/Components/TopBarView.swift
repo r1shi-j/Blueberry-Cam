@@ -34,28 +34,24 @@ extension CameraModel {
         !(supportsFlash && isAutoExposure)
     }
     
-    fileprivate func resolutionForeground(for isSelected: Bool) -> Color {
-        isSelected ? .black : .white
+    fileprivate func resolutionForeground(for isSelected: Bool, isEnabled: Bool) -> Color {
+        guard isEnabled else { return Colors.buttonText.opacity(0.3) }
+        return isSelected ? .black : .white
     }
     
-    fileprivate func resolutionBackground(for isSelected: Bool) -> Color {
-        isSelected ? .yellow : Colors.buttonBackground
+    fileprivate func resolutionBackground(for isSelected: Bool, isEnabled: Bool) -> Color {
+        guard isEnabled else { return Colors.buttonBackground.opacity(0.3) }
+        return isSelected ? .yellow : Colors.buttonBackground
     }
     
-    fileprivate func formatForeground(for mode: CaptureMode) -> Color {
-        captureMode == mode ? .black : .white
+    fileprivate func formatForeground(for mode: CaptureMode, isEnabled: Bool) -> Color {
+        guard isEnabled else { return Colors.buttonText.opacity(0.3) }
+        return captureMode == mode ? .black : .white
     }
     
-    fileprivate func formatBackground(for mode: CaptureMode) -> Color {
-        captureMode == mode ? .yellow : Colors.buttonBackground
-    }
-    
-    fileprivate var formatOpacity: Double {
-        isAutoExposure ? 1.0 : 0.45
-    }
-    
-    fileprivate var isFormatDisabled: Bool {
-        !isAutoExposure
+    fileprivate func formatBackground(for mode: CaptureMode, isEnabled: Bool) -> Color {
+        guard isEnabled else { return Colors.buttonBackground.opacity(0.3) }
+        return captureMode == mode ? .yellow : Colors.buttonBackground
     }
 }
 
@@ -105,6 +101,7 @@ struct TopBarView: View {
     
     var body: some View {
         VStack(spacing: 14) {
+            // MARK: Row 1
             HStack(alignment: .center, spacing: 16) {
                 // MARK: - Readout values
                 ForEach(ManualControl.allCases, id: \.self) { control in
@@ -136,11 +133,13 @@ struct TopBarView: View {
             }
             .padding(.horizontal, 4)
             
+            // MARK: Row 2
             HStack(alignment: .center, spacing: 16) {
                 // MARK: - Resolution picker
                 HStack(spacing: 0) {
                     ForEach(cameraModel.availableResolutions) { opt in
                         let isSelected = cameraModel.selectedResolution?.id == opt.id
+                        let isEnabled = cameraModel.isResolutionEnabled(opt)
                         Button {
                             hapticTrigger += 1
                             withAnimation(.bouncy) {
@@ -152,9 +151,10 @@ struct TopBarView: View {
                                 .fontWidth(.expanded)
                                 .padding(.horizontal, 10)
                                 .padding(.vertical, 5)
-                                .background(cameraModel.resolutionBackground(for: isSelected))
-                                .foregroundColor(cameraModel.resolutionForeground(for: isSelected))
+                                .background(cameraModel.resolutionBackground(for: isSelected, isEnabled: isEnabled))
+                                .foregroundStyle(cameraModel.resolutionForeground(for: isSelected, isEnabled: isEnabled))
                         }
+                        .disabled(!isEnabled)
                     }
                 }
                 .clipShape(.rect(cornerRadius: 6))
@@ -164,6 +164,7 @@ struct TopBarView: View {
                 // MARK: - Format picker
                 HStack(spacing: 0) {
                     ForEach(cameraModel.availableFormats) { mode in
+                        let isEnabled = cameraModel.isFormatEnabled(mode)
                         Button {
                             hapticTrigger += 1
                             withAnimation(.bouncy) {
@@ -175,19 +176,19 @@ struct TopBarView: View {
                                 .fontWidth(.expanded)
                                 .padding(.horizontal, 10)
                                 .padding(.vertical, 5)
-                                .background(cameraModel.formatBackground(for: mode))
-                                .foregroundColor(cameraModel.formatForeground(for: mode))
+                                .background(cameraModel.formatBackground(for: mode, isEnabled: isEnabled))
+                                .foregroundStyle(cameraModel.formatForeground(for: mode, isEnabled: isEnabled))
                         }
+                        .disabled(!isEnabled)
                     }
                 }
-                .opacity(cameraModel.formatOpacity)
-                .disabled(cameraModel.isFormatDisabled)
                 .clipShape(.rect(cornerRadius: 6))
                 .overlay(RoundedRectangle(cornerRadius: 6).stroke(.white.opacity(0.2), lineWidth: 1))
-                .animation(.spring(duration: 0.3), value: cameraModel.availableFormats)
+                .animation(.spring(duration: 0.3), value: cameraModel.availableResolutions)
             }
             .padding(.horizontal, 8)
             
+            // MARK: Row 3
             HStack(alignment: .center, spacing: 16) {
                 // MARK: - Macro
                 if cameraModel.supportsMacro {

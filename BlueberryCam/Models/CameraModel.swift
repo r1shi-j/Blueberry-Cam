@@ -65,8 +65,8 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
         didSet {
             UserDefaults.standard.set(preferredResolution.rawValue, forKey: "preferredResolution")
             // Force apply the new preference immediately to the current selection
-            if !availableResolutions.isEmpty {
-                selectedResolution = preferredResolution == .max ? availableResolutions.last : availableResolutions.first
+            if !enabledResolutions.isEmpty {
+                selectedResolution = preferredResolution == .max ? enabledResolutions.last : enabledResolutions.first
             }
         }
     }
@@ -104,7 +104,9 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
         }
     }
     private(set) var availableFormats: [CaptureMode] = []
+    private(set) var enabledFormats: [CaptureMode] = []
     private(set) var availableResolutions: [ResolutionOption] = []
+    private(set) var enabledResolutions: [ResolutionOption] = []
     var selectedResolution: ResolutionOption? = nil
     var activeLens: Lens = .wide
     var flipRotation: Double = 0
@@ -280,6 +282,14 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
     
     // MARK: - Computed properties
     var captureAspectRatio: CGFloat { 3.0 / 4.0 }
+
+    func isFormatEnabled(_ mode: CaptureMode) -> Bool {
+        enabledFormats.contains(mode)
+    }
+
+    func isResolutionEnabled(_ option: ResolutionOption) -> Bool {
+        enabledResolutions.contains(where: { $0.id == option.id })
+    }
     
     var supportsManualFocus: Bool {
         device?.isLockingFocusWithCustomLensPositionSupported ?? false
@@ -472,15 +482,32 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
         let zoomBlocksRAW = (device?.videoZoomFactor ?? 1.0) > 1.0
         let isFront = activeLens.isFront
         
-        var modes: [CaptureMode] = [.jpeg]
+        var visibleModes: [CaptureMode] = [.jpeg]
         if photoOutput.availablePhotoCodecTypes.contains(.hevc) {
-            modes.append(.heif)
+            visibleModes.append(.heif)
         }
-        if !photoOutput.availableRawPhotoPixelFormatTypes.isEmpty && !zoomBlocksRAW && !isMacroEnabled {
-            modes.append(.raw)
+        if !photoOutput.availableRawPhotoPixelFormatTypes.isEmpty {
+            visibleModes.append(.raw)
         }
-        if availableFormats != modes {
-            availableFormats = modes
+        if availableFormats != visibleModes {
+            availableFormats = visibleModes
+        }
+
+        let modes: [CaptureMode]
+        if isAutoExposure {
+            modes = visibleModes.filter { mode in
+                switch mode {
+                    case .jpeg, .heif:
+                        return true
+                    case .raw:
+                        return !zoomBlocksRAW && !isMacroEnabled
+                }
+            }
+        } else {
+            modes = visibleModes.filter { $0 == .raw }
+        }
+        if enabledFormats != modes {
+            enabledFormats = modes
         }
         
         // SMART SWITCH: Keep the current selection if valid, else fallback to preference, else base fallback.
@@ -499,25 +526,10 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
         
         let isCropLens = activeLens == .tele2x || activeLens == .tele8x
         
-        let options: [ResolutionOption]
+        let visibleOptions: [ResolutionOption]
         if isFront {
-            options = []
-        } else if isCropLens || isMacroEnabled {
-            let outputMax = photoOutput.maxPhotoDimensions
-            let allDims = (device?.activeFormat.supportedMaxPhotoDimensions ?? [])
-                .filter { $0.width <= outputMax.width && $0.height <= outputMax.height }
-                .sorted { Int($0.width) * Int($0.height) < Int($1.width) * Int($1.height) }
-            
-            var deduped: [ResolutionOption] = []
-            for dim in allDims {
-                let opt = ResolutionOption(width: dim.width, height: dim.height)
-                if !deduped.contains(where: { abs($0.id - opt.id) < 2_000_000 }) {
-                    deduped.append(opt)
-                }
-            }
-            options = deduped.first.map { [$0] } ?? []
+            visibleOptions = []
         } else {
-            // Back optical lenses: use active format's supported dims, deduped by MP bucket
             let outputMax = photoOutput.maxPhotoDimensions
             let allDims = (device?.activeFormat.supportedMaxPhotoDimensions ?? [])
                 .filter { $0.width <= outputMax.width && $0.height <= outputMax.height }
@@ -532,27 +544,41 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
             }
             // Always show 12MP + 48MP for back optical lenses
             let smallest = deduped.first
-            let largest  = deduped.last
-            if captureMode == .raw {
-                // RAW is strictly 12MP in this app's pipeline (non-ProRAW)
-                options = smallest.map { [$0] } ?? []
-            } else if let s = smallest, let l = largest, s.id != l.id {
-                options = [s, l]
+            let largest = deduped.last
+            if let s = smallest, let l = largest, s.id != l.id {
+                visibleOptions = [s, l]
             } else {
-                options = deduped
+                visibleOptions = deduped
             }
         }
-        
-        let sameOptions = availableResolutions.count == options.count &&
-        zip(availableResolutions, options).allSatisfy { $0.id == $1.id }
-        
-        if !sameOptions {
-            availableResolutions = options
+
+        let enabledOptions: [ResolutionOption]
+        if isFront {
+            enabledOptions = []
+        } else if isCropLens || isMacroEnabled || captureMode == .raw {
+            enabledOptions = visibleOptions.first.map { [$0] } ?? []
+        } else {
+            enabledOptions = visibleOptions
+        }
+
+        let sameVisibleOptions = availableResolutions.count == visibleOptions.count &&
+        zip(availableResolutions, visibleOptions).allSatisfy { $0.id == $1.id }
+        if !sameVisibleOptions {
+            availableResolutions = visibleOptions
+        }
+
+        let sameEnabledOptions = enabledResolutions.count == enabledOptions.count &&
+        zip(enabledResolutions, enabledOptions).allSatisfy { $0.id == $1.id }
+        if !sameEnabledOptions {
+            enabledResolutions = enabledOptions
+        }
+
+        if !sameEnabledOptions {
             // Options change (Format or Lens switch): re-apply resolution preference
-            selectedResolution = preferredResolution == .max ? options.last : options.first
-        } else if let current = selectedResolution, !options.contains(where: { $0.id == current.id }) {
+            selectedResolution = preferredResolution == .max ? enabledOptions.last : enabledOptions.first
+        } else if let current = selectedResolution, !enabledOptions.contains(where: { $0.id == current.id }) {
             // Current selection became invalid
-            selectedResolution = preferredResolution == .max ? options.last : options.first
+            selectedResolution = preferredResolution == .max ? enabledOptions.last : enabledOptions.first
         }
     }
     

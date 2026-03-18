@@ -86,7 +86,7 @@ extension CameraModel {
         }
     }
     
-    func reapplyManualSettingsAfterLensSwitch(previousShutterDuration: CMTime?) {
+    private func reapplyManualSettingsAfterLensSwitch(previousShutterDuration: CMTime?) {
         if !isAutoExposure {
             if let prevDuration = previousShutterDuration, !shutterSpeeds.isEmpty {
                 let prevSecs = CMTimeGetSeconds(prevDuration)
@@ -186,10 +186,12 @@ extension CameraModel {
     }
     
     func selectResolution(_ opt: ResolutionOption) {
+        guard isResolutionEnabled(opt) else { return }
         selectedResolution = opt
     }
     
     func changeCaptureFormat(to mode: CaptureMode) {
+        guard isFormatEnabled(mode) else { return }
         captureMode = mode
     }
 

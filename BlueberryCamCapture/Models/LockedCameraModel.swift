@@ -24,7 +24,9 @@ class LockedCameraModel: NSObject {
         }
     }
     private(set) var availableFormats: [CaptureMode] = []
+    private(set) var enabledFormats: [CaptureMode] = []
     private(set) var availableResolutions: [ResolutionOption] = []
+    private(set) var enabledResolutions: [ResolutionOption] = []
     var selectedResolution: ResolutionOption? = nil
     var activeLens: Lens = .wide
     var flashMode: AVCaptureDevice.FlashMode = .off
@@ -118,6 +120,14 @@ class LockedCameraModel: NSObject {
     // MARK: - Computed properties
     var captureAspectRatio: CGFloat { 3.0 / 4.0 }
     
+    func isFormatEnabled(_ mode: CaptureMode) -> Bool {
+        enabledFormats.contains(mode)
+    }
+    
+    func isResolutionEnabled(_ option: ResolutionOption) -> Bool {
+        enabledResolutions.contains(where: { $0.id == option.id })
+    }
+    
     var supportsManualFocus: Bool {
         device?.isLockingFocusWithCustomLensPositionSupported ?? false
     }
@@ -209,22 +219,49 @@ class LockedCameraModel: NSObject {
         
         let zoomBlocksRAW = (device?.videoZoomFactor ?? 1.0) > 1.0
         
-        var modes: [CaptureMode] = [.jpeg]
+        var visibleModes: [CaptureMode] = [.jpeg]
         if photoOutput.availablePhotoCodecTypes.contains(.hevc) {
-            modes.append(.heif)
+            visibleModes.append(.heif)
         }
-        if !photoOutput.availableRawPhotoPixelFormatTypes.isEmpty && !zoomBlocksRAW && !isMacroEnabled {
-            modes.append(.raw)
+        if !photoOutput.availableRawPhotoPixelFormatTypes.isEmpty {
+            visibleModes.append(.raw)
         }
-        if availableFormats != modes {
-            availableFormats = modes
+        if availableFormats != visibleModes {
+            availableFormats = visibleModes
         }
         
-        if !modes.contains(captureMode) {
-            captureMode = modes.contains(.heif) ? .heif : .jpeg
+        let modes: [CaptureMode]
+        if isAutoExposure {
+            modes = visibleModes.filter { mode in
+                switch mode {
+                    case .jpeg, .heif:
+                        return true
+                    case .raw:
+                        return !zoomBlocksRAW && !isMacroEnabled
+                }
+            }
+        } else {
+            modes = visibleModes.filter { $0 == .raw }
+        }
+        if enabledFormats != modes {
+            enabledFormats = modes
+        }
+        
+        // SMART SWITCH: Keep the current selection if valid, else fallback to preference, else base fallback.
+        let targetMode: CaptureMode
+        if modes.contains(captureMode) {
+            targetMode = captureMode
+        } else {
+            targetMode = modes.contains(.heif) ? .heif : .jpeg
+        }
+        
+        if captureMode != targetMode {
+            captureMode = targetMode
         }
         
         let isCropLens = activeLens == .tele2x || activeLens == .tele8x
+        
+        let visibleOptions: [ResolutionOption]
         
         let outputMax = photoOutput.maxPhotoDimensions
         let allDims = (device?.activeFormat.supportedMaxPhotoDimensions ?? [])
@@ -238,29 +275,40 @@ class LockedCameraModel: NSObject {
                 deduped.append(opt)
             }
         }
-        
-        let options: [ResolutionOption]
-        
-        if isCropLens || isMacroEnabled {
-            options = deduped.first.map { [$0] } ?? []
-        } else if captureMode == .raw {
-            options = deduped.first.map { [$0] } ?? []
-        } else if let s = deduped.first, let l = deduped.last, s.id != l.id {
-            options = [s, l]
+        // Always show 12MP + 48MP for back optical lenses
+        let smallest = deduped.first
+        let largest = deduped.last
+        if let s = smallest, let l = largest, s.id != l.id {
+            visibleOptions = [s, l]
         } else {
-            options = deduped
+            visibleOptions = deduped
         }
         
-        if availableResolutions != options {
-            availableResolutions = options
+        let enabledOptions: [ResolutionOption]
+        if isCropLens || isMacroEnabled || captureMode == .raw {
+            enabledOptions = visibleOptions.first.map { [$0] } ?? []
+        } else {
+            enabledOptions = visibleOptions
         }
         
-        if options.isEmpty {
+        let sameVisibleOptions = availableResolutions.count == visibleOptions.count &&
+        zip(availableResolutions, visibleOptions).allSatisfy { $0.id == $1.id }
+        if !sameVisibleOptions {
+            availableResolutions = visibleOptions
+        }
+        
+        let sameEnabledOptions = enabledResolutions.count == enabledOptions.count &&
+        zip(enabledResolutions, enabledOptions).allSatisfy { $0.id == $1.id }
+        if !sameEnabledOptions {
+            enabledResolutions = enabledOptions
+        }
+        
+        if enabledOptions.isEmpty {
             selectedResolution = nil
-        } else if let cur = selectedResolution, options.contains(where: { $0.id == cur.id }) {
+        } else if let cur = selectedResolution, enabledOptions.contains(where: { $0.id == cur.id }) {
             
         } else {
-            selectedResolution = options.last
+            selectedResolution = enabledOptions.last
         }
     }
     
