@@ -132,7 +132,7 @@ extension CameraModel {
         manualShutterDenominator = 0
         shutterIndex = val
     }
-
+    
     func resetControl(for control: ManualControl) {
         switch control {
             case .ev:
@@ -199,11 +199,11 @@ extension CameraModel {
         guard isFormatEnabled(mode) else { return }
         captureMode = mode
     }
-
+    
     func toggleClipping() { showClipping.toggle() }
-
+    
     func toggleZebraStripes() { showZebraStripes.toggle() }
-
+    
     func cycleHistogramMode(mode: inout HistogramMode, size: HistogramSize? = nil) {
         switch mode {
             case .luminance:

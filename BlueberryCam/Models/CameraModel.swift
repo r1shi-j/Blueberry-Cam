@@ -341,11 +341,11 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
     
     // MARK: - Computed properties
     var captureAspectRatio: CGFloat { 3.0 / 4.0 }
-
+    
     func isFormatEnabled(_ mode: CaptureMode) -> Bool {
         enabledFormats.contains(mode)
     }
-
+    
     func isResolutionEnabled(_ option: ResolutionOption) -> Bool {
         enabledResolutions.contains(where: { $0.id == option.id })
     }
@@ -466,7 +466,7 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
                 metadataOutput.metadataObjectTypes = toSet
             }
         }
-
+        
         enableLensSmudgeDetectionIfSupported(on: cam)
         
         // Keep analysis output orientation aligned with preview from first launch.
@@ -554,7 +554,7 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
         if availableFormats != visibleModes {
             availableFormats = visibleModes
         }
-
+        
         let modes: [CaptureMode]
         if isAutoExposure {
             modes = visibleModes.filter { mode in
@@ -613,7 +613,7 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
                 visibleOptions = deduped
             }
         }
-
+        
         let enabledOptions: [ResolutionOption]
         if isFront {
             enabledOptions = []
@@ -622,19 +622,19 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
         } else {
             enabledOptions = visibleOptions
         }
-
+        
         let sameVisibleOptions = availableResolutions.count == visibleOptions.count &&
         zip(availableResolutions, visibleOptions).allSatisfy { $0.id == $1.id }
         if !sameVisibleOptions {
             availableResolutions = visibleOptions
         }
-
+        
         let sameEnabledOptions = enabledResolutions.count == enabledOptions.count &&
         zip(enabledResolutions, enabledOptions).allSatisfy { $0.id == $1.id }
         if !sameEnabledOptions {
             enabledResolutions = enabledOptions
         }
-
+        
         if !sameEnabledOptions {
             // Options change (Format or Lens switch): re-apply resolution preference
             selectedResolution = preferredResolution == .max ? enabledOptions.last : enabledOptions.first
