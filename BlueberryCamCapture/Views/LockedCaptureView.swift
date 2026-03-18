@@ -27,7 +27,9 @@ struct LockedCaptureView: View {
     
     // Transitions
     @State private var visualZoomScale: CGFloat = 1.0
+    @State private var visualBlur: CGFloat = 0
     @State private var visualOpacity: CGFloat = 1.0
+    @State private var isAwaitingSameFacingLensCompletion = false
     
     var body: some View {
         GeometryReader { geo in
@@ -88,21 +90,26 @@ struct LockedCaptureView: View {
         .onChange(of: cameraModel.activeLens) { oldLens, newLens in
             // Handle visual "zoom" bump to mask lens hardware switch
             if oldLens.isFront == newLens.isFront {
-                // Handle visual "zoom" bump and opacity dip to mask lens hardware switch
-                let oldVal = Double(oldLens.label) ?? 1.0
-                let newVal = Double(newLens.label) ?? 1.0
-                let isZoomIn = newVal > oldVal
-                let targetScale: CGFloat = isZoomIn ? 1.05 : 0.95
-                
-                withAnimation(.easeIn(duration: 0.1)) {
+                // Use a light zoom/blur mask for same-facing lens changes.
+                isAwaitingSameFacingLensCompletion = true
+                let oldValue = Double(oldLens.label) ?? 1.0
+                let newValue = Double(newLens.label) ?? 1.0
+                let isZoomIn = newValue > oldValue
+                let targetScale: CGFloat = isZoomIn ? 1.035 : 0.965
+                withAnimation(.easeIn(duration: 0.14)) {
                     visualZoomScale = targetScale
-                    visualOpacity = 0.5
+                    visualOpacity = 0.72
+                    visualBlur = 6
                 }
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                    withAnimation(.easeOut(duration: 0.25)) {
-                        visualZoomScale = 1.0
-                        visualOpacity = 1.0
-                    }
+            }
+        }
+        .onChange(of: cameraModel.lensSwitchCompletionCount) {
+            if isAwaitingSameFacingLensCompletion {
+                isAwaitingSameFacingLensCompletion = false
+                withAnimation(.easeOut(duration: 0.22)) {
+                    visualZoomScale = 1.0
+                    visualBlur = 0
+                    visualOpacity = 1.0
                 }
             }
         }

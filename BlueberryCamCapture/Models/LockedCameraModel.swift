@@ -116,6 +116,7 @@ class LockedCameraModel: NSObject {
     var liveShutter: String = ""
     var liveWB: String = ""
     var liveFocus: String = ""
+    var lensSwitchCompletionCount: Int = 0
     
     // MARK: - Computed properties
     var captureAspectRatio: CGFloat { 3.0 / 4.0 }

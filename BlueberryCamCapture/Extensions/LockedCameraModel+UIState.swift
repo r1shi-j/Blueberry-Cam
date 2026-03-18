@@ -74,6 +74,7 @@ extension LockedCameraModel {
                 if !cam.isLockingFocusWithCustomLensPositionSupported {
                     self.isAutoFocus = true
                 }
+                self.lensSwitchCompletionCount += 1
             }
         }
     }
