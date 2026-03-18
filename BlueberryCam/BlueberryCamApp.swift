@@ -32,7 +32,6 @@ struct BlueberryCamApp: App {
 // Improve memory/cpu usage, quicker camera switching
 // Swift 6
 
-// lens cleaning hint, same structure as barcode link
 // Macro, portrait, dual cam, burst, flash, timer buttons new line
 // Tap to focus with focus EV
 // Show proper selfie cameras

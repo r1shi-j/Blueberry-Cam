@@ -41,6 +41,7 @@ extension CameraModel {
                 cam.videoZoomFactor = lens.zoomFactor
                 cam.unlockForConfiguration()
             }
+            self.enableLensSmudgeDetectionIfSupported(on: cam)
             
             // Connection properties (Hardware)
             let isFront = lens.isFront
@@ -58,6 +59,7 @@ extension CameraModel {
             // 3. Final synchronization back to UI state
             Task { @MainActor in
                 self.device = cam
+                self.configureLensSmudgeDetection(for: cam)
                 
                 if let largest = cam.activeFormat.supportedMaxPhotoDimensions.max(by: {
                     Int($0.width) * Int($0.height) < Int($1.width) * Int($1.height)

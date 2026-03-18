@@ -24,6 +24,9 @@ extension CaptureView {
     private var closeSymbolName: String { "xmark.square" }
     private var linkSymbolName: String { "link" }
     private var backupURLName: String { "Open Link" }
+    private var lensCleaningTitle: String { "You lens may need cleaning" }
+    private var closeCleaningTitle: String { "Done" }
+    private var lensCleaningSymbolName: String { "camera.aperture" }
     private var errorString: String { "Error" }
     private var okButtonString: String { "OK" }
     
@@ -181,6 +184,38 @@ struct CaptureView: View {
                     }
                 }
                 .animation(.bouncy, value: cameraModel.detectedCodeURL)
+                
+                // MARK: - Lens Cleaning Hint
+                ZStack {
+                    if cameraModel.shouldShowLensCleaningHint {
+                        VStack(spacing: 4) {
+                            Button {
+                                hapticTriggerR += 1
+                                cameraModel.dismissLensCleaningHint()
+                            } label: {
+                                HStack(spacing: 8) {
+                                    Image(systemName: lensCleaningSymbolName)
+                                    Text(lensCleaningTitle)
+                                }
+                                .font(.system(size: 14, weight: .bold))
+                                .fontWidth(.expanded)
+                            }
+                            .buttonStyle(.glass)
+                            .padding(.horizontal)
+                            
+                            Button(closeCleaningTitle, systemImage: closeSymbolName) {
+                                cameraModel.dismissLensCleaningHint()
+                            }
+                            .font(.system(size: 10, weight: .bold))
+                            .fontWidth(.expanded)
+                            .foregroundStyle(.yellow.opacity(0.8))
+                            .buttonStyle(.glass)
+                        }
+                        .position(x: previewRect.midX, y: previewRect.midY)
+                        .transition(.scale(scale: 0.5, anchor: .center).combined(with: .opacity))
+                    }
+                }
+                .animation(.bouncy, value: cameraModel.shouldShowLensCleaningHint)
                 
                 // MARK: - UI Overlays
                 VStack(spacing: 0) {

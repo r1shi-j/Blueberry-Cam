@@ -28,6 +28,14 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
     var ignoredCodes: [String: Date] = [:]
     var barcodeResetTask: Task<Void, Never>?
     
+    // MARK: - Lens cleaning detection
+    var lensSmudgeDetectionStatus: AVCaptureCameraLensSmudgeDetectionStatus = .disabled
+    var shouldShowLensCleaningHint = false
+    @ObservationIgnored
+    private var didDismissLensCleaningHint = false
+    @ObservationIgnored
+    private var lensSmudgeStatusObservation: NSKeyValueObservation?
+    
     var supportedMetadataTypes: [AVMetadataObject.ObjectType] {
         [
             .qr, .microQR,
@@ -277,6 +285,56 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
     @ObservationIgnored
     nonisolated(unsafe) private(set) var histogramModeForAnalysisLarge: HistogramMode = .luminance
     
+    // MARK: - Lens cleaning
+    nonisolated func enableLensSmudgeDetectionIfSupported(on camera: AVCaptureDevice) {
+        guard camera.activeFormat.isCameraLensSmudgeDetectionSupported else { return }
+        try? camera.lockForConfiguration()
+        camera.setCameraLensSmudgeDetectionEnabled(true, detectionInterval: CMTime(seconds: 30, preferredTimescale: 1))
+        camera.unlockForConfiguration()
+    }
+    
+    func configureLensSmudgeDetection(for camera: AVCaptureDevice) {
+        lensSmudgeStatusObservation?.invalidate()
+        lensSmudgeStatusObservation = nil
+        
+        guard camera.activeFormat.isCameraLensSmudgeDetectionSupported else {
+            lensSmudgeDetectionStatus = .disabled
+            shouldShowLensCleaningHint = false
+            didDismissLensCleaningHint = false
+            return
+        }
+        
+        lensSmudgeDetectionStatus = camera.cameraLensSmudgeDetectionStatus
+        updateLensCleaningHint(for: lensSmudgeDetectionStatus)
+        
+        lensSmudgeStatusObservation = camera.observe(\.cameraLensSmudgeDetectionStatus, options: [.initial, .new]) { [weak self] _, change in
+            guard let status = change.newValue else { return }
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                self.lensSmudgeDetectionStatus = status
+                self.updateLensCleaningHint(for: status)
+            }
+        }
+    }
+    
+    func dismissLensCleaningHint() {
+        didDismissLensCleaningHint = true
+        shouldShowLensCleaningHint = false
+    }
+    
+    private func updateLensCleaningHint(for status: AVCaptureCameraLensSmudgeDetectionStatus) {
+        switch status {
+            case .smudged:
+                shouldShowLensCleaningHint = !didDismissLensCleaningHint
+            case .smudgeNotDetected, .unknown, .disabled:
+                shouldShowLensCleaningHint = false
+                didDismissLensCleaningHint = false
+            @unknown default:
+                shouldShowLensCleaningHint = false
+                didDismissLensCleaningHint = false
+        }
+    }
+    
     // MARK: - Location
     let locationManager = CLLocationManager()
     var currentLocation: CLLocation?
@@ -408,6 +466,8 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
                 metadataOutput.metadataObjectTypes = toSet
             }
         }
+
+        enableLensSmudgeDetectionIfSupported(on: cam)
         
         // Keep analysis output orientation aligned with preview from first launch.
         let isFront = activeLens.isFront
@@ -437,6 +497,7 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
         
         // Restoration of hardware defaults and state
         self.device = cam
+        self.configureLensSmudgeDetection(for: cam)
         if let largest = cam.activeFormat.supportedMaxPhotoDimensions.max(by: {
             Int($0.width) * Int($0.height) < Int($1.width) * Int($1.height)
         }) {
