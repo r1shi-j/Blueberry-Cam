@@ -123,7 +123,7 @@ extension CameraModel: AVCaptureDataOutputSynchronizerDelegate, AVCaptureVideoDa
                     lumaGrid[idx] = luma
                 }
                 if wantsZebra {
-                    zebra[idx] = (r >= 220 || g >= 220 || b >= 220) ? 1 : 0
+                    zebra[idx] = (r >= 230 || g >= 230 || b >= 230) ? 1 : 0
                 }
                 if wantsClipping {
                     clipping[idx] = (r >= 250 || g >= 250 || b >= 250) ? 1 : 0
