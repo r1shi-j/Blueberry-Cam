@@ -47,7 +47,9 @@ struct LensSelectorView: View {
             // MARK: - Flip camera button — always visible
             Button {
                 hapticTrigger += 1
-                cameraModel.toggleSelfie()
+                withAnimation(.bouncy) {
+                    cameraModel.toggleSelfie()
+                }
             } label: {
                 Image(systemName: flipLensSymbolName)
                     .font(.system(size: 16))

@@ -32,13 +32,8 @@ struct BlueberryCamApp: App {
 // Improve memory/cpu usage, quicker camera switching
 // Swift 6
 
-// Always show all resolutions and formats (back cameras), but just disable unallowed ones
-// Macro, portrait, dual cam, burst, flash, timer buttons new line
-// zebras threshold too low
 // lens cleaning hint, same structure as barcode link
-// Update locked model with new ui changes
-// macro hidden on front cam
-
+// Macro, portrait, dual cam, burst, flash, timer buttons new line
 // Tap to focus with focus EV
 // Show proper selfie cameras
 

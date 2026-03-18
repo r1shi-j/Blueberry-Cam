@@ -136,30 +136,33 @@ struct TopBarView: View {
             // MARK: Row 2
             HStack(alignment: .center, spacing: 16) {
                 // MARK: - Resolution picker
-                HStack(spacing: 0) {
-                    ForEach(cameraModel.availableResolutions) { opt in
-                        let isSelected = cameraModel.selectedResolution?.id == opt.id
-                        let isEnabled = cameraModel.isResolutionEnabled(opt)
-                        Button {
-                            hapticTrigger += 1
-                            withAnimation(.bouncy) {
-                                cameraModel.selectResolution(opt)
+                if !cameraModel.activeLens.isFront {
+                    HStack(spacing: 0) {
+                        ForEach(cameraModel.availableResolutions) { opt in
+                            let isSelected = cameraModel.selectedResolution?.id == opt.id
+                            let isEnabled = cameraModel.isResolutionEnabled(opt)
+                            Button {
+                                hapticTrigger += 1
+                                withAnimation(.bouncy) {
+                                    cameraModel.selectResolution(opt)
+                                }
+                            } label: {
+                                Text(opt.label)
+                                    .font(.system(size: 12, weight: .medium))
+                                    .fontWidth(.expanded)
+                                    .padding(.horizontal, 10)
+                                    .padding(.vertical, 5)
+                                    .background(cameraModel.resolutionBackground(for: isSelected, isEnabled: isEnabled))
+                                    .foregroundStyle(cameraModel.resolutionForeground(for: isSelected, isEnabled: isEnabled))
                             }
-                        } label: {
-                            Text(opt.label)
-                                .font(.system(size: 12, weight: .medium))
-                                .fontWidth(.expanded)
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 5)
-                                .background(cameraModel.resolutionBackground(for: isSelected, isEnabled: isEnabled))
-                                .foregroundStyle(cameraModel.resolutionForeground(for: isSelected, isEnabled: isEnabled))
+                            .disabled(!isEnabled)
                         }
-                        .disabled(!isEnabled)
                     }
+                    .clipShape(.rect(cornerRadius: 6))
+                    .overlay(RoundedRectangle(cornerRadius: 6).stroke(.white.opacity(0.2), lineWidth: 1))
+                    .animation(.bouncy, value: cameraModel.availableResolutions)
+                    .transition(.opacity.combined(with: .scale(scale: 0.5)))
                 }
-                .clipShape(.rect(cornerRadius: 6))
-                .overlay(RoundedRectangle(cornerRadius: 6).stroke(.white.opacity(0.2), lineWidth: 1))
-                .animation(.spring(duration: 0.3), value: cameraModel.availableResolutions)
                 
                 // MARK: - Format picker
                 HStack(spacing: 0) {
@@ -184,14 +187,14 @@ struct TopBarView: View {
                 }
                 .clipShape(.rect(cornerRadius: 6))
                 .overlay(RoundedRectangle(cornerRadius: 6).stroke(.white.opacity(0.2), lineWidth: 1))
-                .animation(.spring(duration: 0.3), value: cameraModel.availableResolutions)
+                .animation(.bouncy, value: cameraModel.availableResolutions)
             }
             .padding(.horizontal, 8)
             
             // MARK: Row 3
             HStack(alignment: .center, spacing: 16) {
                 // MARK: - Macro
-                if cameraModel.supportsMacro {
+                if cameraModel.supportsMacro && !cameraModel.activeLens.isFront {
                     Button {
                         hapticTrigger += 1
                         withAnimation(.bouncy) {
@@ -207,6 +210,8 @@ struct TopBarView: View {
                             .clipShape(.capsule)
                     }
                     .opacity(cameraModel.macroButtonOpacity)
+                    .animation(.bouncy, value: cameraModel.activeLens)
+                    .transition(.opacity.combined(with: .scale))
                 }
                 
                 // MARK: - Flash

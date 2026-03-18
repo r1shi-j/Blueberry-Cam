@@ -62,6 +62,8 @@ struct CaptureView: View {
     @State private var visualZoomScale: CGFloat = 1.0
     @State private var visualBlur: CGFloat = 0
     @State private var visualOpacity: CGFloat = 1.0
+    @State private var isAwaitingFacingFlipCompletion = false
+    @State private var pendingFacingFlipRotation: Double = 0
     
     var body: some View {
         GeometryReader { geo in
@@ -290,18 +292,28 @@ struct CaptureView: View {
                     }
                 }
             } else {
-                // Bidirectional 180 / -180 Flip with motion blur and opacity dip
-                visualOpacity = 0.1
-                visualBlur = 20
-                cameraModel.flipRotation = (newLens.isFront) ? 180 : -180
-              
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                // Keep the motion continuous; only the de-blur waits for the hardware swap.
+                isAwaitingFacingFlipCompletion = true
+                pendingFacingFlipRotation = newLens.isFront ? -80 : 80
+                withAnimation(.easeIn(duration: 0.12)) {
+                    visualOpacity = 0.1
+                    visualBlur = 18
+                    cameraModel.flipRotation = newLens.isFront ? 80 : -80
+                }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
+                    cameraModel.flipRotation = pendingFacingFlipRotation
                     withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
                         cameraModel.flipRotation = 0
-                        visualBlur = 0
-                        visualOpacity = 1.0
                     }
                 }
+            }
+        }
+        .onChange(of: cameraModel.lensSwitchCompletionCount) {
+            guard isAwaitingFacingFlipCompletion else { return }
+            isAwaitingFacingFlipCompletion = false
+            withAnimation(.easeOut(duration: 0.18)) {
+                visualBlur = 0
+                visualOpacity = 1.0
             }
         }
         .onChange(of: cameraModel.appView) { _, new in

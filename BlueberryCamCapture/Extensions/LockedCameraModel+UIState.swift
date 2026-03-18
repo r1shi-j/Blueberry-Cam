@@ -5,9 +5,11 @@ extension LockedCameraModel {
     // MARK: - UI Controls
     func switchLens(to lens: Lens) {
         guard lens != activeLens, !lens.isFront else { return }
+        guard let previewCamera = AVCaptureDevice.default(lens.deviceType, for: .video, position: .back) else { return }
         
         // 1. Instant UI update to trigger animations and selection state
         self.activeLens = lens
+        self.primeResolutionOptions(for: lens, device: previewCamera)
         
         // 2. Heavy hardware reconfiguration in background
         sessionQueue.async { [weak self] in

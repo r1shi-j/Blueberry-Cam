@@ -247,6 +247,7 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
     var liveShutter: String = ""
     var liveWB: String = ""
     var liveFocus: String = ""
+    var lensSwitchCompletionCount: Int = 0
     var appView: AppView = .standard {
         didSet {
             if oldValue != appView && (appView == .settings || oldValue == .settings) {
@@ -578,6 +579,57 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
             selectedResolution = preferredResolution == .max ? enabledOptions.last : enabledOptions.first
         } else if let current = selectedResolution, !enabledOptions.contains(where: { $0.id == current.id }) {
             // Current selection became invalid
+            selectedResolution = preferredResolution == .max ? enabledOptions.last : enabledOptions.first
+        }
+    }
+    
+    func primeResolutionOptions(for lens: Lens, device: AVCaptureDevice) {
+        let visibleOptions: [ResolutionOption]
+        if lens.isFront {
+            visibleOptions = []
+        } else {
+            let outputMax = device.activeFormat.supportedMaxPhotoDimensions.max(by: {
+                Int($0.width) * Int($0.height) < Int($1.width) * Int($1.height)
+            }) ?? photoOutput.maxPhotoDimensions
+            let allDims = device.activeFormat.supportedMaxPhotoDimensions
+                .filter { $0.width <= outputMax.width && $0.height <= outputMax.height }
+                .sorted { Int($0.width) * Int($0.height) < Int($1.width) * Int($1.height) }
+            
+            var deduped: [ResolutionOption] = []
+            for dim in allDims {
+                let opt = ResolutionOption(width: dim.width, height: dim.height)
+                if !deduped.contains(where: { abs($0.id - opt.id) < 2_000_000 }) {
+                    deduped.append(opt)
+                }
+            }
+            
+            let smallest = deduped.first
+            let largest = deduped.last
+            if let s = smallest, let l = largest, s.id != l.id {
+                visibleOptions = [s, l]
+            } else {
+                visibleOptions = deduped
+            }
+        }
+        
+        let isCropLens = lens == .tele2x || lens == .tele8x
+        let enabledOptions: [ResolutionOption]
+        if lens.isFront {
+            enabledOptions = []
+        } else if isCropLens || isMacroEnabled || captureMode == .raw {
+            enabledOptions = visibleOptions.first.map { [$0] } ?? []
+        } else {
+            enabledOptions = visibleOptions
+        }
+        
+        availableResolutions = visibleOptions
+        enabledResolutions = enabledOptions
+        
+        if enabledOptions.isEmpty {
+            selectedResolution = nil
+        } else if let current = selectedResolution, enabledOptions.contains(where: { $0.id == current.id }) {
+            return
+        } else {
             selectedResolution = preferredResolution == .max ? enabledOptions.last : enabledOptions.first
         }
     }

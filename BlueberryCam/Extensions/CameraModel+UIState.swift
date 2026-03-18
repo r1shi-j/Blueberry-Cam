@@ -10,10 +10,12 @@ extension CameraModel {
     
     func switchLens(to lens: Lens) {
         guard lens != activeLens else { return }
+        guard let previewCamera = AVCaptureDevice.default(lens.deviceType, for: .video, position: lens.position) else { return }
         
         // 1. Instant UI update to trigger animations and selection state
         self.activeLens = lens
         self.flipRotation = 0
+        self.primeResolutionOptions(for: lens, device: previewCamera)
         
         // 2. Heavy hardware reconfiguration in background
         sessionQueue.async { [weak self] in
@@ -82,6 +84,7 @@ extension CameraModel {
                 if !cam.isLockingFocusWithCustomLensPositionSupported {
                     self.isAutoFocus = true
                 }
+                self.lensSwitchCompletionCount += 1
             }
         }
     }

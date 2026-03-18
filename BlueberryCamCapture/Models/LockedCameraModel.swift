@@ -312,6 +312,51 @@ class LockedCameraModel: NSObject {
         }
     }
     
+    func primeResolutionOptions(for lens: Lens, device: AVCaptureDevice) {
+        let outputMax = device.activeFormat.supportedMaxPhotoDimensions.max(by: {
+            Int($0.width) * Int($0.height) < Int($1.width) * Int($1.height)
+        }) ?? photoOutput.maxPhotoDimensions
+        let allDims = device.activeFormat.supportedMaxPhotoDimensions
+            .filter { $0.width <= outputMax.width && $0.height <= outputMax.height }
+            .sorted { Int($0.width) * Int($0.height) < Int($1.width) * Int($1.height) }
+        
+        var deduped: [ResolutionOption] = []
+        for dim in allDims {
+            let opt = ResolutionOption(width: dim.width, height: dim.height)
+            if !deduped.contains(where: { abs($0.id - opt.id) < 2_000_000 }) {
+                deduped.append(opt)
+            }
+        }
+        
+        let smallest = deduped.first
+        let largest = deduped.last
+        let visibleOptions: [ResolutionOption]
+        if let s = smallest, let l = largest, s.id != l.id {
+            visibleOptions = [s, l]
+        } else {
+            visibleOptions = deduped
+        }
+        
+        let isCropLens = lens == .tele2x || lens == .tele8x
+        let enabledOptions: [ResolutionOption]
+        if isCropLens || isMacroEnabled || captureMode == .raw {
+            enabledOptions = visibleOptions.first.map { [$0] } ?? []
+        } else {
+            enabledOptions = visibleOptions
+        }
+        
+        availableResolutions = visibleOptions
+        enabledResolutions = enabledOptions
+        
+        if enabledOptions.isEmpty {
+            selectedResolution = nil
+        } else if let current = selectedResolution, enabledOptions.contains(where: { $0.id == current.id }) {
+            return
+        } else {
+            selectedResolution = enabledOptions.last
+        }
+    }
+    
     func normalizeFlashModeForCurrentDevice() {
         guard supportsFlash else {
             flashMode = .off
