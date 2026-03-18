@@ -104,13 +104,13 @@ struct LockedTopBarView: View {
     @State private var hapticTriggerR = 0
     
     var body: some View {
-        VStack(spacing: 20) {
-            HStack(alignment: .center, spacing: 22) {
+        VStack(spacing: 14) {
+            HStack(alignment: .center, spacing: 16) {
                 // MARK: - Readout values
                 ForEach(ManualControl.allCases, id: \.self) { control in
                     Text(readoutTitle(for: control))
-                        .padding(4)
-                        .font(.system(size: 12, weight: selectedControl == control ? .black : .regular, design: .monospaced))
+                        .padding(.horizontal, 4)
+                        .font(.system(size: 14, weight: selectedControl == control ? .black : .regular, design: .monospaced))
                         .underline(isReadoutUnderlined(for: control))
                         .foregroundColor(readoutColor(for: control))
                         .onTapGesture(count: 2) {
@@ -134,52 +134,9 @@ struct LockedTopBarView: View {
                         }
                 }
             }
-            .padding(.horizontal, 12)
+            .padding(.horizontal, 4)
             
-            HStack(alignment: .center, spacing: cameraModel.supportsMacro ? 10 : 16) {
-                // MARK: - Macro
-                if cameraModel.supportsMacro {
-                    Button {
-                        hapticTrigger += 1
-                        withAnimation(.bouncy) {
-                            cameraModel.toggleMacroMode()
-                        }
-                    } label: {
-                        Image(systemName: cameraModel.macroButtonSymbol)
-                            .font(.system(size: 11, weight: .bold))
-                            .foregroundColor(cameraModel.macroButtonForeground)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 5)
-                            .background(cameraModel.macroButtonBackground)
-                            .clipShape(.capsule)
-                    }
-                    .opacity(cameraModel.macroButtonOpacity)
-                }
-                
-                // MARK: - Flash
-                Button {
-                    hapticTrigger += 1
-                    withAnimation(.bouncy) {
-                        cameraModel.cycleFlashMode()
-                    }
-                } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: cameraModel.flashLabel.systemImage)
-                            .font(.system(size: 11, weight: .bold))
-                        if !cameraModel.flashLabel.label.isEmpty {
-                            Text(cameraModel.flashLabel.label)
-                                .font(.system(size: 11, weight: .bold, design: .monospaced))
-                        }
-                    }
-                    .foregroundColor(cameraModel.flashButtonForeground)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 5)
-                    .background(cameraModel.flashButtonBackground)
-                    .clipShape(.capsule)
-                }
-                .opacity(cameraModel.flashButtonOpacity)
-                .disabled(cameraModel.isFlashButtonDisabled)
-                
+            HStack(alignment: .center, spacing: 16) {
                 // MARK: - Resolution picker
                 HStack(spacing: 0) {
                     ForEach(cameraModel.availableResolutions) { opt in
@@ -191,7 +148,7 @@ struct LockedTopBarView: View {
                             }
                         } label: {
                             Text(opt.label)
-                                .font(.system(size: 11, weight: .medium))
+                                .font(.system(size: 12, weight: .medium))
                                 .fontWidth(.expanded)
                                 .padding(.horizontal, 10)
                                 .padding(.vertical, 5)
@@ -214,7 +171,7 @@ struct LockedTopBarView: View {
                             }
                         } label: {
                             Text(mode.rawValue)
-                                .font(.system(size: 11, weight: .medium))
+                                .font(.system(size: 12, weight: .medium))
                                 .fontWidth(.expanded)
                                 .padding(.horizontal, 10)
                                 .padding(.vertical, 5)
@@ -228,6 +185,112 @@ struct LockedTopBarView: View {
                 .clipShape(.rect(cornerRadius: 6))
                 .overlay(RoundedRectangle(cornerRadius: 6).stroke(.white.opacity(0.2), lineWidth: 1))
                 .animation(.spring(duration: 0.3), value: cameraModel.availableFormats)
+            }
+            .padding(.horizontal, 8)
+            
+            HStack(alignment: .center, spacing: 16) {
+                // MARK: - Macro
+                if cameraModel.supportsMacro {
+                    Button {
+                        hapticTrigger += 1
+                        withAnimation(.bouncy) {
+                            cameraModel.toggleMacroMode()
+                        }
+                    } label: {
+                        Image(systemName: cameraModel.macroButtonSymbol)
+                            .font(.system(size: 12, weight: .bold))
+                            .foregroundColor(cameraModel.macroButtonForeground)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 5)
+                            .background(cameraModel.macroButtonBackground)
+                            .clipShape(.capsule)
+                    }
+                    .opacity(cameraModel.macroButtonOpacity)
+                }
+                
+                // MARK: - Flash
+                Button {
+                    hapticTrigger += 1
+                    withAnimation(.bouncy) {
+                        cameraModel.cycleFlashMode()
+                    }
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: cameraModel.flashLabel.systemImage)
+                            .font(.system(size: 12, weight: .bold))
+                        if !cameraModel.flashLabel.label.isEmpty {
+                            Text(cameraModel.flashLabel.label)
+                                .font(.system(size: 12, weight: .bold, design: .monospaced))
+                        }
+                    }
+                    .foregroundColor(cameraModel.flashButtonForeground)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 5)
+                    .background(cameraModel.flashButtonBackground)
+                    .clipShape(.capsule)
+                }
+                .opacity(cameraModel.flashButtonOpacity)
+                .disabled(cameraModel.isFlashButtonDisabled)
+                
+                Button {
+                    
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "applelogo")
+                            .font(.system(size: 12, weight: .bold))
+                    }
+                    .foregroundColor(cameraModel.flashButtonForeground)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 5)
+                    .background(cameraModel.flashButtonBackground)
+                    .clipShape(.capsule)
+                }
+                .disabled(true)
+                
+                Button {
+                    
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "applelogo")
+                            .font(.system(size: 12, weight: .bold))
+                    }
+                    .foregroundColor(cameraModel.flashButtonForeground)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 5)
+                    .background(cameraModel.flashButtonBackground)
+                    .clipShape(.capsule)
+                }
+                .disabled(true)
+                
+                Button {
+                    
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "applelogo")
+                            .font(.system(size: 12, weight: .bold))
+                    }
+                    .foregroundColor(cameraModel.flashButtonForeground)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 5)
+                    .background(cameraModel.flashButtonBackground)
+                    .clipShape(.capsule)
+                }
+                .disabled(true)
+                
+                Button {
+                    
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "applelogo")
+                            .font(.system(size: 12, weight: .bold))
+                    }
+                    .foregroundColor(cameraModel.flashButtonForeground)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 5)
+                    .background(cameraModel.flashButtonBackground)
+                    .clipShape(.capsule)
+                }
+                .disabled(true)
             }
             .padding(.horizontal, 8)
         }

@@ -53,6 +53,7 @@ struct LockedCaptureView: View {
                 // MARK: - UI Overlays
                 VStack(spacing: 0) {
                     LockedTopBarView(cameraModel: cameraModel, selectedControl: $selectedControl)
+                        .offset(y:-2)
                     
                     Spacer()
                     

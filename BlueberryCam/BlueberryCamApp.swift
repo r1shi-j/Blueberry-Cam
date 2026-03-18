@@ -32,19 +32,22 @@ struct BlueberryCamApp: App {
 // Improve memory/cpu usage, quicker camera switching
 // Swift 6
 
-// Move lens picker to bottom right?
+// Always show all resolutions and formats (back cameras), but just disable unallowed ones
+// Macro, portrait, dual cam, burst, flash, timer buttons new line
+// zebras threshold too low
+// lens cleaning hint, same structure as barcode link
+// Update locked model with new ui changes
+// macro hidden on front cam
+
+// Tap to focus with focus EV
+// Show proper selfie cameras
+
+// Improve lens picker UI (liquid glass sliding), move to bottom right?
 // Click on any readout -> shows vertical slider right side screen like halide
 /// slider shows the auto value constantly updating, manually changing it turns on manual mode, for ss/iso have left iso right ss?
 
-// Front and rear photos simultaneously
-// Show proper selfie cameras
-// Tap to focus with focus EV
-
 // Focus Loupe
 // ProRaw
-// Burst
-// Timer
 // Photographic styles
-// Portraits
 // Digital zoom
 // View outside frame

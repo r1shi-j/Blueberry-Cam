@@ -184,6 +184,7 @@ struct CaptureView: View {
                 VStack(spacing: 0) {
                     if !cameraModel.showSimpleView {
                         TopBarView(cameraModel: cameraModel, selectedControl: $selectedControl)
+                            .offset(y:-10)
                         
                         Spacer()
                         
@@ -209,7 +210,7 @@ struct CaptureView: View {
                                     hapticTriggerR += 1
                                     cameraModel.hideHistogram(for: .large)
                                 }
-                                .transition(.scale(scale: 1.5, anchor: .center).combined(with: .opacity))
+                                .transition(.scale(scale: 0.5, anchor: .center).combined(with: .opacity))
                             }
                         }
                         .animation(.bouncy, value: cameraModel.histogramModeLarge)
