@@ -117,6 +117,32 @@ class LockedCameraModel: NSObject {
     var liveWB: String = ""
     var liveFocus: String = ""
     var lensSwitchCompletionCount: Int = 0
+    var tapFocusIndicatorPoint: CGPoint? = nil
+    var isTapFocusIndicatorVisible = false
+    var isTapFocusIndicatorDimmed = false
+    var isTapFocusInteractionActive = false
+    var tapFocusIndicatorOffset: CGFloat = 0
+    var tapFocusLockLabel: String? = nil
+    var tapExposureBias: Float = 0
+    var tap​Focus​Lock​Haptic​Trigger: Int = 0
+    @ObservationIgnored
+    var tapFocusHideTask: Task<Void, Never>?
+    @ObservationIgnored
+    var tapFocusLockTask: Task<Void, Never>?
+    @ObservationIgnored
+    var subjectAreaChangeObserver: NSObjectProtocol?
+    @ObservationIgnored
+    var focusAdjustmentObservation: NSKeyValueObservation?
+    @ObservationIgnored
+    var lensPositionObservation: NSKeyValueObservation?
+    @ObservationIgnored
+    var ignoredTapFocusAdjustmentEvents = 0
+    @ObservationIgnored
+    var ignoredTapFocusAdjustmentDeadline: Date?
+    @ObservationIgnored
+    var tapFocusLensPositionBaseline: Float?
+    @ObservationIgnored
+    var tapFocusLensPositionMonitorTask: Task<Void, Never>?
     
     // MARK: - Computed properties
     var captureAspectRatio: CGFloat { 3.0 / 4.0 }
@@ -165,6 +191,14 @@ class LockedCameraModel: NSObject {
         sessionQueue.async { Task { @MainActor in self.setupPipeline() } }
     }
     
+    deinit {
+        if let subjectAreaChangeObserver {
+            NotificationCenter.default.removeObserver(subjectAreaChangeObserver)
+        }
+        focusAdjustmentObservation?.invalidate()
+        lensPositionObservation?.invalidate()
+    }
+    
     private func setupPipeline() {
         session.beginConfiguration()
         session.sessionPreset = .photo
@@ -186,6 +220,8 @@ class LockedCameraModel: NSObject {
         if session.canAddOutput(videoOutput) {
             session.addOutput(videoOutput)
         }
+        
+        configureSubjectAreaMonitoring(for: cam)
         
         for conn in [photoOutput.connection(with: .video),
                      videoOutput.connection(with: .video)].compactMap({ $0 }) {

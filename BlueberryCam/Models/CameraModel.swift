@@ -268,12 +268,38 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
     var greenHistogram: [Float] = Array(repeating: 0, count: 256)
     var blueHistogram: [Float] = Array(repeating: 0, count: 256)
     var waveformData: [Float] = []
+    var tapFocusIndicatorPoint: CGPoint? = nil
+    var isTapFocusIndicatorVisible = false
+    var isTapFocusIndicatorDimmed = false
+    var isTapFocusInteractionActive = false
+    var tapFocusIndicatorOffset: CGFloat = 0
+    var tapFocusLockLabel: String? = nil
+    var tapExposureBias: Float = 0
     nonisolated static var wfCols: Int { WaveformConstants.wfCols }
     nonisolated static var wfRows: Int { WaveformConstants.wfRows }
     var analysisGridSize: CGSize = .zero
     var focusPeakingMask: [UInt8] = []
     var zebraMask: [UInt8] = []
     var clippingMask: [UInt8] = []
+    var tap​Focus​Lock​Haptic​Trigger: Int = 0
+    @ObservationIgnored
+    var tapFocusHideTask: Task<Void, Never>?
+    @ObservationIgnored
+    var tapFocusLockTask: Task<Void, Never>?
+    @ObservationIgnored
+    var subjectAreaChangeObserver: NSObjectProtocol?
+    @ObservationIgnored
+    var focusAdjustmentObservation: NSKeyValueObservation?
+    @ObservationIgnored
+    var lensPositionObservation: NSKeyValueObservation?
+    @ObservationIgnored
+    var ignoredTapFocusAdjustmentEvents = 0
+    @ObservationIgnored
+    var ignoredTapFocusAdjustmentDeadline: Date?
+    @ObservationIgnored
+    var tapFocusLensPositionBaseline: Float?
+    @ObservationIgnored
+    var tapFocusLensPositionMonitorTask: Task<Void, Never>?
     @ObservationIgnored
     nonisolated(unsafe) private(set) var peakingEnabledForAnalysis: Bool = false
     @ObservationIgnored
@@ -425,6 +451,14 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
         }
     }
     
+    deinit {
+        if let subjectAreaChangeObserver {
+            NotificationCenter.default.removeObserver(subjectAreaChangeObserver)
+        }
+        focusAdjustmentObservation?.invalidate()
+        lensPositionObservation?.invalidate()
+    }
+    
     private func setupSession() {
         session.beginConfiguration()
         session.sessionPreset = .photo
@@ -468,6 +502,7 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
         }
         
         enableLensSmudgeDetectionIfSupported(on: cam)
+        configureSubjectAreaMonitoring(for: cam)
         
         // Keep analysis output orientation aligned with preview from first launch.
         let isFront = activeLens.isFront

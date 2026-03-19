@@ -49,6 +49,7 @@ extension LockedCameraModel {
             // 3. Final synchronization back to UI state
             Task { @MainActor in
                 self.device = cam
+                self.configureSubjectAreaMonitoring(for: cam)
                 
                 if let largest = cam.activeFormat.supportedMaxPhotoDimensions.max(by: {
                     Int($0.width) * Int($0.height) < Int($1.width) * Int($1.height)

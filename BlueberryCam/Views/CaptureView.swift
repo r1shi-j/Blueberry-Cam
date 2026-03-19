@@ -29,6 +29,10 @@ extension CaptureView {
     private var lensCleaningSymbolName: String { "camera.aperture" }
     private var errorString: String { "Error" }
     private var okButtonString: String { "OK" }
+    private var tapHoldDuration: TimeInterval { 0.7 }
+    private var tapMoveTolerance: CGFloat { 18 }
+    private var focusReticleSliderXTolerance: CGFloat { 24 }
+    private var focusReticleSliderYTolerance: CGFloat { 96 }
     
     private func changeLevelMonitoring(_ condition: Bool) {
         if condition {
@@ -50,6 +54,96 @@ extension CaptureView {
         let previewY = (size.height - previewH) / 2
         return CGRect(x: previewX, y: previewY - xHeight, width: previewW, height: previewH)
     }
+    
+    private func isNearExistingExposureSlider(_ point: CGPoint) -> Bool {
+        guard let indicatorPoint = cameraModel.tapFocusIndicatorPoint,
+              cameraModel.isTapFocusIndicatorVisible else { return false }
+        let sliderCenterX = indicatorPoint.x + 56
+        let sliderCenterY = indicatorPoint.y + cameraModel.tapFocusIndicatorOffset
+        let dx = abs(sliderCenterX - point.x)
+        let dy = abs(sliderCenterY - point.y)
+        return dx <= focusReticleSliderXTolerance && dy <= focusReticleSliderYTolerance
+    }
+    
+    private func beginPreviewInteraction(at location: CGPoint) {
+        cameraModel.isTapFocusInteractionActive = true
+        previewInteractionStartPoint = location
+        previewInteractionStartTime = Date()
+        previewInteractionDidLock = false
+        previewInteractionIsBiasOnly = cameraModel.canAdjustTapPointExposureBias && isNearExistingExposureSlider(location)
+        previewInteractionStartBias = previewInteractionIsBiasOnly ? cameraModel.tapExposureBias : 0
+        cameraModel.suspendTapFocusIndicatorHide()
+        
+        guard cameraModel.canHandleTapPointInteraction else { return }
+        if previewInteractionIsBiasOnly { return }
+        guard cameraModel.isAutoFocus,
+              let devicePoint = previewProxy.captureDevicePoint(fromLayerPoint: location) else { return }
+        cameraModel.handleTapPointAction(devicePoint: devicePoint, previewPoint: location)
+        cameraModel.suspendTapFocusIndicatorHide()
+        schedulePreviewHold(at: location)
+    }
+    
+    private func updatePreviewInteraction(at location: CGPoint) {
+        guard let startPoint = previewInteractionStartPoint,
+              previewInteractionStartTime != nil else { return }
+        
+        let verticalDrag = location.y - startPoint.y
+        let movement = hypot(location.x - startPoint.x, verticalDrag)
+        if movement > tapMoveTolerance {
+            previewInteractionHoldTask?.cancel()
+        }
+        
+        if cameraModel.canAdjustTapPointExposureBias,
+           (previewInteractionIsBiasOnly || cameraModel.isAutoFocus),
+           !previewInteractionDidLock {
+            cameraModel.suspendTapFocusIndicatorHide()
+            cameraModel.keepTapFocusIndicatorAlive(at: startPoint)
+            cameraModel.updateTapExposureBias(from: previewInteractionStartBias, verticalDrag: verticalDrag)
+        }
+    }
+    
+    private func endPreviewInteraction(at location: CGPoint) {
+        defer {
+            cameraModel.isTapFocusInteractionActive = false
+            previewInteractionHoldTask?.cancel()
+            previewInteractionHoldTask = nil
+            previewInteractionStartPoint = nil
+            previewInteractionStartTime = nil
+            previewInteractionDidLock = false
+            previewInteractionIsBiasOnly = false
+        }
+        
+        guard let startPoint = previewInteractionStartPoint else { return }
+        let movement = hypot(location.x - startPoint.x, location.y - startPoint.y)
+        
+        if cameraModel.canAdjustTapPointExposureBias {
+            if cameraModel.tapFocusLockLabel == nil {
+                cameraModel.scheduleTapFocusIndicatorHide()
+            }
+        }
+        
+        guard movement <= tapMoveTolerance,
+              !previewInteractionDidLock,
+              !previewInteractionIsBiasOnly,
+              !cameraModel.isAutoFocus,
+              cameraModel.isAutoExposure,
+              let devicePoint = previewProxy.captureDevicePoint(fromLayerPoint: startPoint) else { return }
+        cameraModel.handleTapPointAction(devicePoint: devicePoint, previewPoint: startPoint)
+    }
+    
+    private func schedulePreviewHold(at location: CGPoint) {
+        previewInteractionHoldTask?.cancel()
+        guard cameraModel.canLockTapPoint else { return }
+        previewInteractionHoldTask = Task { @MainActor in
+            try? await Task.sleep(for: .seconds(tapHoldDuration))
+            guard !Task.isCancelled,
+                  !previewInteractionDidLock,
+                  let startPoint = previewInteractionStartPoint,
+                  let devicePoint = previewProxy.captureDevicePoint(fromLayerPoint: startPoint) else { return }
+            previewInteractionDidLock = true
+            cameraModel.handleTapPointHold(devicePoint: devicePoint, previewPoint: location)
+        }
+    }
 }
 
 struct CaptureView: View {
@@ -58,8 +152,19 @@ struct CaptureView: View {
     @State private var cameraModel = CameraModel()
     @State private var levelModel  = LevelMotionModel()
     @State private var selectedControl: ManualControl?
+    
+    // Haptics
     @State private var hapticTrigger = 0
     @State private var hapticTriggerR = 0
+    
+    // Preview focus
+    @State private var previewProxy = PreviewViewProxy()
+    @State private var previewInteractionStartPoint: CGPoint?
+    @State private var previewInteractionStartTime: Date?
+    @State private var previewInteractionDidLock = false
+    @State private var previewInteractionIsBiasOnly = false
+    @State private var previewInteractionStartBias: Float = 0
+    @State private var previewInteractionHoldTask: Task<Void, Never>?
     
     // Transitions
     @State private var visualZoomScale: CGFloat = 1.0
@@ -160,6 +265,33 @@ struct CaptureView: View {
                                 .ignoresSafeArea()
                         }
                     }
+                    
+                    // MARK: - Tap to focus overlay
+                    if cameraModel.isTapFocusIndicatorVisible, let indicatorPoint = cameraModel.tapFocusIndicatorPoint {
+                        FocusReticleView(
+                            lockLabel: cameraModel.tapFocusLockLabel,
+                            exposureOffset: cameraModel.tapFocusIndicatorOffset,
+                            showsExposureHandle: cameraModel.canAdjustTapPointExposureBias,
+                            isDimmed: cameraModel.isTapFocusIndicatorDimmed
+                        )
+                        .position(indicatorPoint)
+                        .transition(.opacity)
+                    }
+                    
+                    // MARK: - Focus lock overlay
+                    ZStack {
+                        if let lockLabel = cameraModel.tapFocusLockLabel {
+                            Text(lockLabel)
+                                .font(.system(size: 12, weight: .bold))
+                                .foregroundStyle(.yellow)
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 6)
+                                .background(.black.opacity(0.55), in: .capsule)
+                                .position(x: previewRect.midX, y: previewRect.midY - previewRect.height / 2 + 20)
+                                .transition(.opacity)
+                        }
+                    }
+                    .animation(.bouncy, value: cameraModel.tapFocusLockLabel)
                     
                     // MARK: - QR Code
                     ZStack {
@@ -316,17 +448,20 @@ struct CaptureView: View {
         .sensoryFeedback(.impact, trigger: hapticTrigger)
         .sensoryFeedback(.impact(flexibility: .soft), trigger: hapticTriggerR)
         .sensoryFeedback(.impact(flexibility: .soft), trigger: cameraModel.detectedCodeURL)
+        .sensoryFeedback(.impact(flexibility: .soft), trigger: cameraModel.tap​Focus​Lock​Haptic​Trigger)
         .onAppear {
             cameraModel.configure()
             levelModel.startUpdates()
         }
         .onDisappear {
             levelModel.stopUpdates()
+            cameraModel.clearTapPointInteraction(resetDeviceState: false)
         }
         .onChange(of: cameraModel.shouldShowLevel) { _, new in
             changeLevelMonitoring(new)
         }
         .onChange(of: cameraModel.activeLens) { oldLens, newLens in
+            cameraModel.clearTapPointInteraction(resetDeviceState: false)
             // Handle visual "zoom" bump to mask lens hardware switch
             if oldLens.isFront == newLens.isFront {
                 // Use a light zoom/blur mask for same-facing lens changes.

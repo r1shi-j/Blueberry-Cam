@@ -2,18 +2,30 @@ internal import AVFoundation
 import AVKit
 import SwiftUI
 
+final class PreviewViewProxy {
+    weak var view: PreviewUIView?
+    
+    func captureDevicePoint(fromLayerPoint point: CGPoint) -> CGPoint? {
+        view?.previewLayer.captureDevicePointConverted(fromLayerPoint: point)
+    }
+}
+
 struct CameraPreviewView: UIViewRepresentable {
     let session: AVCaptureSession
     let onCapture: () -> Void
+    let proxy: PreviewViewProxy
     
     func makeUIView(context: Context) -> PreviewUIView {
         let view = PreviewUIView()
         view.session = session
         view.onCapture = onCapture
+        proxy.view = view
         return view
     }
     
-    func updateUIView(_ uiView: PreviewUIView, context: Context) {}
+    func updateUIView(_ uiView: PreviewUIView, context: Context) {
+        proxy.view = uiView
+    }
 }
 
 final class PreviewUIView: UIView {

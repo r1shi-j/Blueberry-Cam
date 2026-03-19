@@ -90,6 +90,7 @@
 				Models/SharedIDs.swift,
 				Models/SharedTypes.swift,
 				Views/Components/CameraPreviewView.swift,
+				Views/Overlays/FocusReticleView.swift,
 			);
 			target = 5B5FC82B2F648F8E00532B15 /* BlueberryCamCapture */;
 		};
