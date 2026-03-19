@@ -31,6 +31,7 @@ struct BlueberryCamApp: App {
 // Add tips and welcome screen with tutorials
 // Improve memory/cpu usage, quicker camera switching
 // Swift 6
+// Update identifier (variable/function) names
 
 // black/white filter to camera control efter view (2nd)
 // Macro, portrait, dual cam, burst, flash, timer buttons: 3rd row on TopBarView
