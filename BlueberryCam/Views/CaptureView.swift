@@ -76,147 +76,163 @@ struct CaptureView: View {
             ZStack {
                 Color.black.ignoresSafeArea()
                 
-                // MARK: - Viewfinder
-                CameraPreviewView(session: cameraModel.session) {
-                    cameraModel.capturePhoto {
-                        withAnimation { cameraModel.changeCapturingState(to: true) }
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-                            withAnimation { cameraModel.changeCapturingState(to: false) }
+                // MARK: - Camera Overlays
+                ZStack {
+                    // MARK: - Viewfinder
+                    CameraPreviewView(session: cameraModel.session, onCapture: {
+                        cameraModel.capturePhoto {
+                            withAnimation { cameraModel.changeCapturingState(to: true) }
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                                withAnimation { cameraModel.changeCapturingState(to: false) }
+                            }
+                        }
+                    }, proxy: previewProxy)
+                    .scaleEffect(visualZoomScale)
+                    .rotation3DEffect(.degrees(cameraModel.flipRotation), axis: (x: 0, y: 1, z: 0))
+                    .blur(radius: visualBlur)
+                    .opacity(visualOpacity)
+                    .animation(.easeInOut, value: scenePhase)
+                    .frame(width: previewRect.width, height: previewRect.height)
+                    .position(x: previewRect.midX, y: previewRect.midY)
+                    .gesture(
+                        DragGesture(minimumDistance: 0)
+                            .onChanged { value in
+                                if previewInteractionStartPoint == nil {
+                                    beginPreviewInteraction(at: value.startLocation)
+                                }
+                                updatePreviewInteraction(at: value.location)
+                            }
+                            .onEnded { value in
+                                endPreviewInteraction(at: value.location)
+                            }
+                    )
+                    .simultaneousGesture(
+                        SpatialTapGesture(count: 2)
+                            .onEnded { _ in
+                                hapticTrigger += 1
+                                withAnimation(.bouncy) {
+                                    cameraModel.toggleSelfie()
+                                }
+                            }
+                    )
+                    
+                    if !cameraModel.showSimpleView {
+                        // MARK: - Peaking/Clipping overlays
+                        if cameraModel.showZebraStripes {
+                            AnalysisOverlayView(
+                                mask: cameraModel.zebraMask,
+                                gridSize: cameraModel.analysisGridSize,
+                                style: .zebra
+                            )
+                            .frame(width: previewRect.width, height: previewRect.height)
+                            .position(x: previewRect.midX, y: previewRect.midY)
+                        }
+                        
+                        if !cameraModel.isAutoFocus {
+                            AnalysisOverlayView(
+                                mask: cameraModel.focusPeakingMask,
+                                gridSize: cameraModel.analysisGridSize,
+                                style: .focusPeaking
+                            )
+                            .frame(width: previewRect.width, height: previewRect.height)
+                            .position(x: previewRect.midX, y: previewRect.midY)
+                        }
+                        
+                        if cameraModel.showClipping {
+                            AnalysisOverlayView(
+                                mask: cameraModel.clippingMask,
+                                gridSize: cameraModel.analysisGridSize,
+                                style: .clipping
+                            )
+                            .frame(width: previewRect.width, height: previewRect.height)
+                            .position(x: previewRect.midX, y: previewRect.midY)
+                        }
+                        
+                        // MARK: - Crop frame overlay
+                        if cameraModel.shouldShowGrid {
+                            CropOverlayView(aspectRatio: cameraModel.captureAspectRatio)
+                                .ignoresSafeArea()
+                        }
+                        
+                        // MARK: - Level / Horizon overlay
+                        if cameraModel.shouldShowLevel {
+                            LevelOverlayView(model: levelModel)
+                                .ignoresSafeArea()
                         }
                     }
-                }
-                .scaleEffect(visualZoomScale)
-                .rotation3DEffect(.degrees(cameraModel.flipRotation), axis: (x: 0, y: 1, z: 0))
-                .blur(radius: visualBlur)
-                .opacity(visualOpacity)
-                .blur(radius: scenePhase != .active ? 20 : 0)
-                .animation(.easeInOut, value: scenePhase)
-                .ignoresSafeArea()
-                .contentShape(.rect.path(in: previewRect))
-                .onTapGesture(count: 2) {
-                    hapticTrigger += 1
-                    withAnimation(.bouncy) {
-                        cameraModel.toggleSelfie()
-                    }
-                }
-                
-                // MARK: - Peaking/Clipping overlays
-                if !cameraModel.showSimpleView {
-                    if cameraModel.showZebraStripes {
-                        AnalysisOverlayView(
-                            mask: cameraModel.zebraMask,
-                            gridSize: cameraModel.analysisGridSize,
-                            style: .zebra
-                        )
-                        .frame(width: previewRect.width, height: previewRect.height)
-                        .position(x: previewRect.midX, y: previewRect.midY)
-                    }
                     
-                    if !cameraModel.isAutoFocus {
-                        AnalysisOverlayView(
-                            mask: cameraModel.focusPeakingMask,
-                            gridSize: cameraModel.analysisGridSize,
-                            style: .focusPeaking
-                        )
-                        .frame(width: previewRect.width, height: previewRect.height)
-                        .position(x: previewRect.midX, y: previewRect.midY)
-                    }
-                    
-                    if cameraModel.showClipping {
-                        AnalysisOverlayView(
-                            mask: cameraModel.clippingMask,
-                            gridSize: cameraModel.analysisGridSize,
-                            style: .clipping
-                        )
-                        .frame(width: previewRect.width, height: previewRect.height)
-                        .position(x: previewRect.midX, y: previewRect.midY)
-                    }
-                    
-                    // MARK: - Crop frame overlay
-                    if cameraModel.shouldShowGrid {
-                        CropOverlayView(aspectRatio: cameraModel.captureAspectRatio)
-                            .ignoresSafeArea()
-                            .allowsHitTesting(false)
-                    }
-                    
-                    // MARK: - Level / Horizon overlay
-                    if cameraModel.shouldShowLevel {
-                        LevelOverlayView(model: levelModel)
-                            .ignoresSafeArea()
-                    }
-                }
-                
-                // MARK: - QR Code
-                ZStack {
-                    if let url = cameraModel.detectedCodeURL {
-                        VStack(spacing: 4) {
-                            Text(copiedString)
+                    // MARK: - QR Code
+                    ZStack {
+                        if let url = cameraModel.detectedCodeURL {
+                            VStack(spacing: 4) {
+                                Text(copiedString)
+                                    .font(.system(size: 10, weight: .bold))
+                                    .fontWidth(.expanded)
+                                    .foregroundStyle(.yellow.opacity(0.8))
+                                    .padding(8)
+                                    .glassEffect()
+                                Button {
+                                    UIApplication.shared.open(url)
+                                    cameraModel.ignoreCurrentCode()
+                                } label: {
+                                    HStack(spacing: 8) {
+                                        Image(systemName: linkSymbolName)
+                                        Text(url.host ?? backupURLName)
+                                            .lineLimit(1)
+                                    }
+                                    .font(.system(size: 14, weight: .bold))
+                                    .fontWidth(.expanded)
+                                }
+                                .buttonStyle(.glass)
+                                .padding(.horizontal)
+                                
+                                Button(closeLinkTitle, systemImage: closeSymbolName) {
+                                    cameraModel.ignoreCurrentCode()
+                                }
                                 .font(.system(size: 10, weight: .bold))
                                 .fontWidth(.expanded)
                                 .foregroundStyle(.yellow.opacity(0.8))
-                                .padding(8)
-                                .glassEffect()
-                            Button {
-                                hapticTriggerR += 1
-                                UIApplication.shared.open(url)
-                                cameraModel.ignoreCurrentCode()
-                            } label: {
-                                HStack(spacing: 8) {
-                                    Image(systemName: linkSymbolName)
-                                    Text(url.host ?? backupURLName)
-                                        .lineLimit(1)
-                                }
-                                .font(.system(size: 14, weight: .bold))
-                                .fontWidth(.expanded)
+                                .buttonStyle(.glass)
                             }
-                            .buttonStyle(.glass)
-                            .padding(.horizontal)
-                            
-                            Button(closeLinkTitle, systemImage: closeSymbolName) {
-                                cameraModel.ignoreCurrentCode()
-                            }
-                            .font(.system(size: 10, weight: .bold))
-                            .fontWidth(.expanded)
-                            .foregroundStyle(.yellow.opacity(0.8))
-                            .buttonStyle(.glass)
+                            .position(x: previewRect.midX, y: previewRect.midY)
+                            .transition(.opacity)
                         }
-                        .position(x: previewRect.midX, y: previewRect.midY)
-                        .transition(.scale(scale: 0.5, anchor: .center).combined(with: .opacity))
                     }
-                }
-                .animation(.bouncy, value: cameraModel.detectedCodeURL)
-                
-                // MARK: - Lens Cleaning Hint
-                ZStack {
-                    if cameraModel.shouldShowLensCleaningHint {
-                        VStack(spacing: 4) {
-                            Button {
-                                hapticTriggerR += 1
-                                cameraModel.dismissLensCleaningHint()
-                            } label: {
-                                HStack(spacing: 8) {
-                                    Image(systemName: lensCleaningSymbolName)
-                                    Text(lensCleaningTitle)
+                    .animation(.bouncy, value: cameraModel.detectedCodeURL)
+                    
+                    // MARK: - Lens Cleaning Hint
+                    ZStack {
+                        if cameraModel.shouldShowLensCleaningHint {
+                            VStack(spacing: 4) {
+                                Button {
+                                    hapticTriggerR += 1
+                                    cameraModel.dismissLensCleaningHint()
+                                } label: {
+                                    HStack(spacing: 8) {
+                                        Image(systemName: lensCleaningSymbolName)
+                                        Text(lensCleaningTitle)
+                                    }
+                                    .font(.system(size: 14, weight: .bold))
+                                    .fontWidth(.expanded)
                                 }
-                                .font(.system(size: 14, weight: .bold))
+                                .buttonStyle(.glass)
+                                .padding(.horizontal)
+                                
+                                Button(closeCleaningTitle, systemImage: closeSymbolName) {
+                                    cameraModel.dismissLensCleaningHint()
+                                }
+                                .font(.system(size: 10, weight: .bold))
                                 .fontWidth(.expanded)
+                                .foregroundStyle(.yellow.opacity(0.8))
+                                .buttonStyle(.glass)
                             }
-                            .buttonStyle(.glass)
-                            .padding(.horizontal)
-                            
-                            Button(closeCleaningTitle, systemImage: closeSymbolName) {
-                                cameraModel.dismissLensCleaningHint()
-                            }
-                            .font(.system(size: 10, weight: .bold))
-                            .fontWidth(.expanded)
-                            .foregroundStyle(.yellow.opacity(0.8))
-                            .buttonStyle(.glass)
+                            .position(x: previewRect.midX, y: previewRect.midY)
+                            .transition(.opacity)
                         }
-                        .position(x: previewRect.midX, y: previewRect.midY)
-                        .transition(.scale(scale: 0.5, anchor: .center).combined(with: .opacity))
                     }
+                    .animation(.bouncy, value: cameraModel.shouldShowLensCleaningHint)
                 }
-                .animation(.bouncy, value: cameraModel.shouldShowLensCleaningHint)
+                .blur(radius: scenePhase != .active ? 20 : 0)
                 
                 // MARK: - UI Overlays
                 VStack(spacing: 0) {
@@ -281,6 +297,7 @@ struct CaptureView: View {
             }
         }
         .safeAreaInset(edge: .top) {
+            // MARK: - Status bar
             if !cameraModel.showSimpleView {
                 StatusBarAreaView(cameraModel: cameraModel)
                     .padding()
@@ -298,6 +315,7 @@ struct CaptureView: View {
         .statusBarHidden()
         .sensoryFeedback(.impact, trigger: hapticTrigger)
         .sensoryFeedback(.impact(flexibility: .soft), trigger: hapticTriggerR)
+        .sensoryFeedback(.impact(flexibility: .soft), trigger: cameraModel.detectedCodeURL)
         .onAppear {
             cameraModel.configure()
             levelModel.startUpdates()
@@ -374,7 +392,6 @@ struct CaptureView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: UIDevice.deviceDidShakeNotification)) { _ in
             if let url = cameraModel.detectedCodeURL {
-                hapticTriggerR += 1
                 UIApplication.shared.open(url)
                 cameraModel.ignoreCurrentCode()
             }
