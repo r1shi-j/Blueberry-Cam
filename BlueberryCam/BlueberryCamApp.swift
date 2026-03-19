@@ -37,7 +37,7 @@ struct BlueberryCamApp: App {
 // Show proper selfie cameras
 
 // Improve lens picker UI (liquid glass sliding), move to bottom right?
-// Click on any readout -> shows vertical slider right side screen like halide
+// Click on any readout -> shows vertical slider right side screen like halide (and add animations to knock on effects)
 /// slider shows the auto value constantly updating, manually changing it turns on manual mode, for ss/iso have left iso right ss?
 // Focus Loupe, option to disable green dots in focus peaking/manual focus
 // Photographic styles, black/white filter to camera control efter view (2nd)
@@ -45,5 +45,3 @@ struct BlueberryCamApp: App {
 // ProRaw
 
 // MARK: - FIXME
-// when manual exposure, go back to auto exposure, formats are still disabled
-// disable macro when manual exposure (like flash is also disabled then)

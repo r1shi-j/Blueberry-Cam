@@ -57,6 +57,7 @@ class LockedCameraModel: NSObject {
                     }
                 }
                 enforceExposureModeConstraints()
+                buildAvailableFormats()
             }
         }
     }
@@ -410,6 +411,9 @@ class LockedCameraModel: NSObject {
     func enforceExposureModeConstraints() {
         if !isAutoExposure {
             flashMode = .off
+            if isMacroEnabled {
+                isMacroEnabled = false
+            }
             if captureMode != .raw {
                 captureMode = .raw
             }

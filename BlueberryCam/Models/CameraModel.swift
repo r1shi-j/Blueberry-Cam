@@ -145,6 +145,7 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
                     }
                 }
                 enforceExposureModeConstraints()
+                buildAvailableFormats()
                 updateCameraControlsMode()
             }
         }
@@ -746,6 +747,9 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
     func enforceExposureModeConstraints() {
         if !isAutoExposure {
             flashMode = .off
+            if isMacroEnabled {
+                isMacroEnabled = false
+            }
             if captureMode != .raw {
                 captureMode = .raw
             }

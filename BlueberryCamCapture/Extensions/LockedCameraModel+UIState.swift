@@ -137,7 +137,7 @@ extension LockedCameraModel {
     }
     
     func toggleMacroMode() {
-        guard supportsMacro else { return }
+        guard supportsMacro, isAutoExposure else { return }
         
         if !isMacroEnabled {
             // Enabling macro: switch to Ultra Wide first

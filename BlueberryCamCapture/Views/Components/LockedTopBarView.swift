@@ -15,7 +15,11 @@ extension LockedCameraModel {
     }
     
     fileprivate var macroButtonOpacity: Double {
-        supportsMacro ? 1.0 : 0.45
+        (supportsMacro && isAutoExposure) ? 1.0 : 0.3
+    }
+
+    fileprivate var isMacroButtonDisabled: Bool {
+        !(supportsMacro && isAutoExposure)
     }
     
     fileprivate var flashButtonForeground: Color {
@@ -27,7 +31,7 @@ extension LockedCameraModel {
     }
     
     fileprivate var flashButtonOpacity: Double {
-        (supportsFlash && isAutoExposure) ? 1.0 : 0.45
+        (supportsFlash && isAutoExposure) ? 1.0 : 0.3
     }
     
     fileprivate var isFlashButtonDisabled: Bool {
@@ -206,6 +210,7 @@ struct LockedTopBarView: View {
                             .background(cameraModel.macroButtonBackground)
                             .clipShape(.capsule)
                     }
+                    .disabled(cameraModel.isMacroButtonDisabled)
                     .opacity(cameraModel.macroButtonOpacity)
                 }
                 
