@@ -137,7 +137,7 @@ extension CameraModel: AVCapturePhotoCaptureDelegate {
                     inputImage: sourceImage
                 ) else { return nil }
                 filteredImage = output
-            
+                
             case .comic:
                 guard let output = processedImage(
                     named: "CIComicEffect",
@@ -190,7 +190,7 @@ extension CameraModel: AVCapturePhotoCaptureDelegate {
                     ]
                 ) else { return nil }
                 filteredImage = croppedImage(output, to: sourceImage.extent)
-            
+                
             case .twirlDistortion:
                 guard let output = processedImage(
                     named: "CITwirlDistortion",
@@ -233,7 +233,7 @@ extension CameraModel: AVCapturePhotoCaptureDelegate {
                         kCIInputScaleKey: 0.9
                     ]
                 ) else { return nil }
-
+                
                 let squareRect = largestInscribedSquareBySampling(distorted)
                 let squareCropped = croppedImage(distorted, to: squareRect)
                 
@@ -251,7 +251,7 @@ extension CameraModel: AVCapturePhotoCaptureDelegate {
                     kCIInputImageKey: radialGradient,
                     kCIInputBackgroundImageKey: squareCropped
                 ])?.outputImage else { return nil }
-
+                
                 filteredImage = vignetted
             case .droste:
                 guard let output = processedImage(
@@ -294,7 +294,7 @@ extension CameraModel: AVCapturePhotoCaptureDelegate {
         
         let colorSpace = CGColorSpace(name: CGColorSpace.sRGB) ?? CGColorSpaceCreateDeviceRGB()
         let context = CIContext()
-        guard let cgImage = context.createCGImage(filteredImage, from: filteredImage.extent, format: .RGBA8, colorSpace: colorSpace) else {
+        guard let cgImage = context.createCGImage(filteredImage, from: filteredImage.extent, format: .RGBX8, colorSpace: colorSpace) else {
             return nil
         }
         
@@ -390,7 +390,7 @@ extension CameraModel: AVCapturePhotoCaptureDelegate {
         // Largest centered square inside these bounds
         let side = min(contentWidth, contentHeight)
         let centerX = (contentMinX + contentMaxX) * 0.5
-//        let centerY = (contentMinY + contentMaxY) * 0.5
+        // let centerY = (contentMinY + contentMaxY) * 0.5
         let square = CGRect(x: -centerX, y: 2*centerX, width: side, height: side)
         
         return square.integral

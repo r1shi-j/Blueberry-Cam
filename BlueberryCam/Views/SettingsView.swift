@@ -11,7 +11,7 @@ struct SettingsView: View {
             List {
                 Section {
                     LabeledContent("Format ") {
-                        Picker("", selection: $cameraModel.selectedFileFormat) {
+                        Picker("", selection: $cameraModel.defaultFileFormat) {
                             ForEach(CaptureMode.allCases, id: \.self) { format in
                                 Text(format.rawValue)
                                     .tag(format)
@@ -22,7 +22,7 @@ struct SettingsView: View {
                     }
                     
                     LabeledContent("Resolution ") {
-                        Picker("", selection: $cameraModel.preferredResolution) {
+                        Picker("", selection: $cameraModel.defaultResolution) {
                             ForEach(ResolutionPreference.allCases, id: \.self) { pref in
                                 Text(pref.rawValue)
                                     .tag(pref)
@@ -40,28 +40,6 @@ struct SettingsView: View {
                             }
                         }
                         .pickerStyle(.menu)
-                    }
-                    
-                    LabeledContent("Geotag Location ") {
-                        Toggle("", isOn: $cameraModel.shouldGeotagLocation)
-                    }
-                    
-                    LabeledContent("Recognize Barcodes ") {
-                        Toggle("", isOn: $cameraModel.recognizeBarcodes)
-                    }
-                } header: {
-                    Text("Image Defaults")
-                } footer: {
-                    Text("Preferred format, resolution, and filter are used as startup defaults.")
-                }
-                
-                Section {
-                    LabeledContent("Show Grid ") {
-                        Toggle("", isOn: $cameraModel.shouldShowGrid)
-                    }
-                    
-                    LabeledContent("Show Level/Crosshair ") {
-                        Toggle("", isOn: $cameraModel.shouldShowLevel)
                     }
                     
                     LabeledContent("Small Histogram ") {
@@ -84,13 +62,35 @@ struct SettingsView: View {
                         .pickerStyle(.menu)
                     }
                 } header: {
-                    Text("User Interface Defaults")
-                } footer : {
-                    Text("Tap the histogram to cycle through all histograms.")
+                    Text("Defaults")
+                } footer: {
+                    Text("These are all used as startup defaults. To cycle through histograms, simply tap each histogram.")
                 }
                 
                 Section {
-                    Text("This app supports LockedCameraCapture which enables the app to be opened from camera control, control centre and from the lock screen action buttons. However when the app is opened from the lock screen some features arent available, these include: Histograms, Zebras, Highlight Clipping, Focus Peaking, Level, Grid, Selfie Cameras, Embedding Location and Recognising Barcodes. Settings, Clean UI view and filters will also not be available as camera control isn't available. Additionally the default image format and resolution will not be applied, this required a paid Apple Developer account. The defaults used will be RAW Efficiency. To open the full app click the app icon in the bottom left (left of the shutter).")
+                    LabeledContent("Geotag Location ") {
+                        Toggle("", isOn: $cameraModel.shouldGeotagLocation)
+                    }
+                    
+                    LabeledContent("Recognize Barcodes ") {
+                        Toggle("", isOn: $cameraModel.recognizeBarcodes)
+                    }
+                    
+                    LabeledContent("Show Grid ") {
+                        Toggle("", isOn: $cameraModel.shouldShowGrid)
+                    }
+                    
+                    LabeledContent("Show Level/Crosshair ") {
+                        Toggle("", isOn: $cameraModel.shouldShowLevel)
+                    }
+                } header: {
+                    Text("Customization")
+                } footer : {
+                    Text("This app supports lens smudge detection and is always enabled.")
+                }
+                
+                Section {
+                    Text("This app supports LockedCameraCapture which enables the app to be opened from camera control, control centre and from the lock screen action buttons. However when the app is opened from the lock screen some features arent available, these include: Histograms, Zebras, Highlight Clipping, Focus Peaking, Level, Grid, Selfie Cameras, Embedding Location and Recognising Barcodes. Settings, Clean UI view and filters will also not be available as camera control isn't available. Additionally the default image format and resolution will not be applied, this required a paid Apple Developer account. The defaults used will be Efficient High Efficiency (HEIF 12MP). To open the full app click the app icon in the bottom left (left of the shutter).")
                     Text("Photos library usage is only required to search for the album to save photos taken with this app, you can set it to limited access and select no photos, the app still work.")
                     Text("With auto focus and auto exposure, tap sets focus and exposure at the selected point, and hold locks both focus and exposure. With auto focus and manual exposure, tap sets focus and hold locks focus. With manual focus and auto exposure, tap sets exposure at the selected point.")
                     Button("Reset Shutter Count") {

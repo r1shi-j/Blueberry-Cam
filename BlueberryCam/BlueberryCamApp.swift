@@ -31,7 +31,7 @@ struct BlueberryCamApp: App {
 // Add tips and welcome screen with tutorials
 // Improve memory/cpu usage, quicker camera switching
 // Swift 6
-// Update identifier (variable/function) names, especially userdefaults and defaults
+// Update identifier (variable/function) names
 
 // Macro, portrait, dual cam, burst, flash, timer buttons: 3rd row on TopBarView
 // Show proper selfie cameras
@@ -43,3 +43,4 @@ struct BlueberryCamApp: App {
 // ProRaw
 
 // MARK: - FIXME
+// Horizontal photos

@@ -18,25 +18,10 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
     
     // MARK: - Barcode Detection
     nonisolated let metadataOutput = AVCaptureMetadataOutput()
-    var recognizeBarcodes: Bool = true {
-        didSet {
-            UserDefaults.standard.set(recognizeBarcodes, forKey: "recognizeBarcodes")
-            updateMetadataOutputStatus()
-        }
-    }
     var detectedCodeURL: URL? = nil
     var detectedCodeString: String? = nil
     var ignoredCodes: [String: Date] = [:]
     var barcodeResetTask: Task<Void, Never>?
-    
-    // MARK: - Lens cleaning detection
-    var lensSmudgeDetectionStatus: AVCaptureCameraLensSmudgeDetectionStatus = .disabled
-    var shouldShowLensCleaningHint = false
-    @ObservationIgnored
-    private var didDismissLensCleaningHint = false
-    @ObservationIgnored
-    private var lensSmudgeStatusObservation: NSKeyValueObservation?
-    
     var supportedMetadataTypes: [AVMetadataObject.ObjectType] {
         [
             .qr, .microQR,
@@ -47,6 +32,14 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
             .codabar, .gs1DataBar, .gs1DataBarExpanded, .gs1DataBarLimited
         ]
     }
+    
+    // MARK: - Lens cleaning detection
+    var lensSmudgeDetectionStatus: AVCaptureCameraLensSmudgeDetectionStatus = .disabled
+    var shouldShowLensCleaningHint = false
+    @ObservationIgnored
+    private var didDismissLensCleaningHint = false
+    @ObservationIgnored
+    private var lensSmudgeStatusObservation: NSKeyValueObservation?
     
     // MARK: - Camera Control (iOS 18)
     var cleanUIControl: AVCaptureIndexPicker?
@@ -61,34 +54,28 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
     var isUpdatingHardwareControl = false
     
     // MARK: - Defaults (for settings)
-    var selectedFileFormat: CaptureMode = .raw {
+    var defaultFileFormat: CaptureMode = .raw {
         didSet {
-            UserDefaults.standard.set(selectedFileFormat.rawValue, forKey: "selectedFileFormat")
+            UserDefaults.standard.set(defaultFileFormat.rawValue, forKey: "defaultFileFormat")
             // Always try to apply the preference to the active mode immediately.
             // Enforcement (fallbacks) will be handled by buildAvailableFormats() once hardware is ready.
-            if captureMode != selectedFileFormat {
-                captureMode = selectedFileFormat
+            if captureMode != defaultFileFormat {
+                captureMode = defaultFileFormat
             }
         }
     }
-    var preferredResolution: ResolutionPreference = .max {
+    var defaultResolution: ResolutionPreference = .max {
         didSet {
-            UserDefaults.standard.set(preferredResolution.rawValue, forKey: "preferredResolution")
+            UserDefaults.standard.set(defaultResolution.rawValue, forKey: "defaultResolution")
             // Force apply the new preference immediately to the current selection
             if !enabledResolutions.isEmpty {
-                selectedResolution = preferredResolution == .max ? enabledResolutions.last : enabledResolutions.first
+                selectedResolution = defaultResolution == .max ? enabledResolutions.last : enabledResolutions.first
             }
         }
     }
     var defaultPhotoFilter: PhotoFilter = .off {
         didSet {
             UserDefaults.standard.set(defaultPhotoFilter.rawValue, forKey: "defaultPhotoFilter")
-        }
-    }
-    var shouldGeotagLocation = false {
-        didSet {
-            UserDefaults.standard.set(shouldGeotagLocation, forKey: "shouldGeotagLocation")
-            toggleLocationGeotag()
         }
     }
     var defaultHistogramSmall: HistogramMode = .none {
@@ -103,10 +90,22 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
             histogramModeLarge = defaultHistogramLarge
         }
     }
-    var shouldShowGrid = true {
+    var shouldGeotagLocation = false {
+        didSet {
+            UserDefaults.standard.set(shouldGeotagLocation, forKey: "shouldGeotagLocation")
+            toggleLocationGeotag()
+        }
+    }
+    var recognizeBarcodes: Bool = false {
+        didSet {
+            UserDefaults.standard.set(recognizeBarcodes, forKey: "recognizeBarcodes")
+            updateMetadataOutputStatus()
+        }
+    }
+    var shouldShowGrid = false {
         didSet { UserDefaults.standard.set(shouldShowGrid, forKey: "shouldShowGrid") }
     }
-    var shouldShowLevel = true {
+    var shouldShowLevel = false {
         didSet { UserDefaults.standard.set(shouldShowLevel, forKey: "shouldShowLevel") }
     }
     
@@ -561,8 +560,8 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
     private func loadSettings() {
         let defaults = UserDefaults.standard
         
-        if let format = defaults.string(forKey: "selectedFileFormat"), let mode = CaptureMode(rawValue: format) {
-            self.selectedFileFormat = mode
+        if let format = defaults.string(forKey: "defaultFileFormat"), let mode = CaptureMode(rawValue: format) {
+            self.defaultFileFormat = mode
             // Prime the active mode immediately so the UI reflects the saved state during launch.
             self.captureMode = mode
         }
@@ -572,8 +571,8 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
         self.shouldShowGrid = defaults.object(forKey: "shouldShowGrid") as? Bool ?? true
         self.shouldShowLevel = defaults.object(forKey: "shouldShowLevel") as? Bool ?? true
         
-        if let res = defaults.string(forKey: "preferredResolution"), let rPref = ResolutionPreference(rawValue: res) {
-            self.preferredResolution = rPref
+        if let res = defaults.string(forKey: "defaultResolution"), let rPref = ResolutionPreference(rawValue: res) {
+            self.defaultResolution = rPref
         }
         
         if let filter = defaults.string(forKey: "defaultPhotoFilter"),
@@ -631,8 +630,8 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
         let targetMode: CaptureMode
         if modes.contains(captureMode) {
             targetMode = captureMode
-        } else if modes.contains(selectedFileFormat) {
-            targetMode = selectedFileFormat
+        } else if modes.contains(defaultFileFormat) {
+            targetMode = defaultFileFormat
         } else {
             targetMode = modes.contains(.heif) ? .heif : .jpeg
         }
@@ -692,10 +691,10 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
         
         if !sameEnabledOptions {
             // Options change (Format or Lens switch): re-apply resolution preference
-            selectedResolution = preferredResolution == .max ? enabledOptions.last : enabledOptions.first
+            selectedResolution = defaultResolution == .max ? enabledOptions.last : enabledOptions.first
         } else if let current = selectedResolution, !enabledOptions.contains(where: { $0.id == current.id }) {
             // Current selection became invalid
-            selectedResolution = preferredResolution == .max ? enabledOptions.last : enabledOptions.first
+            selectedResolution = defaultResolution == .max ? enabledOptions.last : enabledOptions.first
         }
     }
     
@@ -746,7 +745,7 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
         } else if let current = selectedResolution, enabledOptions.contains(where: { $0.id == current.id }) {
             return
         } else {
-            selectedResolution = preferredResolution == .max ? enabledOptions.last : enabledOptions.first
+            selectedResolution = defaultResolution == .max ? enabledOptions.last : enabledOptions.first
         }
     }
     

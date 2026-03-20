@@ -16,7 +16,7 @@ class LockedCameraModel: NSObject {
     nonisolated let _sessionContentURLBox = SessionURLBox()
     
     // MARK: - Capture format
-    var captureMode: CaptureMode = .raw {
+    var captureMode: CaptureMode = .heif {
         didSet {
             if oldValue != captureMode {
                 buildAvailableFormats()
@@ -346,7 +346,7 @@ class LockedCameraModel: NSObject {
         } else if let cur = selectedResolution, enabledOptions.contains(where: { $0.id == cur.id }) {
             
         } else {
-            selectedResolution = enabledOptions.last
+            selectedResolution = enabledOptions.first
         }
     }
     
@@ -391,7 +391,7 @@ class LockedCameraModel: NSObject {
         } else if let current = selectedResolution, enabledOptions.contains(where: { $0.id == current.id }) {
             return
         } else {
-            selectedResolution = enabledOptions.last
+            selectedResolution = enabledOptions.first
         }
     }
     
