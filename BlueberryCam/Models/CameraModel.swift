@@ -14,6 +14,7 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
     nonisolated let sessionQueue = DispatchQueue(label: "\(BundleIDs.appID).sessionQueue")
     nonisolated let frameCounter = FrameCounter()
     let _pendingCaptureModeBox = CaptureModeBox()
+    let _pendingPhotoFilterBox = PhotoFilterBox()
     
     // MARK: - Barcode Detection
     nonisolated let metadataOutput = AVCaptureMetadataOutput()
@@ -49,6 +50,7 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
     
     // MARK: - Camera Control (iOS 18)
     var cleanUIControl: AVCaptureIndexPicker?
+    var filterControl: AVCaptureIndexPicker?
     var lensControl: AVCaptureIndexPicker?
     var evControl: AVCaptureSlider?
     var isoControl: AVCaptureSlider?
@@ -76,6 +78,11 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
             if !enabledResolutions.isEmpty {
                 selectedResolution = preferredResolution == .max ? enabledResolutions.last : enabledResolutions.first
             }
+        }
+    }
+    var defaultPhotoFilter: PhotoFilter = .off {
+        didSet {
+            UserDefaults.standard.set(defaultPhotoFilter.rawValue, forKey: "defaultPhotoFilter")
         }
     }
     var shouldGeotagLocation = false {
@@ -108,6 +115,7 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
         didSet {
             if oldValue != captureMode {
                 buildAvailableFormats()
+                updateCameraControlsMode()
             }
         }
     }
@@ -116,6 +124,11 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
     private(set) var availableResolutions: [ResolutionOption] = []
     private(set) var enabledResolutions: [ResolutionOption] = []
     var selectedResolution: ResolutionOption? = nil
+    var selectedPhotoFilter: PhotoFilter = .off {
+        didSet {
+            syncPhotoFilterToHardware()
+        }
+    }
     var activeLens: Lens = .wide
     var flipRotation: Double = 0
     var flashMode: AVCaptureDevice.FlashMode = .off
@@ -563,6 +576,12 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
             self.preferredResolution = rPref
         }
         
+        if let filter = defaults.string(forKey: "defaultPhotoFilter"),
+           let defaultPhotoFilter = PhotoFilter(rawValue: filter) {
+            self.defaultPhotoFilter = defaultPhotoFilter
+        }
+        self.selectedPhotoFilter = defaultPhotoFilter
+        
         if let histSmall = defaults.string(forKey: "defaultHistogramSmall"), let hMode = HistogramMode(rawValue: histSmall) {
             self.defaultHistogramSmall = hMode
         }
@@ -835,6 +854,7 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
         
         exposureDebounceTask?.cancel()
         _pendingCaptureModeBox.value = captureMode
+        _pendingPhotoFilterBox.value = selectedPhotoFilter
         
         // For manual exposure, wait for hardware to confirm values are applied before firing.
         // setExposureModeCustom is async — the completionHandler fires once the sensor has

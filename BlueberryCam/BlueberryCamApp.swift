@@ -31,17 +31,14 @@ struct BlueberryCamApp: App {
 // Add tips and welcome screen with tutorials
 // Improve memory/cpu usage, quicker camera switching
 // Swift 6
-// Update identifier (variable/function) names
+// Update identifier (variable/function) names, especially userdefaults and defaults
 
-// black/white filter to camera control efter view (2nd)
 // Macro, portrait, dual cam, burst, flash, timer buttons: 3rd row on TopBarView
 // Show proper selfie cameras
-
 // Improve lens picker UI (liquid glass sliding), move to bottom right?
 // Click on any readout -> shows vertical slider right side screen like halide (and add animations to knock on effects)
 /// slider shows the auto value constantly updating, manually changing it turns on manual mode, for ss/iso have left iso right ss?
 // Focus Loupe, option to disable green dots in focus peaking/manual focus
-// Photographic styles, black/white filter to camera control efter view (2nd)
 // View outside frame
 // ProRaw
 

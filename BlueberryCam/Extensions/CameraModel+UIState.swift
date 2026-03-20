@@ -200,7 +200,11 @@ extension CameraModel {
         guard isFormatEnabled(mode) else { return }
         captureMode = mode
     }
-    
+
+    func changePhotoFilter(to filter: PhotoFilter) {
+        selectedPhotoFilter = filter
+    }
+
     func toggleClipping() { showClipping.toggle() }
     
     func toggleZebraStripes() { showZebraStripes.toggle() }

@@ -21,6 +21,10 @@ final class CaptureModeBox: @unchecked Sendable {
     nonisolated(unsafe) var value: CaptureMode = .jpeg
 }
 
+final class PhotoFilterBox: @unchecked Sendable {
+    nonisolated(unsafe) var value: PhotoFilter = .off
+}
+
 final class SessionURLBox: @unchecked Sendable {
     nonisolated(unsafe) var value: URL? = nil
 }
@@ -49,6 +53,33 @@ enum CaptureMode: String, CaseIterable, Identifiable {
     case jpeg = "JPEG"
     case heif = "HEIF"
     case raw = "RAW"
+    var id: String { rawValue }
+}
+
+enum PhotoFilter: String, CaseIterable, Identifiable {
+    case off = "Off"
+    case temperatureAndTint = "1980s"
+    case chrome = "Chrome"
+    case instant = "Instant"
+    case dither = "Dither"
+    case mono = "Mono"
+    case tonal = "Tonal"
+    case noir = "Noir"
+    case thermal = "Thermal"
+    case xRay = "X-Ray"
+    case comic = "Comic"
+    case lineScreen = "Line Screen"
+    case pixellate = "Pixellate"
+    case lineOverlay = "Line Overlay"
+    case kaleidoscope = "Kaleidoscope"
+    case bumpDistortion = "Bump Distortion"
+    case twirlDistortion = "Twirl Distortion"
+    case motionBlur = "Motion Blur"
+    case zoomBlur = "Zoom Blur"
+    case lightTunnel = "Light Tunnel"
+    case droste = "Droste"
+    case glassLozenge = "Glass Lozenge"
+    case fisheye = "Fisheye"
     var id: String { rawValue }
 }
 

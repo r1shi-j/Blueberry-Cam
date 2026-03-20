@@ -5,6 +5,7 @@ extension CameraModel {
     func setupCameraControls() {
         // Surgical removal to prevent duplicates
         if let c = cleanUIControl { session.removeControl(c); cleanUIControl = nil }
+        if let filter = filterControl { session.removeControl(filter); filterControl = nil }
         if let l = lensControl { session.removeControl(l); lensControl = nil }
         if let e = evControl { session.removeControl(e); evControl = nil }
         if let i = isoControl { session.removeControl(i); isoControl = nil }
@@ -31,25 +32,40 @@ extension CameraModel {
         self.cleanUIControl = picker
         session.addControl(picker)
         
-        // Lens Picker
-        let availableLenses = Lens.allCases.filter { len in
-            AVCaptureDevice.default(len.deviceType, for: .video, position: len.position) != nil
+        // Filter Picker
+        let availableFilters = PhotoFilter.allCases
+        let filterTitles = availableFilters.map(\.rawValue)
+        let filterPicker = AVCaptureIndexPicker("Filters", symbolName: "camera.filters", localizedIndexTitles: filterTitles)
+        filterPicker.setActionQueue(.main) { [weak self] index in
+            guard let self else { return }
+            guard index >= 0 && index < availableFilters.count else { return }
+            self.changePhotoFilter(to: availableFilters[index])
         }
-        if !availableLenses.isEmpty {
-            let titles = availableLenses.map { "\($0.label)x" }
-            let picker = AVCaptureIndexPicker("Cameras", symbolName: "camera.aperture", localizedIndexTitles: titles)
-            picker.setActionQueue(.main) { [weak self] index in
-                guard let self else { return }
-                guard index >= 0 && index < availableLenses.count else { return }
-                self.switchLens(to: availableLenses[index])
-            }
-            if let activeIndex = availableLenses.firstIndex(of: activeLens) {
-                picker.selectedIndex = activeIndex
-            }
-            self.lensControl = picker
-            session.addControl(picker)
+        if let selectedIndex = availableFilters.firstIndex(of: selectedPhotoFilter) {
+            filterPicker.selectedIndex = selectedIndex
         }
+        self.filterControl = filterPicker
+        session.addControl(filterPicker)
         
+        // Lens Picker
+//        let availableLenses = Lens.allCases.filter { len in
+//            AVCaptureDevice.default(len.deviceType, for: .video, position: len.position) != nil
+//        }
+//        if !availableLenses.isEmpty {
+//            let titles = availableLenses.map { "\($0.label)x" }
+//            let picker = AVCaptureIndexPicker("Cameras", symbolName: "camera.aperture", localizedIndexTitles: titles)
+//            picker.setActionQueue(.main) { [weak self] index in
+//                guard let self else { return }
+//                guard index >= 0 && index < availableLenses.count else { return }
+//                self.switchLens(to: availableLenses[index])
+//            }
+//            if let activeIndex = availableLenses.firstIndex(of: activeLens) {
+//                picker.selectedIndex = activeIndex
+//            }
+//            self.lensControl = picker
+//            session.addControl(picker)
+//        }
+
         // EV Slider
         let ev = AVCaptureSlider("Exposure", symbolName: "plusminus", in: -4.0...4.0, step: 0.1)
         ev.prominentValues = [-4.0, -3.5, -3.0, -2.5, -2.0, -1.5, -1.0, -0.5, 0.0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0]
@@ -145,6 +161,7 @@ extension CameraModel {
     }
     
     func updateCameraControlsMode() {
+        filterControl?.isEnabled = captureMode != .raw
         evControl?.isEnabled = isAutoExposure
         isoControl?.isEnabled = !isAutoExposure
         ssControl?.isEnabled = !isAutoExposure
@@ -153,6 +170,16 @@ extension CameraModel {
     }
     
     // MARK: - Bidirectional Sync Helpers
+    func syncPhotoFilterToHardware() {
+        guard let ctrl = filterControl,
+              let selectedIndex = PhotoFilter.allCases.firstIndex(of: selectedPhotoFilter) else { return }
+        if ctrl.selectedIndex != selectedIndex {
+            isUpdatingHardwareControl = true
+            ctrl.selectedIndex = selectedIndex
+            isUpdatingHardwareControl = false
+        }
+    }
+    
     func syncEVToHardware() {
         guard let ctrl = evControl else { return }
         let clamped = max(-4.0, min(4.0, exposureBias))

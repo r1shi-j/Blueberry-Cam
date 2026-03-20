@@ -32,6 +32,16 @@ struct SettingsView: View {
                         .frame(maxWidth: 200)
                     }
                     
+                    LabeledContent("Filter ") {
+                        Picker("", selection: $cameraModel.defaultPhotoFilter) {
+                            ForEach(PhotoFilter.allCases, id: \.self) { filter in
+                                Text(filter.rawValue)
+                                    .tag(filter)
+                            }
+                        }
+                        .pickerStyle(.menu)
+                    }
+                    
                     LabeledContent("Geotag Location ") {
                         Toggle("", isOn: $cameraModel.shouldGeotagLocation)
                     }
@@ -42,7 +52,7 @@ struct SettingsView: View {
                 } header: {
                     Text("Image Defaults")
                 } footer: {
-                    Text("Preferred format and resolution will be automatically selected when supported by the lens.")
+                    Text("Preferred format, resolution, and filter are used as startup defaults.")
                 }
                 
                 Section {
