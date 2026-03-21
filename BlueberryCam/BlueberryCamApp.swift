@@ -42,4 +42,3 @@ struct BlueberryCamApp: App {
 // ProRaw
 
 // MARK: - FIXME
-// update to version 3
