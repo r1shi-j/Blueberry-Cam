@@ -17,6 +17,8 @@ extension ManualControlsView {
     private var isoString: String { "ISO" }
     private var ssString: String { "Shutter" }
     private var focusString: String { "Focus" }
+    private var focusPeakingString: String { "Focus Peaking" }
+    private var focusLoupeString: String { "Focus Loupe" }
     private var wbString: String { "White Balance" }
     
     private var customEVValue: String { String(format: "%+.1f", cameraModel.exposureBias) }
@@ -207,12 +209,23 @@ struct ManualControlsView: View {
                     
                     if !cameraModel.isAutoFocus {
                         HStack {
-                            Text("FOCUS PEAKING")
+                            Text(focusPeakingString.uppercased())
                                 .font(Fonts.manualLabel)
                                 .foregroundColor(Colors.manualLabel)
                                 .tracking(2)
                             Spacer()
                             Toggle("", isOn: $cameraModel.showFocusPeaking)
+                                .labelsHidden()
+                                .tint(.green)
+                        }
+                        .padding(.horizontal, 20)
+                        HStack {
+                            Text(focusLoupeString.uppercased())
+                                .font(Fonts.manualLabel)
+                                .foregroundColor(Colors.manualLabel)
+                                .tracking(2)
+                            Spacer()
+                            Toggle("", isOn: $cameraModel.showFocusLoupe)
                                 .labelsHidden()
                                 .tint(.green)
                         }

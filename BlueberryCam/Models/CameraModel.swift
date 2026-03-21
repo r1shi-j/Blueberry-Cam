@@ -200,13 +200,21 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
     var isAdjustingManualFocus: Bool = false
     var showFocusPeaking: Bool = true {
         didSet {
+            if showFocusPeaking && showFocusLoupe { showFocusLoupe = false }
             peakingEnabledForAnalysis = !isAutoFocus && showFocusPeaking
+        }
+    }
+    var showFocusLoupe: Bool = false {
+        didSet {
+            if showFocusLoupe && showFocusPeaking { showFocusPeaking = false }
+            loupeEnabledForAnalysis = !isAutoFocus && showFocusLoupe
         }
     }
     var isAutoFocus: Bool = true {
         didSet {
             if oldValue != isAutoFocus {
                 peakingEnabledForAnalysis = !isAutoFocus && showFocusPeaking
+                loupeEnabledForAnalysis = !isAutoFocus && showFocusLoupe
                 if !isAutoFocus, let d = device {
                     self.lensPosition = d.lensPosition
                 }
@@ -286,11 +294,19 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
             }
         }
     }
+    var loupeImage: CGImage?
+    nonisolated static let loupeCIContext = CIContext(options: [.useSoftwareRenderer: false])
+    var focusPeakingMask: [UInt8] = []
+    var zebraMask: [UInt8] = []
+    var clippingMask: [UInt8] = []
+    var analysisGridSize: CGSize = .zero
     var histogramData: [Float] = Array(repeating: 0, count: 256)
     var redHistogram: [Float] = Array(repeating: 0, count: 256)
     var greenHistogram: [Float] = Array(repeating: 0, count: 256)
     var blueHistogram: [Float] = Array(repeating: 0, count: 256)
     var waveformData: [Float] = []
+    nonisolated static var wfCols: Int { WaveformConstants.wfCols }
+    nonisolated static var wfRows: Int { WaveformConstants.wfRows }
     var tapFocusIndicatorPoint: CGPoint? = nil
     var isTapFocusIndicatorVisible = false
     var isTapFocusIndicatorDimmed = false
@@ -298,12 +314,6 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
     var tapFocusIndicatorOffset: CGFloat = 0
     var tapFocusLockLabel: String? = nil
     var tapExposureBias: Float = 0
-    nonisolated static var wfCols: Int { WaveformConstants.wfCols }
-    nonisolated static var wfRows: Int { WaveformConstants.wfRows }
-    var analysisGridSize: CGSize = .zero
-    var focusPeakingMask: [UInt8] = []
-    var zebraMask: [UInt8] = []
-    var clippingMask: [UInt8] = []
     var tap​Focus​Lock​Haptic​Trigger: Int = 0
     @ObservationIgnored
     var tapFocusHideTask: Task<Void, Never>?
@@ -323,6 +333,8 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
     var tapFocusLensPositionBaseline: Float?
     @ObservationIgnored
     var tapFocusLensPositionMonitorTask: Task<Void, Never>?
+    @ObservationIgnored
+    nonisolated(unsafe) private(set) var loupeEnabledForAnalysis: Bool = false
     @ObservationIgnored
     nonisolated(unsafe) private(set) var peakingEnabledForAnalysis: Bool = false
     @ObservationIgnored

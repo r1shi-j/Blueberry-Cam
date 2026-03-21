@@ -216,7 +216,7 @@ struct CaptureView: View {
                     )
                     
                     if !cameraModel.showSimpleView {
-                        // MARK: - Peaking/Clipping overlays
+                        // MARK: - Zebras
                         if cameraModel.showZebraStripes {
                             AnalysisOverlayView(
                                 mask: cameraModel.zebraMask,
@@ -227,7 +227,19 @@ struct CaptureView: View {
                             .position(x: previewRect.midX, y: previewRect.midY)
                         }
                         
-                        if !cameraModel.isAutoFocus {
+                        // MARK: - Highlight Clipping
+                        if cameraModel.showClipping {
+                            AnalysisOverlayView(
+                                mask: cameraModel.clippingMask,
+                                gridSize: cameraModel.analysisGridSize,
+                                style: .clipping
+                            )
+                            .frame(width: previewRect.width, height: previewRect.height)
+                            .position(x: previewRect.midX, y: previewRect.midY)
+                        }
+                        
+                        // MARK: - Focus Peaking
+                        if !cameraModel.isAutoFocus && cameraModel.showFocusPeaking {
                             AnalysisOverlayView(
                                 mask: cameraModel.focusPeakingMask,
                                 gridSize: cameraModel.analysisGridSize,
@@ -237,14 +249,20 @@ struct CaptureView: View {
                             .position(x: previewRect.midX, y: previewRect.midY)
                         }
                         
-                        if cameraModel.showClipping {
-                            AnalysisOverlayView(
-                                mask: cameraModel.clippingMask,
-                                gridSize: cameraModel.analysisGridSize,
-                                style: .clipping
-                            )
-                            .frame(width: previewRect.width, height: previewRect.height)
-                            .position(x: previewRect.midX, y: previewRect.midY)
+                        // MARK: - Focus Loupe
+                        if !cameraModel.isAutoFocus && cameraModel.showFocusLoupe, cameraModel.loupeImage != nil {
+                            let loupeSize: CGFloat = previewRect.width / 3
+                            FocusLoupeView(loupeImage: cameraModel.loupeImage)
+                                .frame(width: loupeSize, height: loupeSize)
+                                .clipShape(Circle())
+                                .overlay(
+                                    Circle()
+                                        .stroke(.white.opacity(0.5), lineWidth: 1.5)
+                                )
+                                .shadow(color: .black.opacity(0.5), radius: 8, x: 0, y: 2)
+                                .position(x: previewRect.midX, y: previewRect.midY)
+                                .allowsHitTesting(false)
+                                .transition(.opacity)
                         }
                         
                         // MARK: - Crop frame overlay

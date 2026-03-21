@@ -43,12 +43,11 @@ struct BlueberryCamApp: App {
 // Add tips, welcome screen and tutorials
 
 // Implement 3rd row on TopBarView: Macro, portrait, dual cam, burst, flash, timer buttons
-// Focus Loupe, in manual focus toggle between focus peaking, focus loupe or none
 // Show proper selfie cameras
-// View outside frame
 // Improve lens picker UI (liquid glass sliding), move to bottom right?
 // Click on any readout -> shows vertical slider right side screen like halide (and add animations to knock on effects)
 /// slider shows the auto value constantly updating, manually changing it turns on manual mode, for ss/iso have left iso right ss?
+// View outside frame
 // ProRaw
 
 // MARK: - FIXME

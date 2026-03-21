@@ -1,6 +1,6 @@
 internal import AVFoundation
-import Foundation
 import CoreMedia
+import Foundation
 
 extension CameraModel: AVCaptureDataOutputSynchronizerDelegate, AVCaptureVideoDataOutputSampleBufferDelegate {
     // FALLBACK: Used when LiDAR/Depth is not available or connections fail
@@ -39,6 +39,7 @@ extension CameraModel: AVCaptureDataOutputSynchronizerDelegate, AVCaptureVideoDa
         }
         
         let frameNumber = frameCounter.next()
+        let wantsLoupe = loupeEnabledForAnalysis
         let wantsPeaking = peakingEnabledForAnalysis
         let wantsZebra = zebraEnabledForAnalysis
         let wantsClipping = clippingEnabledForAnalysis
@@ -49,6 +50,65 @@ extension CameraModel: AVCaptureDataOutputSynchronizerDelegate, AVCaptureVideoDa
         let wantsWaveform = modeSmall == .waveform || modeLarge == .waveform
         let wantsColorHistogram = modeSmall == .color || modeSmall == .parade || modeLarge == .color || modeLarge == .parade
         let wantsAnyAnalysis = wantsPeaking || wantsZebra || wantsClipping || wantsHistogramSmall || wantsHistogramLarge
+        
+        // Generate loupe image from center crop (every 4th frame for performance)
+        if wantsLoupe, frameNumber.isMultiple(of: 4) {
+            let fullW = CVPixelBufferGetWidth(pixelBuffer)
+            let fullH = CVPixelBufferGetHeight(pixelBuffer)
+            let pixelFormat = CVPixelBufferGetPixelFormatType(pixelBuffer)
+            
+            // Only support BGRA for direct crop
+            if pixelFormat == kCVPixelFormatType_32BGRA {
+                CVPixelBufferLockBaseAddress(pixelBuffer, .readOnly)
+                let bytesPerRow = CVPixelBufferGetBytesPerRow(pixelBuffer)
+                guard let base = CVPixelBufferGetBaseAddress(pixelBuffer) else {
+                    CVPixelBufferUnlockBaseAddress(pixelBuffer, .readOnly)
+                    return
+                }
+                
+                // Crop center 1/9th of frame → 3× magnification
+                let cropSize = min(fullW, fullH) / 9
+                let cropX = (fullW - cropSize) / 2
+                let cropY = (fullH - cropSize) / 2
+                let outSize = 200 // Small output for the loupe circle
+                
+                if let ctx = CGContext(
+                    data: nil,
+                    width: outSize,
+                    height: outSize,
+                    bitsPerComponent: 8,
+                    bytesPerRow: outSize * 4,
+                    space: CGColorSpaceCreateDeviceRGB(),
+                    bitmapInfo: CGBitmapInfo.byteOrder32Little.rawValue | CGImageAlphaInfo.premultipliedFirst.rawValue
+                ) {
+                    // Scale and draw the crop directly
+                    let srcPtr = base.advanced(by: cropY * bytesPerRow + cropX * 4)
+                    for dy in 0..<outSize {
+                        let sy = dy * cropSize / outSize
+                        let srcRow = srcPtr.advanced(by: sy * bytesPerRow)
+                        let dstRow = ctx.data!.advanced(by: dy * outSize * 4)
+                        for dx in 0..<outSize {
+                            let sx = dx * cropSize / outSize
+                            dstRow.advanced(by: dx * 4).copyMemory(
+                                from: srcRow.advanced(by: sx * 4),
+                                byteCount: 4
+                            )
+                        }
+                    }
+                    let cgImage = ctx.makeImage()
+                    CVPixelBufferUnlockBaseAddress(pixelBuffer, .readOnly)
+                    if let cgImage {
+                        Task { @MainActor in self.loupeImage = cgImage }
+                    }
+                } else {
+                    CVPixelBufferUnlockBaseAddress(pixelBuffer, .readOnly)
+                }
+            }
+        } else if !wantsLoupe {
+            Task { @MainActor in
+                if self.loupeImage != nil { self.loupeImage = nil }
+            }
+        }
         
         guard wantsAnyAnalysis else {
             if !peakingTemporalScores.isEmpty {
