@@ -89,7 +89,7 @@ struct SettingsView: View {
                     Text("This app supports lens smudge detection and is always enabled.")
                 }
                 
-                Section {
+                Section("About") {
                     Text("This app supports LockedCameraCapture which enables the app to be opened from camera control, control centre and from the lock screen action buttons. However when the app is opened from the lock screen some features arent available, these include: Histograms, Zebras, Highlight Clipping, Focus Peaking, Level, Grid, Selfie Cameras, Embedding Location and Recognising Barcodes. Settings, Clean UI view and filters will also not be available as camera control isn't available. Additionally the default image format and resolution will not be applied, this required a paid Apple Developer account. The defaults used will be Efficient High Efficiency (HEIF 12MP). To open the full app click the app icon in the bottom left (left of the shutter).")
                     Text("Photos library usage is only required to search for the album to save photos taken with this app, you can set it to limited access and select no photos, the app still work.")
                     Text("With auto focus and auto exposure, tap sets focus and exposure at the selected point, and hold locks both focus and exposure. With auto focus and manual exposure, tap sets focus and hold locks focus. With manual focus and auto exposure, tap sets exposure at the selected point.")
@@ -97,10 +97,25 @@ struct SettingsView: View {
                         isShowingConfirmationAlert = true
                     }
                     .tint(.red)
+                }
+                
+                Section {
+                    Button {
+                        openMail(subject: "Bug Report", description: "Enter your bug report with screenshots (recommended) below this line.")
+                    } label: {
+                        LabeledContent("Bug Report") { Image(systemName: "mail") }
+                            .tint(.red)
+                    }
+                    Button {
+                        openMail(subject: "Feature Request", description: "Enter your feature request with any mockup sketches below this line. Describe your feature in detail to the best of your extent.")
+                    } label: {
+                        LabeledContent("Feature Request") { Image(systemName: "mail") }
+                            .tint(.blue)
+                    }
                 } header: {
-                    Text("About")
+                    Text("Contact")
                 } footer: {
-                    Text(" Rishi Jansari © 2026")
+                    Text("© 2026 Rishi Jansari . All Rights Reserved.")
                 }
             }
             .navigationTitle("Settings")
@@ -115,6 +130,30 @@ struct SettingsView: View {
                 Button("Cancel", role: .cancel) { }
                 Button("Reset", role: .destructive, action: resetShutterCount)
             }
+        }
+    }
+    
+    private func openMail(subject: String, description: String) {
+        let appName = Bundle.main.infoDictionary?[kCFBundleNameKey as String] as? String ?? "Unknown"
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "?"
+        let build = Bundle.main.object(forInfoDictionaryKey: kCFBundleVersionKey as String) as? String ?? "?"
+        let model = UIDevice.current.model
+        let os = "\(UIDevice.current.systemName) \(UIDevice.current.systemVersion)"
+        
+        let body = """
+    ————————————————————————
+    App: \(appName) \(version) (\(build))
+    Device: \(model), \(os)
+    \(description)
+    ————————————————————————
+    """
+        
+        let encodedBody = body.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
+        let encodedSubject = "Blueberry Camera App: \(subject)"
+            .addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
+        
+        if let url = URL(string: "mailto:rishi_j@icloud.com?subject=\(encodedSubject)&body=\(encodedBody)") {
+            UIApplication.shared.open(url)
         }
     }
 }
