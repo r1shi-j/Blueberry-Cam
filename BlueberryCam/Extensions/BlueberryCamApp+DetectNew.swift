@@ -42,8 +42,9 @@ extension BlueberryCamApp {
         
         let photoCount = ids.count
         
-        // Only attempt album operations if we have read access
-        let readStatus = PHPhotoLibrary.authorizationStatus(for: .addOnly)
+        // Only attempt album operations if we have read access (.readWrite).
+        // Checking .addOnly here would trigger an implicit .readWrite prompt.
+        let readStatus = PHPhotoLibrary.authorizationStatus(for: .readWrite)
         let canRead = readStatus == .authorized || readStatus == .limited
         
         if canRead {

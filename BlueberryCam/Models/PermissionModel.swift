@@ -37,14 +37,23 @@ final class PermissionModel {
     }
     
     private func checkPhotos() async {
-        switch PHPhotoLibrary.authorizationStatus(for: .addOnly) {
-            case .authorized, .limited:
-                photosStatus = .granted
-            case .notDetermined:
-                let status = await PHPhotoLibrary.requestAuthorization(for: .addOnly)
-                photosStatus = (status == .authorized || status == .limited) ? .granted : .denied
-            default:
-                photosStatus = .denied
+        // Step 1: Ensure at least add-only access for saving photos.
+        var addStatus = PHPhotoLibrary.authorizationStatus(for: .addOnly)
+        if addStatus == .notDetermined {
+            addStatus = await PHPhotoLibrary.requestAuthorization(for: .addOnly)
+        }
+        guard addStatus == .authorized || addStatus == .limited else {
+            photosStatus = .denied
+            return
+        }
+        photosStatus = .granted
+        
+        // Step 2: Ask for read/write once (enables album management).
+        // iOS only shows this prompt once — if declined, add-only access
+        // remains and photos save to the camera roll without album sorting.
+        let readWriteStatus = PHPhotoLibrary.authorizationStatus(for: .readWrite)
+        if readWriteStatus == .notDetermined {
+            _ = await PHPhotoLibrary.requestAuthorization(for: .readWrite)
         }
     }
 }

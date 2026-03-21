@@ -10,6 +10,15 @@ class LockedCameraModel: NSObject {
     private var lockedSession: LockedCameraCaptureSession?
     var photosAuthStatus: PHAuthorizationStatus = PHPhotoLibrary.authorizationStatus(for: .addOnly)
     
+    /// Whether the extension has sufficient Photos access to save captures.
+    /// Checks both `.addOnly` and `.readWrite` — if either is granted, we can save.
+    var hasPhotosAccess: Bool {
+        let addOnly = PHPhotoLibrary.authorizationStatus(for: .addOnly)
+        let readWrite = PHPhotoLibrary.authorizationStatus(for: .readWrite)
+        return addOnly == .authorized || addOnly == .limited
+            || readWrite == .authorized || readWrite == .limited
+    }
+    
     var device: AVCaptureDevice?
     nonisolated let photoOutput = AVCapturePhotoOutput()
     nonisolated let videoOutput = AVCaptureVideoDataOutput()
@@ -196,15 +205,11 @@ class LockedCameraModel: NSObject {
         self.lockedSession = lockedSession
         _sessionContentURLBox.value = lockedSession.sessionContentURL
         
-        // Request photos authorization eagerly so it's ready before first capture
+        // Refresh photos authorization — the main app handles the prompt,
+        // so this just picks up the current status.
         Task {
             let status = PHPhotoLibrary.authorizationStatus(for: .addOnly)
-            if status == .notDetermined {
-                let newStatus = await PHPhotoLibrary.requestAuthorization(for: .addOnly)
-                photosAuthStatus = newStatus
-            } else {
-                photosAuthStatus = status
-            }
+            photosAuthStatus = status
         }
         
         sessionQueue.async { Task { @MainActor in self.setupPipeline() } }

@@ -236,10 +236,10 @@ struct LockedCaptureView: View {
     var body: some View {
         ZStack {
             cameraContent
-                .disabled(cameraModel.photosAuthStatus != .authorized)
+                .disabled(!cameraModel.hasPhotosAccess)
             
             // MARK: - Photos Permission Denied Overlay
-            if cameraModel.photosAuthStatus != .authorized {
+            if !cameraModel.hasPhotosAccess {
                 ZStack {
                     Color.black.opacity(0.85).ignoresSafeArea()
                     
