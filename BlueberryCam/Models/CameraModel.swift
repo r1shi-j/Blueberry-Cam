@@ -1,6 +1,6 @@
 internal import AVFoundation
 internal import CoreLocation
-import Photos
+internal import Photos
 import UIKit
 
 @MainActor @Observable

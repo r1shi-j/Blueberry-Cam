@@ -2,7 +2,7 @@ internal import AVFoundation
 import CoreImage
 import Foundation
 import ImageIO
-import Photos
+internal import Photos
 import UniformTypeIdentifiers
 
 extension CameraModel: AVCapturePhotoCaptureDelegate {
@@ -44,6 +44,7 @@ extension CameraModel: AVCapturePhotoCaptureDelegate {
         
         performSave(data: data, location: location, isDNG: isDNG, isHEIF: isHEIF)
     }
+    
     private nonisolated func performSave(data: Data, location: CLLocation? = nil, isDNG: Bool, isHEIF: Bool) {
         let albumID = resolveAlbumID()
         let album = albumID.flatMap {

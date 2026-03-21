@@ -1,6 +1,6 @@
 internal import AVFoundation
 import CoreMedia
-import Photos
+internal import Photos
 import SwiftUI
 
 // MARK: Constants

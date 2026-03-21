@@ -1,5 +1,5 @@
 internal import AVFoundation
-import Photos
+internal import Photos
 import SwiftUI
 
 @MainActor @Observable

@@ -1,4 +1,5 @@
 import LockedCameraCapture
+internal import Photos
 import SwiftUI
 
 extension LockedCaptureView {
@@ -138,7 +139,7 @@ struct LockedCaptureView: View {
     @State private var visualOpacity: CGFloat = 1.0
     @State private var isAwaitingSameFacingLensCompletion = false
     
-    var body: some View {
+    private var cameraContent: some View {
         GeometryReader { geo in
             let previewRect = makePreviewRect(in: geo)
             
@@ -228,6 +229,52 @@ struct LockedCaptureView: View {
                         .position(x: previewRect.midX, y: previewRect.midY)
                         .animation(.easeOut(duration: 0.15), value: cameraModel.isCapturing)
                 }
+            }
+        }
+    }
+    
+    var body: some View {
+        ZStack {
+            cameraContent
+                .disabled(cameraModel.photosAuthStatus != .authorized)
+            
+            // MARK: - Photos Permission Denied Overlay
+            if cameraModel.photosAuthStatus != .authorized {
+                ZStack {
+                    Color.black.opacity(0.85).ignoresSafeArea()
+                    
+                    VStack(spacing: 20) {
+                        Image(systemName: "photo.badge.exclamationmark")
+                            .font(.system(size: 48))
+                            .foregroundStyle(.white)
+                        
+                        Text("Photos Access Required")
+                            .font(.system(size: 18, weight: .bold))
+                            .foregroundStyle(.white)
+                        
+                        Text("Blueberry Cam needs permission to save photos.")
+                            .font(.system(size: 14))
+                            .foregroundStyle(.white.opacity(0.7))
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 32)
+                        
+                        Button {
+                            Task {
+                                let activity = NSUserActivity(activityType: "\(BundleIDs.fullBundleID).opencamera")
+                                try? await lockedSession.openApplication(for: activity)
+                            }
+                        } label: {
+                            Text("Open App to Grant Access")
+                                .font(.system(size: 15, weight: .semibold))
+                                .foregroundStyle(.black)
+                                .padding(.horizontal, 24)
+                                .padding(.vertical, 12)
+                                .background(.white)
+                                .clipShape(.capsule)
+                        }
+                    }
+                }
+                .transition(.opacity)
             }
         }
         .environment(\.scenePhase, .active)

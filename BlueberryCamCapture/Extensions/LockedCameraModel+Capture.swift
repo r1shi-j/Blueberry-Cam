@@ -1,6 +1,6 @@
 internal import AVFoundation
 import Foundation
-import Photos
+internal import Photos
 
 extension LockedCameraModel: AVCapturePhotoCaptureDelegate {
     nonisolated func photoOutput(_ output: AVCapturePhotoOutput,

@@ -1,6 +1,6 @@
 internal import AVFoundation
 import LockedCameraCapture
-import Photos
+internal import Photos
 import UIKit
 
 @MainActor @Observable
@@ -8,6 +8,7 @@ class LockedCameraModel: NSObject {
     // MARK: - Session
     nonisolated let session = AVCaptureSession()
     private var lockedSession: LockedCameraCaptureSession?
+    var photosAuthStatus: PHAuthorizationStatus = PHPhotoLibrary.authorizationStatus(for: .addOnly)
     
     var device: AVCaptureDevice?
     nonisolated let photoOutput = AVCapturePhotoOutput()
@@ -196,9 +197,14 @@ class LockedCameraModel: NSObject {
         _sessionContentURLBox.value = lockedSession.sessionContentURL
         
         // Request photos authorization eagerly so it's ready before first capture
-        let status = PHPhotoLibrary.authorizationStatus(for: .addOnly)
-        if status == .notDetermined {
-            PHPhotoLibrary.requestAuthorization(for: .addOnly) { _ in }
+        Task {
+            let status = PHPhotoLibrary.authorizationStatus(for: .addOnly)
+            if status == .notDetermined {
+                let newStatus = await PHPhotoLibrary.requestAuthorization(for: .addOnly)
+                photosAuthStatus = newStatus
+            } else {
+                photosAuthStatus = status
+            }
         }
         
         sessionQueue.async { Task { @MainActor in self.setupPipeline() } }

@@ -1,6 +1,6 @@
 import Foundation
 import LockedCameraCapture
-import Photos
+internal import Photos
 
 extension BlueberryCamApp {
     func detectLockedCaptureSessions() async {
