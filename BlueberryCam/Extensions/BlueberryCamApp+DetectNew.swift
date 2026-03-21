@@ -3,11 +3,23 @@ import LockedCameraCapture
 internal import Photos
 
 extension BlueberryCamApp {
+    /// Tracks session URLs that have already been processed so the live stream
+    /// and the snapshot scan don't double-count the same session.
+    private static let processedURLs = ProcessedURLSet()
+    
     func detectLockedCaptureSessions() async {
         for await update in LockedCameraCaptureManager.shared.sessionContentUpdates {
             if case .added(let url) = update {
+                guard Self.processedURLs.insert(url) else { continue }
                 await addSessionPhotosToAlbum(at: url)
             }
+        }
+    }
+    
+    func scanExistingSessions() async {
+        for url in LockedCameraCaptureManager.shared.sessionContentURLs {
+            guard Self.processedURLs.insert(url) else { continue }
+            await addSessionPhotosToAlbum(at: url)
         }
     }
     
@@ -28,7 +40,6 @@ extension BlueberryCamApp {
             return
         }
         
-        // Always increment shutter count — we know photos were taken from the manifest
         let photoCount = ids.count
         
         // Only attempt album operations if we have read access
@@ -36,10 +47,12 @@ extension BlueberryCamApp {
         let canRead = readStatus == .authorized || readStatus == .limited
         
         if canRead {
-            let assets = PHAsset.fetchAssets(withLocalIdentifiers: ids, options: nil)
-            guard assets.count > 0 else {
-                // Photos not yet in library, don't invalidate — retry next time
-                DispatchQueue.main.async { self.shutterCount += photoCount }
+            // Use the retry helper — Photos may not have indexed the assets yet
+            // immediately after the locked camera extension saved them.
+            guard let assets = await fetchAllAssets(withIdentifiers: ids) else {
+                // Exhausted retries — photos were likely deleted or are inaccessible.
+                // Invalidate the session so it isn't reprocessed on every launch.
+                Task { try? await LockedCameraCaptureManager.shared.invalidateSessionContent(at: sessionURL) }
                 return
             }
             
@@ -69,7 +82,8 @@ extension BlueberryCamApp {
             }
         }
         
-        // Increment regardless of read access
+        // Increment and invalidate — we confirmed the photos exist (or we have add-only access
+        // and trust the manifest).
         DispatchQueue.main.async { self.shutterCount += photoCount }
         Task { try? await LockedCameraCaptureManager.shared.invalidateSessionContent(at: sessionURL) }
     }
@@ -94,5 +108,18 @@ extension BlueberryCamApp {
         
         let partial = PHAsset.fetchAssets(withLocalIdentifiers: ids, options: nil)
         return partial.count > 0 ? partial : nil
+    }
+}
+
+// MARK: - Thread-safe set to track processed session URLs
+final class ProcessedURLSet: @unchecked Sendable {
+    private var urls = Set<URL>()
+    private let lock = NSLock()
+    
+    /// Returns `true` if the URL was newly inserted, `false` if it was already present.
+    func insert(_ url: URL) -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return urls.insert(url).inserted
     }
 }

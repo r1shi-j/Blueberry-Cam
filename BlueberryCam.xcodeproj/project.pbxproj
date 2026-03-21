@@ -604,7 +604,7 @@
 				INFOPLIST_KEY_CFBundleDisplayName = BlueberryCamCapture;
 				INFOPLIST_KEY_NSCameraUsageDescription = "Blueberry Cam needs camera access to capture photos.";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
-				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "Blueberry Cam saves your photos to your library.";
+				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "Blueberry Cam will save photos directly to your photo library.";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -637,7 +637,7 @@
 				INFOPLIST_KEY_CFBundleDisplayName = BlueberryCamCapture;
 				INFOPLIST_KEY_NSCameraUsageDescription = "Blueberry Cam needs camera access to capture photos.";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
-				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "Blueberry Cam saves your photos to your library.";
+				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "Blueberry Cam will save photos directly to your photo library.";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				LD_RUNPATH_SEARCH_PATHS = (
