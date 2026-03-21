@@ -198,10 +198,15 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
     var exposureDebounceTask: Task<Void, Never>?
     
     var isAdjustingManualFocus: Bool = false
+    var showFocusPeaking: Bool = true {
+        didSet {
+            peakingEnabledForAnalysis = !isAutoFocus && showFocusPeaking
+        }
+    }
     var isAutoFocus: Bool = true {
         didSet {
             if oldValue != isAutoFocus {
-                peakingEnabledForAnalysis = !isAutoFocus
+                peakingEnabledForAnalysis = !isAutoFocus && showFocusPeaking
                 if !isAutoFocus, let d = device {
                     self.lensPosition = d.lensPosition
                 }

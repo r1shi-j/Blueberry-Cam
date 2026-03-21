@@ -207,6 +207,17 @@ struct ManualControlsView: View {
                     
                     if !cameraModel.isAutoFocus {
                         HStack {
+                            Text("FOCUS PEAKING")
+                                .font(Fonts.manualLabel)
+                                .foregroundColor(Colors.manualLabel)
+                                .tracking(2)
+                            Spacer()
+                            Toggle("", isOn: $cameraModel.showFocusPeaking)
+                                .labelsHidden()
+                                .tint(.green)
+                        }
+                        .padding(.horizontal, 20)
+                        HStack {
                             Text("")
                                 .font(Fonts.manualLabel)
                                 .tracking(2)
