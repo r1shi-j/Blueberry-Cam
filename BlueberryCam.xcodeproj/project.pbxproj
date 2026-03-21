@@ -537,7 +537,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 3.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "com.jansari.rishi.Blueberry-Cam";
+				PRODUCT_BUNDLE_IDENTIFIER = com.jansari.rishi.blueberrycam;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -579,7 +579,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 3.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "com.jansari.rishi.Blueberry-Cam";
+				PRODUCT_BUNDLE_IDENTIFIER = com.jansari.rishi.blueberrycam;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -613,7 +613,7 @@
 					"@executable_path/../../Frameworks",
 				);
 				MARKETING_VERSION = 3.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "com.jansari.rishi.Blueberry-Cam.BlueberryCamCapture";
+				PRODUCT_BUNDLE_IDENTIFIER = com.jansari.rishi.blueberrycam.BlueberryCamCapture;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -646,7 +646,7 @@
 					"@executable_path/../../Frameworks",
 				);
 				MARKETING_VERSION = 3.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "com.jansari.rishi.Blueberry-Cam.BlueberryCamCapture";
+				PRODUCT_BUNDLE_IDENTIFIER = com.jansari.rishi.blueberrycam.BlueberryCamCapture;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -679,7 +679,7 @@
 					"@executable_path/../../Frameworks",
 				);
 				MARKETING_VERSION = 3.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "com.jansari.rishi.Blueberry-Cam.BlueberryCamWidget";
+				PRODUCT_BUNDLE_IDENTIFIER = com.jansari.rishi.blueberrycam.BlueberryCamWidget;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -712,7 +712,7 @@
 					"@executable_path/../../Frameworks",
 				);
 				MARKETING_VERSION = 3.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "com.jansari.rishi.Blueberry-Cam.BlueberryCamWidget";
+				PRODUCT_BUNDLE_IDENTIFIER = com.jansari.rishi.blueberrycam.BlueberryCamWidget;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
