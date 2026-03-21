@@ -29,26 +29,18 @@ extension BlueberryCamApp {
         }
         
         let albumID = resolveAlbumID()
-        let album = albumID.flatMap {
-            PHAssetCollection.fetchAssetCollections(
-                withLocalIdentifiers: [$0], options: nil
-            ).firstObject
-        }
-        guard let album else { return }
+        guard let albumID, let album = PHAssetCollection.fetchAssetCollections(withLocalIdentifiers: [albumID], options: nil).firstObject else { return }
+        guard let assets = await fetchAllAssets(withIdentifiers: ids) else { return }
         
-        let assets = PHAsset.fetchAssets(
-            withLocalIdentifiers: ids, options: nil
-        )
-        guard assets.count > 0 else {
-            return  // don't invalidate — retry next time app opens
-        }
+        let albumAssets = PHAsset.fetchAssets(in: album, options: nil)
+        var existingIDs = Set<String>()
+        albumAssets.enumerateObjects { asset, _, _ in existingIDs.insert(asset.localIdentifier) }
         
         var toAdd: [PHAsset] = []
-        let albumAssets = PHAsset.fetchAssets(in: album, options: nil)
-        var albumIDs = Set<String>()
-        albumAssets.enumerateObjects { a, _, _ in albumIDs.insert(a.localIdentifier) }
-        assets.enumerateObjects { a, _, _ in
-            if !albumIDs.contains(a.localIdentifier) { toAdd.append(a) }
+        assets.enumerateObjects { asset, _, _ in
+            if !existingIDs.contains(asset.localIdentifier) {
+                toAdd.append(asset)
+            }
         }
         
         guard !toAdd.isEmpty else {
@@ -60,14 +52,38 @@ extension BlueberryCamApp {
             PHPhotoLibrary.shared().performChanges({
                 PHAssetCollectionChangeRequest(for: album)?
                     .addAssets(toAdd as NSArray)
-            }) { success, _ in
+            }) { success, error in
                 if success {
-                    DispatchQueue.main.async { self.shutterCount += toAdd.count }
+                    DispatchQueue.main.async {
+                        self.shutterCount += toAdd.count
+                    }
                 }
                 continuation.resume()
             }
         }
         
         Task { try? await LockedCameraCaptureManager.shared.invalidateSessionContent(at: sessionURL) }
+    }
+    
+    // MARK: - Retry helper
+    
+    private func fetchAllAssets(withIdentifiers ids: [String],
+                                maxAttempts: Int = 6,
+                                initialDelaySeconds: Double = 0.3) async -> PHFetchResult<PHAsset>? {
+        let expectedCount = ids.count
+        var delay = initialDelaySeconds
+        
+        for attempt in 1...maxAttempts {
+            let result = PHAsset.fetchAssets(withLocalIdentifiers: ids, options: nil)
+            if result.count >= expectedCount {
+                return result
+            }
+            guard attempt < maxAttempts else { break }
+            try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+            delay = min(delay * 2, 4.0)
+        }
+        
+        let partial = PHAsset.fetchAssets(withLocalIdentifiers: ids, options: nil)
+        return partial.count > 0 ? partial : nil
     }
 }
