@@ -44,19 +44,15 @@ extension LockedCameraModel: AVCapturePhotoCaptureDelegate {
     private nonisolated func saveDirectlyToPhotos(data: Data, isDNG: Bool, isHEIF: Bool, sessionURL: URL?) {
         let currentStatus = PHPhotoLibrary.authorizationStatus(for: .addOnly)
         
-        if currentStatus == .authorized || currentStatus == .limited {
-            performDirectSave(data: data, isDNG: isDNG, isHEIF: isHEIF, sessionURL: sessionURL)
-        } else if currentStatus == .notDetermined {
-            PHPhotoLibrary.requestAuthorization(for: .addOnly) { status in
-                guard status == .authorized || status == .limited else {
-                    Task { @MainActor in self.errorMessage = "Photos access denied."; self.showError = true }
-                    return
-                }
-                self.performDirectSave(data: data, isDNG: isDNG, isHEIF: isHEIF, sessionURL: sessionURL)
+        guard currentStatus == .authorized || currentStatus == .limited else {
+            Task { @MainActor in
+                self.errorMessage = "Photos access denied. Please enable in Settings."
+                self.showError = true
             }
-        } else {
-            Task { @MainActor in self.errorMessage = "Photos access denied."; self.showError = true }
+            return
         }
+        
+        performDirectSave(data: data, isDNG: isDNG, isHEIF: isHEIF, sessionURL: sessionURL)
     }
 
     private nonisolated func performDirectSave(data: Data, isDNG: Bool, isHEIF: Bool, sessionURL: URL?) {
