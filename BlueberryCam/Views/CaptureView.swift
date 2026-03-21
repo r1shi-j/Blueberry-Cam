@@ -140,7 +140,9 @@ extension CaptureView {
 
 struct CaptureView: View {
     @Environment(\.scenePhase) private var scenePhase
+    
     @Binding var shutterCount: Int
+    @Bindable var permissionModel: PermissionModel
     @State private var cameraModel = CameraModel()
     @State private var levelModel = LevelMotionModel()
     @State private var selectedControl: ManualControl?
@@ -166,7 +168,7 @@ struct CaptureView: View {
     @State private var isAwaitingSameFacingLensCompletion = false
     @State private var pendingFacingFlipRotation: Double = 0
     
-    var body: some View {
+    private var cameraContent: some View {
         GeometryReader { geo in
             let previewRect = makePreviewRect(in: geo)
             
@@ -436,6 +438,25 @@ struct CaptureView: View {
                     .frame(height: .zero)
             }
         }
+    }
+    
+    var body: some View {
+        ZStack {
+            if permissionModel.allGranted {
+                cameraContent
+                    .transition(.opacity)
+            } else if permissionModel.anyDenied {
+                PermissionDeniedView(
+                    cameraGranted: permissionModel.cameraStatus == .granted,
+                    photosGranted: permissionModel.photosStatus == .granted
+                )
+                .transition(.opacity)
+            } else {
+                Color.black.ignoresSafeArea()
+            }
+        }
+        .animation(.easeInOut(duration: 0.4), value: permissionModel.allGranted)
+        .animation(.easeInOut(duration: 0.4), value: permissionModel.anyDenied)
         .statusBarHidden()
         .sensoryFeedback(.impact, trigger: hapticTrigger)
         .sensoryFeedback(.impact(flexibility: .soft), trigger: hapticTriggerR)
@@ -457,6 +478,22 @@ struct CaptureView: View {
         }
         .onChange(of: cameraModel.shouldShowLevel) { _, new in
             levelModel.setLevelDisplayEnabled(new && cameraModel.appView == .standard)
+        }
+        .onChange(of: scenePhase) { _, newPhase in
+            if newPhase == .active {    
+                cameraModel.startSession()
+                levelModel.startUpdates() // Always start
+                levelModel.setLevelDisplayEnabled(cameraModel.shouldShowLevel && cameraModel.appView == .standard)
+            } else {
+                cameraModel.stopSession()
+                levelModel.stopUpdates() // Only stop when backgrounded
+                if newPhase == .background {
+                    cameraModel.clearIgnoredCodes()
+                }
+            }
+        }
+        .onChange(of: cameraModel.appView) { _, new in
+            levelModel.setLevelDisplayEnabled(new == .standard && cameraModel.shouldShowLevel)
         }
         .onChange(of: cameraModel.activeLens) { oldLens, newLens in
             cameraModel.clearTapPointInteraction(resetDeviceState: false)
@@ -505,22 +542,6 @@ struct CaptureView: View {
                 withAnimation(.easeOut(duration: 0.18)) {
                     visualBlur = 0
                     visualOpacity = 1.0
-                }
-            }
-        }
-        .onChange(of: cameraModel.appView) { _, new in
-            levelModel.setLevelDisplayEnabled(new == .standard && cameraModel.shouldShowLevel)
-        }
-        .onChange(of: scenePhase) { _, newPhase in
-            if newPhase == .active {
-                cameraModel.startSession()
-                levelModel.startUpdates() // Always start
-                levelModel.setLevelDisplayEnabled(cameraModel.shouldShowLevel && cameraModel.appView == .standard)
-            } else {
-                cameraModel.stopSession()
-                levelModel.stopUpdates() // Only stop when backgrounded
-                if newPhase == .background {
-                    cameraModel.clearIgnoredCodes()
                 }
             }
         }

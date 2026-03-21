@@ -28,40 +28,49 @@ extension BlueberryCamApp {
             return
         }
         
-        let albumID = resolveAlbumID()
-        guard let albumID, let album = PHAssetCollection.fetchAssetCollections(withLocalIdentifiers: [albumID], options: nil).firstObject else { return }
-        guard let assets = await fetchAllAssets(withIdentifiers: ids) else { return }
+        // Always increment shutter count — we know photos were taken from the manifest
+        let photoCount = ids.count
         
-        let albumAssets = PHAsset.fetchAssets(in: album, options: nil)
-        var existingIDs = Set<String>()
-        albumAssets.enumerateObjects { asset, _, _ in existingIDs.insert(asset.localIdentifier) }
+        // Only attempt album operations if we have read access
+        let readStatus = PHPhotoLibrary.authorizationStatus(for: .addOnly)
+        let canRead = readStatus == .authorized || readStatus == .limited
         
-        var toAdd: [PHAsset] = []
-        assets.enumerateObjects { asset, _, _ in
-            if !existingIDs.contains(asset.localIdentifier) {
-                toAdd.append(asset)
+        if canRead {
+            let assets = PHAsset.fetchAssets(withLocalIdentifiers: ids, options: nil)
+            guard assets.count > 0 else {
+                // Photos not yet in library, don't invalidate — retry next time
+                DispatchQueue.main.async { self.shutterCount += photoCount }
+                return
             }
-        }
-        
-        guard !toAdd.isEmpty else {
-            Task { try? await LockedCameraCaptureManager.shared.invalidateSessionContent(at: sessionURL) }
-            return
-        }
-        
-        await withCheckedContinuation { continuation in
-            PHPhotoLibrary.shared().performChanges({
-                PHAssetCollectionChangeRequest(for: album)?
-                    .addAssets(toAdd as NSArray)
-            }) { success, error in
-                if success {
-                    DispatchQueue.main.async {
-                        self.shutterCount += toAdd.count
-                    }
+            
+            let albumID = resolveAlbumID()
+            let album = albumID.flatMap {
+                PHAssetCollection.fetchAssetCollections(withLocalIdentifiers: [$0], options: nil).firstObject
+            }
+            
+            var toAdd: [PHAsset] = []
+            if let album {
+                let albumAssets = PHAsset.fetchAssets(in: album, options: nil)
+                var albumIDs = Set<String>()
+                albumAssets.enumerateObjects { a, _, _ in albumIDs.insert(a.localIdentifier) }
+                assets.enumerateObjects { a, _, _ in
+                    if !albumIDs.contains(a.localIdentifier) { toAdd.append(a) }
                 }
-                continuation.resume()
+            }
+            
+            await withCheckedContinuation { continuation in
+                PHPhotoLibrary.shared().performChanges({
+                    if let album, !toAdd.isEmpty {
+                        PHAssetCollectionChangeRequest(for: album)?.addAssets(toAdd as NSArray)
+                    }
+                }) { _, _ in
+                    continuation.resume()
+                }
             }
         }
         
+        // Increment regardless of read access
+        DispatchQueue.main.async { self.shutterCount += photoCount }
         Task { try? await LockedCameraCaptureManager.shared.invalidateSessionContent(at: sessionURL) }
     }
     

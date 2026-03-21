@@ -231,6 +231,8 @@ struct LockedCaptureView: View {
             }
         }
         .environment(\.scenePhase, .active)
+        .sensoryFeedback(.impact, trigger: hapticTrigger)
+        .sensoryFeedback(.impact(flexibility: .soft), trigger: cameraModel.tap​Focus​Lock​Haptic​Trigger)
         .onAppear {
             cameraModel.configure(with: lockedSession)
             levelModel.startUpdates()
@@ -244,8 +246,6 @@ struct LockedCaptureView: View {
             levelModel.stopUpdates()
             cameraModel.clearTapPointInteraction(resetDeviceState: false)
         }
-        .sensoryFeedback(.impact, trigger: hapticTrigger)
-        .sensoryFeedback(.impact(flexibility: .soft), trigger: cameraModel.tap​Focus​Lock​Haptic​Trigger)
         .onChange(of: cameraModel.activeLens) { oldLens, newLens in
             cameraModel.clearTapPointInteraction(resetDeviceState: false)
             // Handle visual "zoom" bump to mask lens hardware switch

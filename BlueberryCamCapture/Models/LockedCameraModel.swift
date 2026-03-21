@@ -194,6 +194,13 @@ class LockedCameraModel: NSObject {
     func configure(with lockedSession: LockedCameraCaptureSession) {
         self.lockedSession = lockedSession
         _sessionContentURLBox.value = lockedSession.sessionContentURL
+        
+        // Request photos authorization eagerly so it's ready before first capture
+        let status = PHPhotoLibrary.authorizationStatus(for: .addOnly)
+        if status == .notDetermined {
+            PHPhotoLibrary.requestAuthorization(for: .addOnly) { _ in }
+        }
+        
         sessionQueue.async { Task { @MainActor in self.setupPipeline() } }
     }
     

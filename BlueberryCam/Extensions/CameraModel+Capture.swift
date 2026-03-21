@@ -32,38 +32,42 @@ extension CameraModel: AVCapturePhotoCaptureDelegate {
     }
     
     private nonisolated func saveToPhotos(data: Data, location: CLLocation?, isDNG: Bool, isHEIF: Bool = false) {
-        PHPhotoLibrary.requestAuthorization(for: .addOnly) { status in
-            guard status == .authorized || status == .limited else {
-                Task { @MainActor in self.errorMessage = "Photos access denied."; self.showError = true }
-                return
+        let currentStatus = PHPhotoLibrary.authorizationStatus(for: .addOnly)
+        
+        guard currentStatus == .authorized || currentStatus == .limited else {
+            Task { @MainActor in
+                self.errorMessage = "Photos access denied. Please enable in Settings."
+                self.showError = true
             }
-            
-            // 1. Resolve the "Blueberry Cam" album, creating it only when necessary.
-            let albumID = resolveAlbumID()
-            let album = albumID.flatMap {
-                PHAssetCollection.fetchAssetCollections(withLocalIdentifiers: [$0], options: nil).firstObject
+            return
+        }
+        
+        performSave(data: data, location: location, isDNG: isDNG, isHEIF: isHEIF)
+    }
+    private nonisolated func performSave(data: Data, location: CLLocation? = nil, isDNG: Bool, isHEIF: Bool) {
+        let albumID = resolveAlbumID()
+        let album = albumID.flatMap {
+            PHAssetCollection.fetchAssetCollections(withLocalIdentifiers: [$0], options: nil).firstObject
+        }
+        
+        PHPhotoLibrary.shared().performChanges({
+            let opts = PHAssetResourceCreationOptions()
+            opts.uniformTypeIdentifier = BundleIDs.UTI(isDNG: isDNG, isHEIF: isHEIF)
+            let req = PHAssetCreationRequest.forAsset()
+            if let loc = location {
+                req.location = loc
             }
+            req.addResource(with: .photo, data: data, options: opts)
             
-            PHPhotoLibrary.shared().performChanges({
-                let opts = PHAssetResourceCreationOptions()
-                opts.uniformTypeIdentifier = BundleIDs.UTI(isDNG: isDNG, isHEIF: isHEIF)
-                let req = PHAssetCreationRequest.forAsset()
-                if let loc = location {
-                    req.location = loc
-                }
-                req.addResource(with: .photo, data: data, options: opts)
-                
-                // 2. Add the new asset to the album
-                if let album, let placeholder = req.placeholderForCreatedAsset {
-                    let albumReq = PHAssetCollectionChangeRequest(for: album)
-                    albumReq?.addAssets([placeholder] as NSArray)
-                }
-            }) { success, error in
-                Task { @MainActor in
-                    if !success {
-                        self.errorMessage = error?.localizedDescription ?? "Unknown save error."
-                        self.showError = true
-                    }
+            if let album, let placeholder = req.placeholderForCreatedAsset {
+                let albumReq = PHAssetCollectionChangeRequest(for: album)
+                albumReq?.addAssets([placeholder] as NSArray)
+            }
+        }) { success, error in
+            Task { @MainActor in
+                if !success {
+                    self.errorMessage = error?.localizedDescription ?? "Unknown save error."
+                    self.showError = true
                 }
             }
         }

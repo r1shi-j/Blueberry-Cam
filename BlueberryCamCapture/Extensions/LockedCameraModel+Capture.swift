@@ -42,36 +42,47 @@ extension LockedCameraModel: AVCapturePhotoCaptureDelegate {
     }
     
     private nonisolated func saveDirectlyToPhotos(data: Data, isDNG: Bool, isHEIF: Bool, sessionURL: URL?) {
-        PHPhotoLibrary.requestAuthorization(for: .addOnly) { status in
-            guard status == .authorized || status == .limited else {
-                Task { @MainActor in self.errorMessage = "Photos access denied."; self.showError = true }
-                return
-            }
-            
-            // Use a local to capture the placeholder ID safely within the performChanges closure.
-            // Declared as a class wrapper so it can be mutated inside the closure without a data race.
-            final class Box<T>: @unchecked Sendable { var value: T; init(_ v: T) { value = v } }
-            let placeholderBox = Box<String?>(nil)
-            
-            PHPhotoLibrary.shared().performChanges({
-                let opts = PHAssetResourceCreationOptions()
-                opts.uniformTypeIdentifier = BundleIDs.UTI(isDNG: isDNG, isHEIF: isHEIF)
-                let req = PHAssetCreationRequest.forAsset()
-                req.addResource(with: .photo, data: data, options: opts)
-                // Capture the identifier while still inside the performChanges block —
-                // this is the only safe place to read placeholderForCreatedAsset.
-                placeholderBox.value = req.placeholderForCreatedAsset?.localIdentifier
-            }) { success, error in
-                if let error {
-                    Task { @MainActor in self.errorMessage = error.localizedDescription; self.showError = true }
+        let currentStatus = PHPhotoLibrary.authorizationStatus(for: .addOnly)
+        
+        if currentStatus == .authorized || currentStatus == .limited {
+            performDirectSave(data: data, isDNG: isDNG, isHEIF: isHEIF, sessionURL: sessionURL)
+        } else if currentStatus == .notDetermined {
+            PHPhotoLibrary.requestAuthorization(for: .addOnly) { status in
+                guard status == .authorized || status == .limited else {
+                    Task { @MainActor in self.errorMessage = "Photos access denied."; self.showError = true }
                     return
                 }
-                guard success, let id = placeholderBox.value, let sessionURL else { return }
-                
-                // Write the localIdentifier to the manifest atomically so a concurrent
-                // write from rapid-fire captures doesn't corrupt the file.
-                Self.appendToManifest(id: id, sessionURL: sessionURL)
+                self.performDirectSave(data: data, isDNG: isDNG, isHEIF: isHEIF, sessionURL: sessionURL)
             }
+        } else {
+            Task { @MainActor in self.errorMessage = "Photos access denied."; self.showError = true }
+        }
+    }
+
+    private nonisolated func performDirectSave(data: Data, isDNG: Bool, isHEIF: Bool, sessionURL: URL?) {
+        // Use a local to capture the placeholder ID safely within the performChanges closure.
+        // Declared as a class wrapper so it can be mutated inside the closure without a data race.
+        final class Box<T>: @unchecked Sendable { var value: T; init(_ v: T) { value = v } }
+        let placeholderBox = Box<String?>(nil)
+        
+        PHPhotoLibrary.shared().performChanges({
+            let opts = PHAssetResourceCreationOptions()
+            opts.uniformTypeIdentifier = BundleIDs.UTI(isDNG: isDNG, isHEIF: isHEIF)
+            let req = PHAssetCreationRequest.forAsset()
+            req.addResource(with: .photo, data: data, options: opts)
+            // Capture the identifier while still inside the performChanges block —
+            // this is the only safe place to read placeholderForCreatedAsset.
+            placeholderBox.value = req.placeholderForCreatedAsset?.localIdentifier
+        }) { success, error in
+            if let error {
+                Task { @MainActor in self.errorMessage = error.localizedDescription; self.showError = true }
+                return
+            }
+            guard success, let id = placeholderBox.value, let sessionURL else { return }
+            
+            // Write the localIdentifier to the manifest atomically so a concurrent
+            // write from rapid-fire captures doesn't corrupt the file.
+            Self.appendToManifest(id: id, sessionURL: sessionURL)
         }
     }
     

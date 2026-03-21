@@ -181,7 +181,7 @@ enum AppView: String, CaseIterable, Hashable {
 
 // MARK: - ResolveAlbumID -
 // Same resolveAlbumID logic as CameraModel — finds or creates "Blueberry Cam" album
-func resolveAlbumID() -> String? {
+nonisolated func resolveAlbumID() -> String? {
     let key = BundleIDs.photoAlbumStorageKey
     let defaults = UserDefaults.standard
     

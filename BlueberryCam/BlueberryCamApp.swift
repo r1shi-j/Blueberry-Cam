@@ -11,13 +11,18 @@ import SwiftUI
 struct BlueberryCamApp: App {
     @Environment(\.scenePhase) private var scenePhase
     @AppStorage("shutterCount") var shutterCount = 0
+    @State var permissionModel = PermissionModel()
     
     var body: some Scene {
         WindowGroup {
-            CaptureView(shutterCount: $shutterCount)
-                .task { await detectLockedCaptureSessions() }
+            CaptureView(shutterCount: $shutterCount, permissionModel: permissionModel)
+                .task {
+                    await permissionModel.checkAndRequest()
+                    await detectLockedCaptureSessions()
+                }
                 .onChange(of: scenePhase) { _, newPhase in
                     if newPhase == .active {
+                        Task { await permissionModel.checkAndRequest() }
                         Task { await detectLockedCaptureSessions() }
                     }
                 }
