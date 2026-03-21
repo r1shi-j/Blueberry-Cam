@@ -5,15 +5,16 @@ import UIKit
 
 extension CameraModel: AVCaptureMetadataOutputObjectsDelegate {
     nonisolated func metadataOutput(_ output: AVCaptureMetadataOutput, didOutput metadataObjects: [AVMetadataObject], from connection: AVCaptureConnection) {
+        // Extract values before crossing isolation boundary (metadataObjects is non-Sendable)
+        let firstString = (metadataObjects.first as? AVMetadataMachineReadableCodeObject)?.stringValue
+        
         Task { @MainActor in
             guard self.recognizeBarcodes else {
                 self.detectedCodeURL = nil
                 return
             }
             
-            if let metadataObject = metadataObjects.first,
-               let readableObject = metadataObject as? AVMetadataMachineReadableCodeObject,
-               let stringValue = readableObject.stringValue {
+            if let stringValue = firstString {
                 
                 // If it's the code we just ignored, check the cooldown
                 if let ignoreDate = self.ignoredCodes[stringValue] {

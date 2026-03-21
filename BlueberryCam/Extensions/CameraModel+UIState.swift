@@ -17,14 +17,20 @@ extension CameraModel {
         self.flipRotation = 0
         self.primeResolutionOptions(for: lens, device: previewCamera)
         
-        // 2. Heavy hardware reconfiguration in background
+        // 2. Capture lens properties before crossing isolation boundary
+        let lensDeviceType = lens.deviceType
+        let lensPosition = lens.position
+        let lensZoomFactor = lens.zoomFactor
+        let lensIsFront = lens.isFront
+        
+        // 3. Heavy hardware reconfiguration in background
         sessionQueue.async { [weak self] in
             guard let self else { return }
             
             self.session.beginConfiguration()
             for input in self.session.inputs { self.session.removeInput(input) }
             
-            guard let cam = AVCaptureDevice.default(lens.deviceType, for: .video, position: lens.position),
+            guard let cam = AVCaptureDevice.default(lensDeviceType, for: .video, position: lensPosition),
                   let input = try? AVCaptureDeviceInput(device: cam),
                   self.session.canAddInput(input) else {
                 self.session.commitConfiguration()
@@ -36,27 +42,26 @@ extension CameraModel {
             // But 'device' and others are @Observable, so move to MainActor Task
             
             // Zoom Factor (Hardware)
-            if lens.zoomFactor > 1.0 {
+            if lensZoomFactor > 1.0 {
                 try? cam.lockForConfiguration()
-                cam.videoZoomFactor = lens.zoomFactor
+                cam.videoZoomFactor = lensZoomFactor
                 cam.unlockForConfiguration()
             }
             self.enableLensSmudgeDetectionIfSupported(on: cam)
             
             // Connection properties (Hardware)
-            let isFront = lens.isFront
-            let rotationAngle: CGFloat = isFront ? 0 : 90
+            let rotationAngle: CGFloat = lensIsFront ? 0 : 90
             for conn in [self.photoOutput.connection(with: .video),
                          self.videoOutput.connection(with: .video)].compactMap({ $0 }) {
                 if conn.isVideoRotationAngleSupported(rotationAngle) {
                     conn.videoRotationAngle = rotationAngle
                 }
-                conn.isVideoMirrored = isFront
+                conn.isVideoMirrored = lensIsFront
             }
             
             self.session.commitConfiguration()
             
-            // 3. Final synchronization back to UI state
+            // 4. Final synchronization back to UI state
             Task { @MainActor in
                 self.device = cam
                 self.rotationCoordinator = AVCaptureDevice.RotationCoordinator(device: cam, previewLayer: nil)
