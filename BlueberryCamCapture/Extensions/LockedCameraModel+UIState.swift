@@ -49,6 +49,7 @@ extension LockedCameraModel {
             // 3. Final synchronization back to UI state
             Task { @MainActor in
                 self.device = cam
+                self.rotationCoordinator = AVCaptureDevice.RotationCoordinator(device: cam, previewLayer: nil)
                 self.configureSubjectAreaMonitoring(for: cam)
                 
                 if let largest = cam.activeFormat.supportedMaxPhotoDimensions.max(by: {

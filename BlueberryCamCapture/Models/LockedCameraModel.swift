@@ -1,6 +1,7 @@
 internal import AVFoundation
 import LockedCameraCapture
 import Photos
+import UIKit
 
 @MainActor @Observable
 class LockedCameraModel: NSObject {
@@ -38,6 +39,10 @@ class LockedCameraModel: NSObject {
             }
         }
     }
+    @ObservationIgnored
+    nonisolated(unsafe) var lastGravity: (x: Double, y: Double, z: Double) = (0, -1, 0)
+    @ObservationIgnored
+    var rotationCoordinator: AVCaptureDevice.RotationCoordinator?
     
     
     // MARK: - Manual controls
@@ -232,6 +237,9 @@ class LockedCameraModel: NSObject {
         }
         
         session.commitConfiguration()
+        
+        // Setup rotation coordinator
+        self.rotationCoordinator = AVCaptureDevice.RotationCoordinator(device: cam, previewLayer: nil)
         
         Task.detached(priority: .userInitiated) {
             self.session.startRunning()
@@ -483,6 +491,9 @@ class LockedCameraModel: NSObject {
         exposureDebounceTask?.cancel()
         _pendingCaptureModeBox.value = captureMode
         
+        // Update orientation based on current physical position
+        updateCaptureOrientation()
+        
         // For manual exposure, wait for hardware to confirm values are applied before firing.
         // setExposureModeCustom is async — the completionHandler fires once the sensor has
         // actually settled on the requested ISO/shutter, then we fire the shutter.
@@ -540,6 +551,43 @@ class LockedCameraModel: NSObject {
                 applyFlashModeIfSupported(to: s)
                 return s
         }
+    }
+    
+    private func updateCaptureOrientation() {
+        guard session.isRunning, let photoConnection = photoOutput.connection(with: .video), photoConnection.isActive else { return }
+        
+        let (gx, gy, gz) = lastGravity
+        
+        // Determine rotation based on gravity
+        let degrees: CGFloat
+        
+        if abs(gz) > 0.75 {
+            // Device is flat - keep current
+            return
+        }
+        
+        if abs(gy) > abs(gx) {
+            // Portrait orientation
+            if gy < 0 {
+                // Normal portrait
+                degrees = 90
+            } else {
+                // Upside down portrait
+                degrees = 270
+            }
+        } else {
+            // Landscape orientation
+            if gx > 0 {
+                // Landscape right (home button on right)
+                degrees = 180
+            } else {
+                // Landscape left (home button on left)
+                degrees = 0
+            }
+        }
+        
+        // Update the photo connection rotation
+        photoConnection.videoRotationAngle = degrees
     }
     
     private func applyFlashModeIfSupported(to settings: AVCapturePhotoSettings) {

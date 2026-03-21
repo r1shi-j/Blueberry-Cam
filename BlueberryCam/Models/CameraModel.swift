@@ -1,6 +1,7 @@
 internal import AVFoundation
 internal import CoreLocation
 import Photos
+import UIKit
 
 @MainActor @Observable
 class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
@@ -139,6 +140,10 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
             }
         }
     }
+    @ObservationIgnored
+    nonisolated(unsafe) var lastGravity: (x: Double, y: Double, z: Double) = (0, -1, 0)
+    @ObservationIgnored
+    var rotationCoordinator: AVCaptureDevice.RotationCoordinator?
     
     // MARK: - Manual controls
     var isAutoExposure: Bool = true {
@@ -533,6 +538,9 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
         // Match initial flip to lens
         self.flipRotation = activeLens.isFront ? 180 : 0
         
+        // Setup rotation coordinator
+        self.rotationCoordinator = AVCaptureDevice.RotationCoordinator(device: cam, previewLayer: nil)
+        
         // Safely setup synchronizer or fallback
         let syncQueue = DispatchQueue(label: "\(BundleIDs.appID).analysisQueue")
         if depthOutput.connection(with: .depthData) != nil && videoOutput.connection(with: .video) != nil {
@@ -855,6 +863,9 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
         _pendingCaptureModeBox.value = captureMode
         _pendingPhotoFilterBox.value = selectedPhotoFilter
         
+        // Update orientation based on current physical position
+        updateCaptureOrientation()
+        
         // For manual exposure, wait for hardware to confirm values are applied before firing.
         // setExposureModeCustom is async — the completionHandler fires once the sensor has
         // actually settled on the requested ISO/shutter, then we fire the shutter.
@@ -912,6 +923,44 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
                 applyFlashModeIfSupported(to: s)
                 return s
         }
+    }
+    
+    private func updateCaptureOrientation() {
+        guard session.isRunning, let photoConnection = photoOutput.connection(with: .video), photoConnection.isActive else { return }
+        
+        let (gx, gy, gz) = lastGravity
+        let isFront = activeLens.isFront
+        
+        // Determine rotation based on gravity
+        let degrees: CGFloat
+        
+        if abs(gz) > 0.75 {
+            // Device is flat - keep current
+            return
+        }
+        
+        if abs(gy) > abs(gx) {
+            // Portrait orientation
+            if gy < 0 {
+                // Normal portrait
+                degrees = isFront ? 0 : 90
+            } else {
+                // Upside down portrait
+                degrees = isFront ? 180 : 270
+            }
+        } else {
+            // Landscape orientation  
+            if gx > 0 {
+                // Landscape right (home button on right)
+                degrees = isFront ? 270 : 180
+            } else {
+                // Landscape left (home button on left)
+                degrees = isFront ? 90 : 0
+            }
+        }
+        
+        // Update the photo connection rotation
+        photoConnection.videoRotationAngle = degrees
     }
     
     private func applyFlashModeIfSupported(to settings: AVCapturePhotoSettings) {

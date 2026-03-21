@@ -43,4 +43,4 @@ struct BlueberryCamApp: App {
 // ProRaw
 
 // MARK: - FIXME
-// Horizontal photos
+// improve locked cam add to album

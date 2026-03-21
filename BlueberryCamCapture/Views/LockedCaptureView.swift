@@ -117,6 +117,7 @@ struct LockedCaptureView: View {
     let lockedSession: LockedCameraCaptureSession
     
     @State private var cameraModel = LockedCameraModel()
+    @State private var levelModel = LockedLevelMotionModel()
     @State private var selectedControl: ManualControl?
     
     // Haptics
@@ -232,6 +233,16 @@ struct LockedCaptureView: View {
         .environment(\.scenePhase, .active)
         .onAppear {
             cameraModel.configure(with: lockedSession)
+            levelModel.startUpdates()
+            
+            // Pass gravity updates to camera model
+            levelModel.onGravityUpdate = { gx, gy, gz in
+                cameraModel.lastGravity = (gx, gy, gz)
+            }
+        }
+        .onDisappear {
+            levelModel.stopUpdates()
+            cameraModel.clearTapPointInteraction(resetDeviceState: false)
         }
         .sensoryFeedback(.impact, trigger: hapticTrigger)
         .sensoryFeedback(.impact(flexibility: .soft), trigger: cameraModel.tap​Focus​Lock​Haptic​Trigger)

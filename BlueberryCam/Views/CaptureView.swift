@@ -34,14 +34,6 @@ extension CaptureView {
     private var focusReticleSliderXTolerance: CGFloat { 24 }
     private var focusReticleSliderYTolerance: CGFloat { 96 }
     
-    private func changeLevelMonitoring(_ condition: Bool) {
-        if condition {
-            levelModel.startUpdates()
-        } else {
-            levelModel.stopUpdates()
-        }
-    }
-    
     private func makePreviewRect(in geo: GeometryProxy) -> CGRect {
         let size = geo.size
         let topInset = geo.safeAreaInsets.top
@@ -150,7 +142,7 @@ struct CaptureView: View {
     @Environment(\.scenePhase) private var scenePhase
     @Binding var shutterCount: Int
     @State private var cameraModel = CameraModel()
-    @State private var levelModel  = LevelMotionModel()
+    @State private var levelModel = LevelMotionModel()
     @State private var selectedControl: ManualControl?
     
     // Haptics
@@ -452,13 +444,19 @@ struct CaptureView: View {
         .onAppear {
             cameraModel.configure()
             levelModel.startUpdates()
+            levelModel.setLevelDisplayEnabled(cameraModel.shouldShowLevel && cameraModel.appView == .standard)
+            
+            // Pass gravity updates to camera model
+            levelModel.onGravityUpdate = { gx, gy, gz in
+                cameraModel.lastGravity = (gx, gy, gz)
+            }
         }
         .onDisappear {
             levelModel.stopUpdates()
             cameraModel.clearTapPointInteraction(resetDeviceState: false)
         }
         .onChange(of: cameraModel.shouldShowLevel) { _, new in
-            changeLevelMonitoring(new)
+            levelModel.setLevelDisplayEnabled(new && cameraModel.appView == .standard)
         }
         .onChange(of: cameraModel.activeLens) { oldLens, newLens in
             cameraModel.clearTapPointInteraction(resetDeviceState: false)
@@ -511,15 +509,16 @@ struct CaptureView: View {
             }
         }
         .onChange(of: cameraModel.appView) { _, new in
-            changeLevelMonitoring(new == AppView.standard)
+            levelModel.setLevelDisplayEnabled(new == .standard && cameraModel.shouldShowLevel)
         }
         .onChange(of: scenePhase) { _, newPhase in
             if newPhase == .active {
                 cameraModel.startSession()
-                changeLevelMonitoring(cameraModel.shouldShowLevel && cameraModel.appView == .standard)
+                levelModel.startUpdates() // Always start
+                levelModel.setLevelDisplayEnabled(cameraModel.shouldShowLevel && cameraModel.appView == .standard)
             } else {
                 cameraModel.stopSession()
-                levelModel.stopUpdates()
+                levelModel.stopUpdates() // Only stop when backgrounded
                 if newPhase == .background {
                     cameraModel.clearIgnoredCodes()
                 }

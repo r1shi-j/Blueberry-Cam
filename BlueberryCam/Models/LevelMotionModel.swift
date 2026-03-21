@@ -1,5 +1,4 @@
 import CoreMotion
-import Observation
 import UIKit
 
 enum LevelDisplayMode: Equatable {
@@ -10,6 +9,7 @@ enum LevelDisplayMode: Equatable {
 
 @MainActor @Observable
 final class LevelMotionModel {
+    var onGravityUpdate: ((Double, Double, Double) -> Void)?
     
     // MARK: - Published state
     /// Angle (degrees) of gravity projected onto the screen plane.
@@ -48,6 +48,14 @@ final class LevelMotionModel {
     private var prevIsAligned = false
     private var prevIsCrosshairAligned = false
     
+    private var isLevelDisplayEnabled: Bool = true
+    func setLevelDisplayEnabled(_ enabled: Bool) {
+        isLevelDisplayEnabled = enabled
+        if !enabled {
+            displayMode = .hidden
+        }
+    }
+    
     // MARK: - Lifecycle
     func startUpdates() {
         guard motionManager.isDeviceMotionAvailable else { return }
@@ -71,6 +79,17 @@ final class LevelMotionModel {
         let gx = motion.gravity.x
         let gy = motion.gravity.y
         let gz = motion.gravity.z
+        
+        // Publish gravity for camera orientation
+        onGravityUpdate?(gx, gy, gz)
+        
+        // ONLY update level display if enabled
+        guard isLevelDisplayEnabled else {
+            if displayMode != .hidden {
+                displayMode = .hidden
+            }
+            return
+        }
         
         // Low-pass filter — smooth out rapid noise
         let rawAngle = atan2(gx, -gy) * 180.0 / .pi
