@@ -8,7 +8,6 @@ class LockedCameraModel: NSObject {
     // MARK: - Session
     nonisolated let session = AVCaptureSession()
     private var lockedSession: LockedCameraCaptureSession?
-    var photosAuthStatus: PHAuthorizationStatus = PHPhotoLibrary.authorizationStatus(for: .addOnly)
     
     /// Whether the extension has sufficient Photos access to save captures.
     /// Checks both `.addOnly` and `.readWrite` — if either is granted, we can save.
@@ -204,13 +203,6 @@ class LockedCameraModel: NSObject {
     func configure(with lockedSession: LockedCameraCaptureSession) {
         self.lockedSession = lockedSession
         _sessionContentURLBox.value = lockedSession.sessionContentURL
-        
-        // Refresh photos authorization — the main app handles the prompt,
-        // so this just picks up the current status.
-        Task {
-            let status = PHPhotoLibrary.authorizationStatus(for: .addOnly)
-            photosAuthStatus = status
-        }
         
         sessionQueue.async { Task { @MainActor in self.setupPipeline() } }
     }

@@ -433,23 +433,8 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
         toggleLocationGeotag()
         
         Task.detached(priority: .userInitiated) { @MainActor in
-            switch AVCaptureDevice.authorizationStatus(for: .video) {
-                case .authorized:
-                    self.setupSession()
-                    self.startSession()
-                case .notDetermined:
-                    AVCaptureDevice.requestAccess(for: .video) { granted in
-                        if granted {
-                            Task { @MainActor in
-                                self.setupSession()
-                                self.startSession()
-                            }
-                        }
-                    }
-                default:
-                    self.errorMessage = "Camera access denied. Please enable in Settings."
-                    self.showError = true
-            }
+            self.setupSession()
+            self.startSession()
         }
     }
     

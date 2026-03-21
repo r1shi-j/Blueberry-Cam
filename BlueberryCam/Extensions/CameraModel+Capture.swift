@@ -46,9 +46,17 @@ extension CameraModel: AVCapturePhotoCaptureDelegate {
     }
     
     private nonisolated func performSave(data: Data, location: CLLocation? = nil, isDNG: Bool, isHEIF: Bool) {
-        let albumID = resolveAlbumID()
-        let album = albumID.flatMap {
-            PHAssetCollection.fetchAssetCollections(withLocalIdentifiers: [$0], options: nil).firstObject
+        // Only resolve the album if the user has read/write access.
+        // With add-only access, resolveAlbumID() would silently fail.
+        let readWriteStatus = PHPhotoLibrary.authorizationStatus(for: .readWrite)
+        let album: PHAssetCollection?
+        if readWriteStatus == .authorized || readWriteStatus == .limited {
+            let albumID = resolveAlbumID()
+            album = albumID.flatMap {
+                PHAssetCollection.fetchAssetCollections(withLocalIdentifiers: [$0], options: nil).firstObject
+            }
+        } else {
+            album = nil
         }
         
         PHPhotoLibrary.shared().performChanges({
