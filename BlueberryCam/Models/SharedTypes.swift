@@ -122,13 +122,13 @@ enum Lens: String, CaseIterable {
     
     var label: String {
         switch self {
-            case .frontUltraWide: return "0.87"
-            case .front: return "0.95"
-            case .ultraWide: return "0.5"
-            case .wide: return "1"
-            case .tele2x: return "2"
-            case .tele4x: return "4"
-            case .tele8x: return "8"
+            case .frontUltraWide: "1"
+            case .front: "1.5"
+            case .ultraWide: "0.5"
+            case .wide: "1"
+            case .tele2x: "2"
+            case .tele4x: "4"
+            case .tele8x: "8"
         }
     }
     
@@ -136,11 +136,10 @@ enum Lens: String, CaseIterable {
     
     var deviceType: AVCaptureDevice.DeviceType {
         switch self {
-            case .frontUltraWide: return .builtInUltraWideCamera
-            case .front: return .builtInWideAngleCamera
-            case .ultraWide: return .builtInUltraWideCamera
-            case .wide, .tele2x: return .builtInWideAngleCamera
-            case .tele4x, .tele8x: return .builtInTelephotoCamera
+            case .front, .frontUltraWide: .builtInUltraWideCamera
+            case .ultraWide: .builtInUltraWideCamera
+            case .wide, .tele2x: .builtInWideAngleCamera
+            case .tele4x, .tele8x: .builtInTelephotoCamera
         }
     }
     
@@ -148,9 +147,10 @@ enum Lens: String, CaseIterable {
     
     var zoomFactor: CGFloat {
         switch self {
-            case .tele2x: return 2.0
-            case .tele8x: return 2.0
-            default: return 1.0
+            case .tele2x: 2.0
+            case .tele8x: 2.0
+            case .front: 1.55
+            default: 1.0
         }
     }
 }
@@ -163,18 +163,18 @@ enum AppView: String, CaseIterable, Hashable {
     
     var index: Int {
         switch self {
-            case .clean:    return 0
-            case .standard: return 1
-            case .settings: return 2
+            case .clean: 0
+            case .standard: 1
+            case .settings: 2
         }
     }
     
     static func fromIndex(_ x: Int) -> AppView {
         switch x {
-            case 0:  return .clean
-            case 1:  return .standard
-            case 2:  return .settings
-            default: return .standard
+            case 0: .clean
+            case 1: .standard
+            case 2: .settings
+            default: .standard
         }
     }
 }
