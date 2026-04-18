@@ -17,7 +17,6 @@ extension ManualControlsView {
     private var isoString: String { "ISO" }
     private var ssString: String { "Shutter" }
     private var focusString: String { "Focus" }
-    private var focusPeakingString: String { "Focus Peaking" }
     private var focusLoupeString: String { "Focus Loupe" }
     private var wbString: String { "White Balance" }
     
@@ -37,7 +36,7 @@ extension ManualControlsView {
 }
 
 struct ManualControlsView: View {
-    @Bindable var cameraModel: CameraModel
+    @ObservedObject var cameraModel: CameraModel
     let control: ManualControl
     
     var body: some View {
@@ -54,7 +53,7 @@ struct ManualControlsView: View {
                         Toggle("", isOn: $cameraModel.isAutoExposure)
                             .labelsHidden()
                             .tint(.yellow)
-                            .onChange(of: cameraModel.isAutoExposure) { _, auto in
+                            .onChange(of: cameraModel.isAutoExposure) { auto in
                                 if auto {
                                     cameraModel.setAutoExposure()
                                 } else {
@@ -76,7 +75,7 @@ struct ManualControlsView: View {
                                 .tracking(2)
                                 .frame(width: 60, alignment: .leading)
                             Slider(value: $cameraModel.exposureBias, in: -4.0...4.0, step: 0.1)
-                                .onChange(of: cameraModel.exposureBias) {
+                                .onChange(of: cameraModel.exposureBias) { _ in
                                     cameraModel.applyExposureBias()
                                 }
                                 .tint(.yellow)
@@ -98,7 +97,7 @@ struct ManualControlsView: View {
                         Toggle("", isOn: $cameraModel.isAutoExposure)
                             .labelsHidden()
                             .tint(.yellow)
-                            .onChange(of: cameraModel.isAutoExposure) { _, auto in
+                            .onChange(of: cameraModel.isAutoExposure) { auto in
                                 if auto {
                                     cameraModel.setAutoExposure()
                                 } else {
@@ -113,23 +112,21 @@ struct ManualControlsView: View {
                     .padding(.horizontal, 20)
                     
                     if !cameraModel.isAutoExposure {
-                        VStack(spacing: 4) {
-                            HStack {
-                                Text(isoString.uppercased())
-                                    .font(Fonts.manualLabel)
-                                    .foregroundColor(Colors.manualLabel)
-                                    .tracking(2)
-                                    .frame(width: 60, alignment: .leading)
-                                Slider(value: $cameraModel.iso, in: cameraModel.minISO...cameraModel.maxISO, step: 1)
-                                    .onChange(of: cameraModel.iso) {
-                                        cameraModel.applyManualExposure()
-                                    }
-                                    .tint(.yellow)
-                                Text(customISOValue)
-                                    .font(Fonts.manualValue)
-                                    .foregroundColor(.yellow)
-                                    .frame(width: 50, alignment: .trailing)
-                            }
+                        HStack {
+                            Text(isoString.uppercased())
+                                .font(Fonts.manualLabel)
+                                .foregroundColor(Colors.manualLabel)
+                                .tracking(2)
+                                .frame(width: 60, alignment: .leading)
+                            Slider(value: $cameraModel.iso, in: cameraModel.minISO...cameraModel.maxISO, step: 1)
+                                .onChange(of: cameraModel.iso) { _ in
+                                    cameraModel.applyManualExposure()
+                                }
+                                .tint(.yellow)
+                            Text(customISOValue)
+                                .font(Fonts.manualValue)
+                                .foregroundColor(.yellow)
+                                .frame(width: 50, alignment: .trailing)
                         }
                         .padding(.horizontal, 20)
                     }
@@ -144,7 +141,7 @@ struct ManualControlsView: View {
                         Toggle("", isOn: $cameraModel.isAutoExposure)
                             .labelsHidden()
                             .tint(.yellow)
-                            .onChange(of: cameraModel.isAutoExposure) { _, auto in
+                            .onChange(of: cameraModel.isAutoExposure) { auto in
                                 if auto {
                                     cameraModel.setAutoExposure()
                                 } else {
@@ -159,29 +156,27 @@ struct ManualControlsView: View {
                     .padding(.horizontal, 20)
                     
                     if !cameraModel.isAutoExposure {
-                        VStack(spacing: 4) {
-                            HStack {
-                                Text(ssString.uppercased())
-                                    .font(Fonts.manualLabel)
-                                    .foregroundColor(Colors.manualLabel)
-                                    .tracking(2)
-                                    .frame(width: 60, alignment: .leading)
-                                Slider(
-                                    value: Binding(get: {
-                                        Double(cameraModel.shutterIndex)
-                                    }, set: {
-                                        cameraModel.setCustomShutter(to: Int($0))
-                                        cameraModel.applyManualExposure()
-                                    }),
-                                    in: 0...Double(max(0, cameraModel.shutterSpeeds.count - 1)),
-                                    step: 1
-                                )
-                                .tint(.yellow)
-                                Text(customSSValue)
-                                    .font(Fonts.manualValue)
-                                    .foregroundColor(.yellow)
-                                    .frame(width: 65, alignment: .trailing)
-                            }
+                        HStack {
+                            Text(ssString.uppercased())
+                                .font(Fonts.manualLabel)
+                                .foregroundColor(Colors.manualLabel)
+                                .tracking(2)
+                                .frame(width: 60, alignment: .leading)
+                            Slider(
+                                value: Binding(get: {
+                                    Double(cameraModel.shutterIndex)
+                                }, set: {
+                                    cameraModel.setCustomShutter(to: Int($0))
+                                    cameraModel.applyManualExposure()
+                                }),
+                                in: 0...Double(max(0, cameraModel.shutterSpeeds.count - 1)),
+                                step: 1
+                            )
+                            .tint(.yellow)
+                            Text(customSSValue)
+                                .font(Fonts.manualValue)
+                                .foregroundColor(.yellow)
+                                .frame(width: 65, alignment: .trailing)
                         }
                         .padding(.horizontal, 20)
                     }
@@ -197,7 +192,7 @@ struct ManualControlsView: View {
                             .labelsHidden()
                             .tint(.yellow)
                             .disabled(!cameraModel.supportsManualFocus)
-                            .onChange(of: cameraModel.isAutoFocus) { _, auto in
+                            .onChange(of: cameraModel.isAutoFocus) { auto in
                                 if auto { cameraModel.setAutoFocus() }
                                 else { cameraModel.applyManualFocus() }
                             }
@@ -208,17 +203,7 @@ struct ManualControlsView: View {
                     .padding(.horizontal, 20)
                     
                     if !cameraModel.isAutoFocus {
-                        HStack {
-                            Text(focusPeakingString.uppercased())
-                                .font(Fonts.manualLabel)
-                                .foregroundColor(Colors.manualLabel)
-                                .tracking(2)
-                            Spacer()
-                            Toggle("", isOn: $cameraModel.showFocusPeaking)
-                                .labelsHidden()
-                                .tint(.green)
-                        }
-                        .padding(.horizontal, 20)
+                        // Focus Loupe toggle
                         HStack {
                             Text(focusLoupeString.uppercased())
                                 .font(Fonts.manualLabel)
@@ -230,6 +215,8 @@ struct ManualControlsView: View {
                                 .tint(.green)
                         }
                         .padding(.horizontal, 20)
+                        
+                        // Lens position slider
                         HStack {
                             Text("")
                                 .font(Fonts.manualLabel)
@@ -242,7 +229,7 @@ struct ManualControlsView: View {
                                     cameraModel.endManualFocusAdjustment()
                                 }
                             })
-                            .onChange(of: cameraModel.lensPosition) {
+                            .onChange(of: cameraModel.lensPosition) { _ in
                                 cameraModel.applyManualFocus()
                             }
                             .tint(.yellow)
@@ -290,10 +277,10 @@ struct ManualControlsView: View {
         .padding(.vertical, 12)
         .background(
             RoundedRectangle(cornerRadius: 12)
-                .fill(.black.opacity(0.65))
+                .fill(Color.black.opacity(0.65))
                 .overlay(
                     RoundedRectangle(cornerRadius: 12)
-                        .stroke(.white.opacity(0.1), lineWidth: 1)
+                        .stroke(Color.white.opacity(0.1), lineWidth: 1)
                 )
         )
         .padding(.horizontal, 12)

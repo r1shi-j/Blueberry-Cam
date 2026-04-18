@@ -1,4 +1,4 @@
-internal import AVFoundation
+import AVFoundation
 import Foundation
 
 extension CameraModel {
@@ -23,7 +23,7 @@ extension CameraModel {
         device.isSubjectAreaChangeMonitoringEnabled = true
         device.unlockForConfiguration()
         
-        if let subjectAreaChangeObserver {
+        if let subjectAreaChangeObserver = subjectAreaChangeObserver {
             NotificationCenter.default.removeObserver(subjectAreaChangeObserver)
         }
         subjectAreaChangeObserver = NotificationCenter.default.addObserver(
@@ -145,7 +145,7 @@ extension CameraModel {
     func scheduleTapFocusIndicatorHide() {
         tapFocusHideTask?.cancel()
         tapFocusHideTask = Task { @MainActor in
-            try? await Task.sleep(nanoseconds: tapFocusHideDelayNanoseconds)
+            try? await Task.sleep(nanoseconds: self.tapFocusHideDelayNanoseconds)
             guard !Task.isCancelled, !self.isTapFocusInteractionActive else { return }
             self.isTapFocusIndicatorDimmed = self.tapFocusLockLabel == nil
         }
@@ -247,12 +247,11 @@ extension CameraModel {
         tapFocusLensPositionMonitorTask?.cancel()
         tapFocusLensPositionBaseline = nil
         tapFocusLensPositionMonitorTask = Task { @MainActor in
-            try? await Task.sleep(nanoseconds: UInt64(tapFocusAdjustmentIgnoreDuration * 1_000_000_000))
+            try? await Task.sleep(nanoseconds: UInt64(self.tapFocusAdjustmentIgnoreDuration * 1_000_000_000))
             guard !Task.isCancelled,
-                  ignoredTapFocusAdjustmentEvents == 0 || ignoredTapFocusAdjustmentDeadline == nil,
-                  tapFocusIndicatorPoint != nil,
-                  tapFocusLockLabel == nil,
-                  !isTapFocusInteractionActive,
+                  self.tapFocusIndicatorPoint != nil,
+                  self.tapFocusLockLabel == nil,
+                  !self.isTapFocusInteractionActive,
                   let d = self.device else { return }
             self.ignoredTapFocusAdjustmentEvents = 0
             self.ignoredTapFocusAdjustmentDeadline = nil

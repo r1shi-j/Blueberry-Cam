@@ -1,6 +1,6 @@
-internal import AVFoundation
+import AVFoundation
 import CoreMedia
-internal import Photos
+import Photos
 import SwiftUI
 
 // MARK: Constants
@@ -16,13 +16,8 @@ enum Fonts {
 }
 
 // MARK: Thread-safe
-// Simple thread-safe box for passing CaptureMode across isolation boundaries
 final class CaptureModeBox: @unchecked Sendable {
     nonisolated(unsafe) var value: CaptureMode = .jpeg
-}
-
-final class PhotoFilterBox: @unchecked Sendable {
-    nonisolated(unsafe) var value: PhotoFilter = .off
 }
 
 final class SessionURLBox: @unchecked Sendable {
@@ -56,34 +51,7 @@ enum CaptureMode: String, CaseIterable, Identifiable {
     var id: String { rawValue }
 }
 
-enum PhotoFilter: String, CaseIterable, Identifiable {
-    case off = "Off"
-    case temperatureAndTint = "1980s"
-    case chrome = "Chrome"
-    case instant = "Instant"
-    case mono = "Mono"
-    case tonal = "Tonal"
-    case noir = "Noir"
-    case thermal = "Thermal"
-    case xRay = "X-Ray"
-    
-    case comic = "Comic"
-    case sketch = "Sketch"
-    case lineScreen = "Line Screen"
-    case pixellate = "Pixellate"
-    case dither = "Dither"
-    
-    case twirlDistortion = "Twirl Distortion"
-    case motionBlur = "Motion Blur"
-    case zoomBlur = "Zoom Blur"
-    
-    case fisheye = "Fisheye"
-    case droste = "Droste"
-    case lightTunnel = "Light Tunnel"
-    case glassLozenge = "Glass Lozenge"
-    
-    var id: String { rawValue }
-}
+
 
 enum ResolutionPreference: String, CaseIterable, Identifiable {
     case efficient = "Efficient"
@@ -118,41 +86,16 @@ enum ManualControl: CaseIterable {
 
 // MARK: - Lens
 enum Lens: String, CaseIterable {
-    case frontUltraWide, front, ultraWide, wide, tele2x, tele4x, tele8x
+    case wide
+    case front
     
-    var label: String {
-        switch self {
-            case .frontUltraWide: "1"
-            case .front: "1.5"
-            case .ultraWide: "0.5"
-            case .wide: "1"
-            case .tele2x: "2"
-            case .tele4x: "4"
-            case .tele8x: "8"
-        }
-    }
+    var isFront: Bool { self == .front }
     
-    var isFront: Bool { self == .front || self == .frontUltraWide }
-    
-    var deviceType: AVCaptureDevice.DeviceType {
-        switch self {
-            case .front, .frontUltraWide: .builtInUltraWideCamera
-            case .ultraWide: .builtInUltraWideCamera
-            case .wide, .tele2x: .builtInWideAngleCamera
-            case .tele4x, .tele8x: .builtInTelephotoCamera
-        }
-    }
+    var deviceType: AVCaptureDevice.DeviceType { .builtInWideAngleCamera }
     
     var position: AVCaptureDevice.Position { isFront ? .front : .back }
     
-    var zoomFactor: CGFloat {
-        switch self {
-            case .tele2x: 2.0
-            case .tele8x: 2.0
-            case .front: 1.55
-            default: 1.0
-        }
-    }
+    var zoomFactor: CGFloat { 1.0 }
 }
 
 // MARK: - AppView
@@ -163,38 +106,34 @@ enum AppView: String, CaseIterable, Hashable {
     
     var index: Int {
         switch self {
-            case .clean: 0
-            case .standard: 1
-            case .settings: 2
+            case .clean: return 0
+            case .standard: return 1
+            case .settings: return 2
         }
     }
     
     static func fromIndex(_ x: Int) -> AppView {
         switch x {
-            case 0: .clean
-            case 1: .standard
-            case 2: .settings
-            default: .standard
+            case 0: return .clean
+            case 1: return .standard
+            case 2: return .settings
+            default: return .standard
         }
     }
 }
 
-// MARK: - ResolveAlbumID -
-// Same resolveAlbumID logic as CameraModel — finds or creates "Blueberry Cam" album
+// MARK: - ResolveAlbumID
 nonisolated func resolveAlbumID() -> String? {
     let key = BundleIDs.photoAlbumStorageKey
     let defaults = UserDefaults.standard
     
-    // Check for a cached ID first
     if let savedID = defaults.string(forKey: key) {
         let existing = PHAssetCollection.fetchAssetCollections(withLocalIdentifiers: [savedID], options: nil)
         if existing.firstObject != nil {
-            return savedID  // Found it – even if the user moved it to a folder
+            return savedID
         }
-        // ID is stale (album was deleted), fall through to create a new one
     }
     
-    // Try to find an existing album with our name
     let fetch = PHAssetCollection.fetchAssetCollections(with: .album, subtype: .albumRegular, options: nil)
     var foundID: String?
     fetch.enumerateObjects { col, _, stop in
@@ -203,19 +142,17 @@ nonisolated func resolveAlbumID() -> String? {
             stop.pointee = true
         }
     }
-    if let foundID {
+    if let foundID = foundID {
         defaults.set(foundID, forKey: key)
         return foundID
     }
     
-    // Create a brand new album
     var newID: String?
     try? PHPhotoLibrary.shared().performChangesAndWait {
         let createReq = PHAssetCollectionChangeRequest.creationRequestForAssetCollection(withTitle: BundleIDs.appName)
         newID = createReq.placeholderForCreatedAssetCollection.localIdentifier
     }
     
-    // Resolve placeholder → real localIdentifier
     if let placeholder = newID {
         let created = PHAssetCollection.fetchAssetCollections(withLocalIdentifiers: [placeholder], options: nil)
         let realID = created.firstObject?.localIdentifier ?? placeholder

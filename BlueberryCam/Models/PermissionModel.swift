@@ -1,15 +1,16 @@
-internal import AVFoundation
-internal import Photos
+import AVFoundation
+import Photos
 import SwiftUI
+internal import Combine
 
-@MainActor @Observable
-final class PermissionModel {
+@MainActor
+final class PermissionModel: ObservableObject {
     enum Status {
         case undetermined, granted, denied
     }
     
-    var cameraStatus: Status = .undetermined
-    var photosStatus: Status = .undetermined
+    @Published var cameraStatus: Status = .undetermined
+    @Published var photosStatus: Status = .undetermined
     
     var allGranted: Bool {
         cameraStatus == .granted && photosStatus == .granted
@@ -37,7 +38,6 @@ final class PermissionModel {
     }
     
     private func checkPhotos() async {
-        // Step 1: Ensure at least add-only access for saving photos.
         var addStatus = PHPhotoLibrary.authorizationStatus(for: .addOnly)
         if addStatus == .notDetermined {
             addStatus = await PHPhotoLibrary.requestAuthorization(for: .addOnly)
@@ -48,9 +48,6 @@ final class PermissionModel {
         }
         photosStatus = .granted
         
-        // Step 2: Ask for read/write once (enables album management).
-        // iOS only shows this prompt once — if declined, add-only access
-        // remains and photos save to the camera roll without album sorting.
         let readWriteStatus = PHPhotoLibrary.authorizationStatus(for: .readWrite)
         if readWriteStatus == .notDetermined {
             _ = await PHPhotoLibrary.requestAuthorization(for: .readWrite)

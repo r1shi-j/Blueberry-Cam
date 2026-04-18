@@ -1,4 +1,4 @@
-internal import CoreLocation
+import CoreLocation
 import Foundation
 
 extension CameraModel: CLLocationManagerDelegate {

@@ -1,5 +1,5 @@
-internal import AVFoundation
-internal import CoreLocation
+import AVFoundation
+import CoreLocation
 import Foundation
 
 extension CameraModel {
@@ -12,20 +12,17 @@ extension CameraModel {
         guard lens != activeLens else { return }
         guard let previewCamera = AVCaptureDevice.default(lens.deviceType, for: .video, position: lens.position) else { return }
         
-        // 1. Instant UI update to trigger animations and selection state
         self.activeLens = lens
         self.flipRotation = 0
         self.primeResolutionOptions(for: lens, device: previewCamera)
         
-        // 2. Capture lens properties before crossing isolation boundary
         let lensDeviceType = lens.deviceType
         let lensPosition = lens.position
         let lensZoomFactor = lens.zoomFactor
         let lensIsFront = lens.isFront
         
-        // 3. Heavy hardware reconfiguration in background
         sessionQueue.async { [weak self] in
-            guard let self else { return }
+            guard let self = self else { return }
             
             self.session.beginConfiguration()
             for input in self.session.inputs { self.session.removeInput(input) }
@@ -38,41 +35,27 @@ extension CameraModel {
             }
             self.session.addInput(input)
             
-            // Internal state that is non-observable can be set here
-            // But 'device' and others are @Observable, so move to MainActor Task
-            
-            // Zoom Factor (Hardware)
             if lensZoomFactor > 1.0 {
                 try? cam.lockForConfiguration()
                 cam.videoZoomFactor = lensZoomFactor
                 cam.unlockForConfiguration()
             }
-            self.enableLensSmudgeDetectionIfSupported(on: cam)
             
-            // Connection properties (Hardware)
-            let rotationAngle: CGFloat = lensIsFront ? 0 : 90
+            // Set orientation on connections (iOS 15 compatible)
+            let orientation: AVCaptureVideoOrientation = lensIsFront ? .portrait : .landscapeRight
             for conn in [self.photoOutput.connection(with: .video),
                          self.videoOutput.connection(with: .video)].compactMap({ $0 }) {
-                if conn.isVideoRotationAngleSupported(rotationAngle) {
-                    conn.videoRotationAngle = rotationAngle
+                if conn.isVideoOrientationSupported {
+                    conn.videoOrientation = orientation
                 }
                 conn.isVideoMirrored = lensIsFront
             }
             
             self.session.commitConfiguration()
             
-            // 4. Final synchronization back to UI state
             Task { @MainActor in
                 self.device = cam
-                self.rotationCoordinator = AVCaptureDevice.RotationCoordinator(device: cam, previewLayer: nil)
-                self.configureLensSmudgeDetection(for: cam)
                 self.configureSubjectAreaMonitoring(for: cam)
-                
-                if let largest = cam.activeFormat.supportedMaxPhotoDimensions.max(by: {
-                    Int($0.width) * Int($0.height) < Int($1.width) * Int($1.height)
-                }) {
-                    self.photoOutput.maxPhotoDimensions = largest
-                }
                 
                 self.buildAvailableFormats()
                 let previousShutterDuration: CMTime? = (!self.isAutoExposure && self.shutterSpeeds.indices.contains(self.shutterIndex)) ? self.shutterSpeeds[self.shutterIndex] : nil
@@ -80,15 +63,8 @@ extension CameraModel {
                 self.normalizeFlashModeForCurrentDevice()
                 self.enforceExposureModeConstraints()
                 
-                if self.isMacroEnabled && lens != .ultraWide {
-                    self.isMacroEnabled = false
-                }
-                if self.isMacroEnabled && lens == .ultraWide {
-                    self.applyMacroMode()
-                }
                 
                 self.reapplyManualSettingsAfterLensSwitch(previousShutterDuration: previousShutterDuration)
-                self.setupCameraControls()
                 
                 if !cam.isLockingFocusWithCustomLensPositionSupported {
                     self.isAutoFocus = true
@@ -102,11 +78,9 @@ extension CameraModel {
         if !isAutoExposure {
             if let prevDuration = previousShutterDuration, !shutterSpeeds.isEmpty {
                 let prevSecs = CMTimeGetSeconds(prevDuration)
-                isUpdatingHardwareControl = true
                 shutterIndex = shutterSpeeds.indices.min { a, b in
                     abs(CMTimeGetSeconds(shutterSpeeds[a]) - prevSecs) < abs(CMTimeGetSeconds(shutterSpeeds[b]) - prevSecs)
                 } ?? 0
-                isUpdatingHardwareControl = false
             }
             applyManualExposure()
         } else {
@@ -161,20 +135,6 @@ extension CameraModel {
         }
     }
     
-    func toggleMacroMode() {
-        guard supportsMacro, isAutoExposure else { return }
-        
-        if !isMacroEnabled {
-            // Enabling macro: switch to Ultra Wide first
-            if activeLens != .ultraWide {
-                switchLens(to: .ultraWide)
-            }
-            isMacroEnabled = true
-        } else {
-            // Disabling macro
-            isMacroEnabled = false
-        }
-    }
     
     func cycleFlashMode() {
         guard supportsFlash, isAutoExposure else {
@@ -206,11 +166,7 @@ extension CameraModel {
         guard isFormatEnabled(mode) else { return }
         captureMode = mode
     }
-
-    func changePhotoFilter(to filter: PhotoFilter) {
-        selectedPhotoFilter = filter
-    }
-
+    
     func toggleClipping() { showClipping.toggle() }
     
     func toggleZebraStripes() { showZebraStripes.toggle() }

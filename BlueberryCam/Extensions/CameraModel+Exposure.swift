@@ -1,4 +1,4 @@
-internal import AVFoundation
+import AVFoundation
 import Foundation
 
 extension CameraModel {
@@ -15,10 +15,10 @@ extension CameraModel {
         exposureDebounceTask?.cancel()
         exposureDebounceTask = Task {
             try? await Task.sleep(nanoseconds: 50_000_000)
-            guard !Task.isCancelled, let d = device, shutterSpeeds.indices.contains(shutterIndex) else { return }
+            guard !Task.isCancelled, let d = self.device, self.shutterSpeeds.indices.contains(self.shutterIndex) else { return }
             try? d.lockForConfiguration()
-            let clampedISO = max(d.activeFormat.minISO, min(d.activeFormat.maxISO, iso))
-            d.setExposureModeCustom(duration: shutterSpeeds[shutterIndex], iso: clampedISO, completionHandler: nil)
+            let clampedISO = max(d.activeFormat.minISO, min(d.activeFormat.maxISO, self.iso))
+            d.setExposureModeCustom(duration: self.shutterSpeeds[self.shutterIndex], iso: clampedISO, completionHandler: nil)
             d.unlockForConfiguration()
         }
     }
@@ -29,9 +29,9 @@ extension CameraModel {
         exposureDebounceTask?.cancel()
         exposureDebounceTask = Task {
             try? await Task.sleep(nanoseconds: 50_000_000)
-            guard !Task.isCancelled, let d = device else { return }
+            guard !Task.isCancelled, let d = self.device else { return }
             try? d.lockForConfiguration()
-            let clampedISO = max(d.activeFormat.minISO, min(d.activeFormat.maxISO, iso))
+            let clampedISO = max(d.activeFormat.minISO, min(d.activeFormat.maxISO, self.iso))
             d.setExposureModeCustom(duration: duration, iso: clampedISO, completionHandler: nil)
             d.unlockForConfiguration()
         }
@@ -44,10 +44,6 @@ extension CameraModel {
         d.exposureMode = .continuousAutoExposure
         d.unlockForConfiguration()
         applyExposureBias()
-        
-        sessionQueue.async { Task { @MainActor in
-            self.updateCameraControlsMode()
-        }}
     }
     
     func applyExposureBias() {
@@ -91,3 +87,4 @@ extension CameraModel {
         updateTapFocusIndicatorOffset(-normalized * tapPointExposureHandleTravel)
     }
 }
+

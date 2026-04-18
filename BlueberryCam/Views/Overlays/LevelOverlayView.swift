@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct LevelOverlayView: View {
-    @Bindable var model: LevelMotionModel
+    @ObservedObject var model: LevelMotionModel
     
     var body: some View {
         GeometryReader { geo in
@@ -10,21 +10,22 @@ struct LevelOverlayView: View {
             let cx = w / 2
             let cy = h / 2
             
-            switch model.displayMode {
-                case .hidden:
-                    EmptyView()
-                case .level:
+            Group {
+                if model.displayMode == .level {
                     Canvas { ctx, size in
                         drawLevelMode(ctx: ctx, cx: cx, cy: cy, w: size.width)
                     }
                     .allowsHitTesting(false)
                     .transition(.opacity)
-                case .flat:
+                } else if model.displayMode == .flat {
                     Canvas { ctx, size in
                         drawFlatMode(ctx: ctx, cx: cx, cy: cy)
                     }
                     .allowsHitTesting(false)
                     .transition(.opacity)
+                } else {
+                    EmptyView()
+                }
             }
         }
         .animation(.easeInOut(duration: 0.25), value: model.displayMode)

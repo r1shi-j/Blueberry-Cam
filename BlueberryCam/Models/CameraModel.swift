@@ -1,152 +1,105 @@
-internal import AVFoundation
-internal import CoreLocation
-internal import Photos
+import AVFoundation
+import CoreLocation
+import Photos
 import UIKit
+internal import Combine
 
-@MainActor @Observable
-class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
+@MainActor
+class CameraModel: NSObject, ObservableObject {
     // MARK: - Session
     nonisolated let session = AVCaptureSession()
     var device: AVCaptureDevice?
     nonisolated let photoOutput = AVCapturePhotoOutput()
     nonisolated let videoOutput = AVCaptureVideoDataOutput()
-    nonisolated let depthOutput = AVCaptureDepthDataOutput()
-    private var synchronizer: AVCaptureDataOutputSynchronizer?
     nonisolated let sessionQueue = DispatchQueue(label: "\(BundleIDs.appID).sessionQueue")
     nonisolated let frameCounter = FrameCounter()
     let _pendingCaptureModeBox = CaptureModeBox()
-    let _pendingPhotoFilterBox = PhotoFilterBox()
     
     // MARK: - Barcode Detection
     nonisolated let metadataOutput = AVCaptureMetadataOutput()
-    var detectedCodeURL: URL? = nil
-    var detectedCodeString: String? = nil
-    var ignoredCodes: [String: Date] = [:]
+    @Published var detectedCodeURL: URL? = nil
+    @Published var detectedCodeString: String? = nil
+    @Published var ignoredCodes: [String: Date] = [:]
     var barcodeResetTask: Task<Void, Never>?
     var supportedMetadataTypes: [AVMetadataObject.ObjectType] {
+        // Only types available on iOS 15
         [
-            .qr, .microQR,
+            .qr,
             .ean13, .ean8, .upce,
             .code128, .code39, .code39Mod43, .code93,
             .itf14, .interleaved2of5,
-            .dataMatrix, .pdf417, .microPDF417, .aztec,
-            .codabar, .gs1DataBar, .gs1DataBarExpanded, .gs1DataBarLimited
+            .dataMatrix, .pdf417, .aztec
         ]
     }
     
-    // MARK: - Lens cleaning detection
-    var lensSmudgeDetectionStatus: AVCaptureCameraLensSmudgeDetectionStatus = .disabled
-    var shouldShowLensCleaningHint = false
-    @ObservationIgnored
-    private var didDismissLensCleaningHint = false
-    @ObservationIgnored
-    private var lensSmudgeStatusObservation: NSKeyValueObservation?
-    
-    // MARK: - Camera Control (iOS 18)
-    var cleanUIControl: AVCaptureIndexPicker?
-    var filterControl: AVCaptureIndexPicker?
-    var lensControl: AVCaptureIndexPicker?
-    var evControl: AVCaptureSlider?
-    var isoControl: AVCaptureSlider?
-    var ssControl: AVCaptureIndexPicker?
-    var focusControl: AVCaptureSlider?
-    var wbControl: AVCaptureSlider?
-    /// Prevents Camera Control action callbacks from overwriting properties when we set ctrl.value programmatically
-    var isUpdatingHardwareControl = false
-    
     // MARK: - Defaults (for settings)
-    var defaultFileFormat: CaptureMode = .raw {
+    @Published var defaultFileFormat: CaptureMode = .raw {
         didSet {
             UserDefaults.standard.set(defaultFileFormat.rawValue, forKey: "defaultFileFormat")
-            // Always try to apply the preference to the active mode immediately.
-            // Enforcement (fallbacks) will be handled by buildAvailableFormats() once hardware is ready.
             if captureMode != defaultFileFormat {
                 captureMode = defaultFileFormat
             }
         }
     }
-    var defaultResolution: ResolutionPreference = .max {
+    @Published var defaultResolution: ResolutionPreference = .max {
         didSet {
             UserDefaults.standard.set(defaultResolution.rawValue, forKey: "defaultResolution")
-            // Force apply the new preference immediately to the current selection
             if !enabledResolutions.isEmpty {
                 selectedResolution = defaultResolution == .max ? enabledResolutions.last : enabledResolutions.first
             }
         }
     }
-    var defaultPhotoFilter: PhotoFilter = .off {
-        didSet {
-            UserDefaults.standard.set(defaultPhotoFilter.rawValue, forKey: "defaultPhotoFilter")
-        }
-    }
-    var defaultHistogramSmall: HistogramMode = .none {
+    @Published var defaultHistogramSmall: HistogramMode = .none {
         didSet {
             UserDefaults.standard.set(defaultHistogramSmall.rawValue, forKey: "defaultHistogramSmall")
             histogramModeSmall = defaultHistogramSmall
         }
     }
-    var defaultHistogramLarge: HistogramMode = .none {
+    @Published var defaultHistogramLarge: HistogramMode = .none {
         didSet {
             UserDefaults.standard.set(defaultHistogramLarge.rawValue, forKey: "defaultHistogramLarge")
             histogramModeLarge = defaultHistogramLarge
         }
     }
-    var shouldGeotagLocation = false {
+    @Published var shouldGeotagLocation = false {
         didSet {
             UserDefaults.standard.set(shouldGeotagLocation, forKey: "shouldGeotagLocation")
             toggleLocationGeotag()
         }
     }
-    var recognizeBarcodes: Bool = false {
+    @Published var recognizeBarcodes: Bool = false {
         didSet {
             UserDefaults.standard.set(recognizeBarcodes, forKey: "recognizeBarcodes")
             updateMetadataOutputStatus()
         }
     }
-    var shouldShowGrid = false {
+    @Published var shouldShowGrid = false {
         didSet { UserDefaults.standard.set(shouldShowGrid, forKey: "shouldShowGrid") }
     }
-    var shouldShowLevel = false {
+    @Published var shouldShowLevel = false {
         didSet { UserDefaults.standard.set(shouldShowLevel, forKey: "shouldShowLevel") }
     }
     
     // MARK: - Capture format
-    var captureMode: CaptureMode = .raw {
+    @Published var captureMode: CaptureMode = .jpeg {
         didSet {
             if oldValue != captureMode {
                 buildAvailableFormats()
-                updateCameraControlsMode()
             }
         }
     }
-    private(set) var availableFormats: [CaptureMode] = []
-    private(set) var enabledFormats: [CaptureMode] = []
-    private(set) var availableResolutions: [ResolutionOption] = []
-    private(set) var enabledResolutions: [ResolutionOption] = []
-    var selectedResolution: ResolutionOption? = nil
-    var selectedPhotoFilter: PhotoFilter = .off {
-        didSet {
-            syncPhotoFilterToHardware()
-        }
-    }
-    var activeLens: Lens = .wide
-    var flipRotation: Double = 0
-    var flashMode: AVCaptureDevice.FlashMode = .off
-    var isMacroEnabled: Bool = false {
-        didSet {
-            if oldValue != isMacroEnabled {
-                applyMacroMode()
-                buildAvailableFormats()
-            }
-        }
-    }
-    @ObservationIgnored
+    @Published private(set) var availableFormats: [CaptureMode] = []
+    @Published private(set) var enabledFormats: [CaptureMode] = []
+    @Published private(set) var availableResolutions: [ResolutionOption] = []
+    @Published private(set) var enabledResolutions: [ResolutionOption] = []
+    @Published var selectedResolution: ResolutionOption? = nil
+    @Published var activeLens: Lens = .wide
+    @Published var flipRotation: Double = 0
+    @Published var flashMode: AVCaptureDevice.FlashMode = .off
     nonisolated(unsafe) var lastGravity: (x: Double, y: Double, z: Double) = (0, -1, 0)
-    @ObservationIgnored
-    var rotationCoordinator: AVCaptureDevice.RotationCoordinator?
     
     // MARK: - Manual controls
-    var isAutoExposure: Bool = true {
+    @Published var isAutoExposure: Bool = true {
         didSet {
             if oldValue != isAutoExposure {
                 if !isAutoExposure, let d = device {
@@ -163,83 +116,49 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
                 }
                 enforceExposureModeConstraints()
                 buildAvailableFormats()
-                updateCameraControlsMode()
             }
         }
     }
-    var iso: Float = 100 {
-        didSet {
-            if oldValue != iso {
-                syncISOToHardware()
-            }
-        }
-    }
-    private(set) var minISO: Float = 25
-    private(set) var maxISO: Float = 6400
-    private(set) var shutterSpeeds: [CMTime] = []
-    var shutterIndex: Int = 0 {
-        didSet {
-            if oldValue != shutterIndex {
-                syncShutterToHardware()
-            }
-        }
-    }
-    /// Denominator for in-app shutter slider (1 = 1s, 500 = 1/500s). 0 means use shutterIndex instead.
-    var manualShutterDenominator: Int = 0
-    var exposureBias: Float = 0.0 {
-        didSet {
-            if oldValue != exposureBias {
-                syncEVToHardware()
-            }
-        }
-    }
-    private(set) var minExposureBias: Float = -8.0
-    private(set) var maxExposureBias: Float = 8.0
+    @Published var iso: Float = 100
+    @Published private(set) var minISO: Float = 25
+    @Published private(set) var maxISO: Float = 6400
+    @Published private(set) var shutterSpeeds: [CMTime] = []
+    @Published var shutterIndex: Int = 0
+    @Published var manualShutterDenominator: Int = 0
+    @Published var exposureBias: Float = 0.0
+    @Published private(set) var minExposureBias: Float = -8.0
+    @Published private(set) var maxExposureBias: Float = 8.0
     var exposureDebounceTask: Task<Void, Never>?
     
-    var isAdjustingManualFocus: Bool = false
-    var showFocusPeaking: Bool = true {
+    @Published var isAdjustingManualFocus: Bool = false
+    @Published var showFocusLoupe: Bool = false {
         didSet {
-            if showFocusPeaking && showFocusLoupe { showFocusLoupe = false }
-            peakingEnabledForAnalysis = !isAutoFocus && showFocusPeaking
-        }
-    }
-    var showFocusLoupe: Bool = false {
-        didSet {
-            if showFocusLoupe && showFocusPeaking { showFocusPeaking = false }
             loupeEnabledForAnalysis = !isAutoFocus && showFocusLoupe
         }
     }
-    var isAutoFocus: Bool = true {
+    @Published var isAutoFocus: Bool = true {
         didSet {
             if oldValue != isAutoFocus {
-                peakingEnabledForAnalysis = !isAutoFocus && showFocusPeaking
                 loupeEnabledForAnalysis = !isAutoFocus && showFocusLoupe
                 if !isAutoFocus, let d = device {
                     self.lensPosition = d.lensPosition
                 }
-                updateCameraControlsMode()
             }
         }
     }
-    var lensPosition: Float = 1.0 {
+    @Published var lensPosition: Float = 1.0 {
         didSet {
             if oldValue != lensPosition {
-                syncFocusToHardware()
                 lastLensPosition = lensPosition
             }
         }
     }
     
-    @ObservationIgnored
     nonisolated(unsafe) private(set) var lastLensPosition: Float = 1.0
-    @ObservationIgnored
-    nonisolated(unsafe) var peakingTemporalScores: [Float] = []
-    @ObservationIgnored
     nonisolated(unsafe) private(set) var minimumFocusDistanceForAnalysis: Float = 0
     var focusPeakingHoldTask: Task<Void, Never>?
     
-    var isAutoWhiteBalance: Bool = true {
+    @Published var isAutoWhiteBalance: Bool = true {
         didSet {
             if oldValue != isAutoWhiteBalance {
                 if isAutoWhiteBalance {
@@ -251,150 +170,75 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
                     }
                     applyManualWhiteBalance()
                 }
-                updateCameraControlsMode()
             }
         }
     }
-    var whiteBalanceTargetKelvin: Float = 5000 {
+    @Published var whiteBalanceTargetKelvin: Float = 5000 {
         didSet {
             if oldValue != whiteBalanceTargetKelvin {
                 if !isAutoWhiteBalance {
                     applyManualWhiteBalance()
                 }
-                syncWBToHardware()
             }
         }
     }
-    var histogramModeSmall: HistogramMode = .none {
+    @Published var histogramModeSmall: HistogramMode = .none {
         didSet { histogramModeForAnalysisSmall = histogramModeSmall }
     }
-    var histogramModeLarge: HistogramMode = .none {
+    @Published var histogramModeLarge: HistogramMode = .none {
         didSet { histogramModeForAnalysisLarge = histogramModeLarge }
     }
-    var showClipping: Bool = false {
+    @Published var showClipping: Bool = false {
         didSet { clippingEnabledForAnalysis = showClipping }
     }
-    var showZebraStripes: Bool = false {
+    @Published var showZebraStripes: Bool = false {
         didSet { zebraEnabledForAnalysis = showZebraStripes }
     }
     
     // MARK: - UI State
-    private(set) var isCapturing: Bool = false
-    var showError: Bool = false
-    var errorMessage: String = ""
-    var liveISO: Float = 0
-    var liveShutter: String = ""
-    var liveWB: String = ""
-    var liveFocus: String = ""
-    var lensSwitchCompletionCount: Int = 0
-    var appView: AppView = .standard {
-        didSet {
-            if oldValue != appView && (appView == .settings || oldValue == .settings) {
-                setupCameraControls()
-            }
-        }
-    }
-    var loupeImage: CGImage?
+    @Published private(set) var isCapturing: Bool = false
+    @Published var showError: Bool = false
+    @Published var errorMessage: String = ""
+    @Published var liveISO: Float = 0
+    @Published var liveShutter: String = ""
+    @Published var liveWB: String = ""
+    @Published var liveFocus: String = ""
+    @Published var lensSwitchCompletionCount: Int = 0
+    @Published var appView: AppView = .standard
+    @Published var loupeImage: CGImage?
     nonisolated static let loupeCIContext = CIContext(options: [.useSoftwareRenderer: false])
-    var focusPeakingMask: [UInt8] = []
-    var zebraMask: [UInt8] = []
-    var clippingMask: [UInt8] = []
-    var analysisGridSize: CGSize = .zero
-    var histogramData: [Float] = Array(repeating: 0, count: 256)
-    var redHistogram: [Float] = Array(repeating: 0, count: 256)
-    var greenHistogram: [Float] = Array(repeating: 0, count: 256)
-    var blueHistogram: [Float] = Array(repeating: 0, count: 256)
-    var waveformData: [Float] = []
+    @Published var zebraMask: [UInt8] = []
+    @Published var clippingMask: [UInt8] = []
+    @Published var analysisGridSize: CGSize = .zero
+    @Published var histogramData: [Float] = Array(repeating: 0, count: 256)
+    @Published var redHistogram: [Float] = Array(repeating: 0, count: 256)
+    @Published var greenHistogram: [Float] = Array(repeating: 0, count: 256)
+    @Published var blueHistogram: [Float] = Array(repeating: 0, count: 256)
+    @Published var waveformData: [Float] = []
     nonisolated static var wfCols: Int { WaveformConstants.wfCols }
     nonisolated static var wfRows: Int { WaveformConstants.wfRows }
-    var tapFocusIndicatorPoint: CGPoint? = nil
-    var isTapFocusIndicatorVisible = false
-    var isTapFocusIndicatorDimmed = false
-    var isTapFocusInteractionActive = false
-    var tapFocusIndicatorOffset: CGFloat = 0
-    var tapFocusLockLabel: String? = nil
-    var tapExposureBias: Float = 0
-    var tap​Focus​Lock​Haptic​Trigger: Int = 0
-    @ObservationIgnored
+    @Published var tapFocusIndicatorPoint: CGPoint? = nil
+    @Published var isTapFocusIndicatorVisible = false
+    @Published var isTapFocusIndicatorDimmed = false
+    @Published var isTapFocusInteractionActive = false
+    @Published var tapFocusIndicatorOffset: CGFloat = 0
+    @Published var tapFocusLockLabel: String? = nil
+    @Published var tapExposureBias: Float = 0
+    @Published var tap​Focus​Lock​Haptic​Trigger: Int = 0
     var tapFocusHideTask: Task<Void, Never>?
-    @ObservationIgnored
     var tapFocusLockTask: Task<Void, Never>?
-    @ObservationIgnored
     var subjectAreaChangeObserver: NSObjectProtocol?
-    @ObservationIgnored
     var focusAdjustmentObservation: NSKeyValueObservation?
-    @ObservationIgnored
     var lensPositionObservation: NSKeyValueObservation?
-    @ObservationIgnored
     var ignoredTapFocusAdjustmentEvents = 0
-    @ObservationIgnored
     var ignoredTapFocusAdjustmentDeadline: Date?
-    @ObservationIgnored
     var tapFocusLensPositionBaseline: Float?
-    @ObservationIgnored
     var tapFocusLensPositionMonitorTask: Task<Void, Never>?
-    @ObservationIgnored
     nonisolated(unsafe) private(set) var loupeEnabledForAnalysis: Bool = false
-    @ObservationIgnored
-    nonisolated(unsafe) private(set) var peakingEnabledForAnalysis: Bool = false
-    @ObservationIgnored
     nonisolated(unsafe) private(set) var zebraEnabledForAnalysis: Bool = false
-    @ObservationIgnored
     nonisolated(unsafe) private(set) var clippingEnabledForAnalysis: Bool = false
-    @ObservationIgnored
     nonisolated(unsafe) private(set) var histogramModeForAnalysisSmall: HistogramMode = .luminance
-    @ObservationIgnored
     nonisolated(unsafe) private(set) var histogramModeForAnalysisLarge: HistogramMode = .luminance
-    
-    // MARK: - Lens cleaning
-    nonisolated func enableLensSmudgeDetectionIfSupported(on camera: AVCaptureDevice) {
-        guard camera.activeFormat.isCameraLensSmudgeDetectionSupported else { return }
-        try? camera.lockForConfiguration()
-        camera.setCameraLensSmudgeDetectionEnabled(true, detectionInterval: CMTime(seconds: 30, preferredTimescale: 1))
-        camera.unlockForConfiguration()
-    }
-    
-    func configureLensSmudgeDetection(for camera: AVCaptureDevice) {
-        lensSmudgeStatusObservation?.invalidate()
-        lensSmudgeStatusObservation = nil
-        
-        guard camera.activeFormat.isCameraLensSmudgeDetectionSupported else {
-            lensSmudgeDetectionStatus = .disabled
-            shouldShowLensCleaningHint = false
-            didDismissLensCleaningHint = false
-            return
-        }
-        
-        lensSmudgeDetectionStatus = camera.cameraLensSmudgeDetectionStatus
-        updateLensCleaningHint(for: lensSmudgeDetectionStatus)
-        
-        lensSmudgeStatusObservation = camera.observe(\.cameraLensSmudgeDetectionStatus, options: [.initial, .new]) { [weak self] _, change in
-            guard let status = change.newValue else { return }
-            Task { @MainActor [weak self] in
-                guard let self else { return }
-                self.lensSmudgeDetectionStatus = status
-                self.updateLensCleaningHint(for: status)
-            }
-        }
-    }
-    
-    func dismissLensCleaningHint() {
-        didDismissLensCleaningHint = true
-        shouldShowLensCleaningHint = false
-    }
-    
-    private func updateLensCleaningHint(for status: AVCaptureCameraLensSmudgeDetectionStatus) {
-        switch status {
-            case .smudged:
-                shouldShowLensCleaningHint = !didDismissLensCleaningHint
-            case .smudgeNotDetected, .unknown, .disabled:
-                shouldShowLensCleaningHint = false
-                didDismissLensCleaningHint = false
-            @unknown default:
-                shouldShowLensCleaningHint = false
-                didDismissLensCleaningHint = false
-        }
-    }
     
     // MARK: - Location
     let locationManager = CLLocationManager()
@@ -415,28 +259,19 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
         device?.isLockingFocusWithCustomLensPositionSupported ?? false
     }
     
-    var supportsMacro: Bool {
-        // Macro is typically supported on Pro models with AF on Ultra Wide.
-        // We look for a back camera that can focus closer than 15cm (150mm).
-        let discovery = AVCaptureDevice.DiscoverySession(
-            deviceTypes: [.builtInUltraWideCamera, .builtInWideAngleCamera],
-            mediaType: .video,
-            position: .back
-        )
-        return discovery.devices.contains { $0.minimumFocusDistance > 0 && $0.minimumFocusDistance <= 150 }
-    }
     
     var supportsFlash: Bool {
         guard device?.hasFlash == true else { return false }
         return !photoOutput.supportedFlashModes.isEmpty
     }
     
-    var flashLabel: (systemImage: String, label: String) {
+    // flashIsOff = bolt.slash, flashAuto = bolt.badge.automatic, flashOn = bolt.fill
+    var flashLabel: (systemImage: String, isActive: Bool) {
         switch flashMode {
-            case .off: return ("flashlight.slash", "")
-            case .auto: return ("flashlight.on.fill", "A")
-            case .on: return ("flashlight.on.fill", "ON")
-            @unknown default: return ("flashlight.slash", "?")
+            case .off: return ("bolt.slash", false)
+            case .auto: return ("bolt.badge.automatic", true)
+            case .on: return ("bolt.fill", true)
+            @unknown default: return ("bolt.slash", false)
         }
     }
     
@@ -472,7 +307,7 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
     }
     
     deinit {
-        if let subjectAreaChangeObserver {
+        if let subjectAreaChangeObserver = subjectAreaChangeObserver {
             NotificationCenter.default.removeObserver(subjectAreaChangeObserver)
         }
         focusAdjustmentObservation?.invalidate()
@@ -491,9 +326,6 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
         }
         session.addInput(input)
         
-        session.setControlsDelegate(self, queue: DispatchQueue.main)
-        setupCameraControls()
-        
         if session.canAddOutput(photoOutput) {
             session.addOutput(photoOutput)
         }
@@ -506,11 +338,6 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
             session.addOutput(videoOutput)
         }
         
-        if session.canAddOutput(depthOutput) {
-            session.addOutput(depthOutput)
-            depthOutput.isFilteringEnabled = true
-        }
-        
         if session.canAddOutput(metadataOutput) {
             session.addOutput(metadataOutput)
             metadataOutput.setMetadataObjectsDelegate(self, queue: .main)
@@ -521,46 +348,28 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
             }
         }
         
-        enableLensSmudgeDetectionIfSupported(on: cam)
         configureSubjectAreaMonitoring(for: cam)
         
-        // Keep analysis output orientation aligned with preview from first launch.
+        // Set video orientation on connections (iOS 15 compatible)
         let isFront = activeLens.isFront
-        let rotationAngle: CGFloat = isFront ? 0 : 90
+        let orientation: AVCaptureVideoOrientation = isFront ? .portrait : .landscapeRight
         for conn in [photoOutput.connection(with: .video),
                      videoOutput.connection(with: .video)].compactMap({ $0 }) {
-            if conn.isVideoRotationAngleSupported(rotationAngle) {
-                conn.videoRotationAngle = rotationAngle
+            if conn.isVideoOrientationSupported {
+                conn.videoOrientation = orientation
             }
             conn.isVideoMirrored = isFront
         }
         
         session.commitConfiguration()
         
-        // Match initial flip to lens
         self.flipRotation = activeLens.isFront ? 180 : 0
         
-        // Setup rotation coordinator
-        self.rotationCoordinator = AVCaptureDevice.RotationCoordinator(device: cam, previewLayer: nil)
-        
-        // Safely setup synchronizer or fallback
+        // Use video output as the sole sample buffer delegate
         let syncQueue = DispatchQueue(label: "\(BundleIDs.appID).analysisQueue")
-        if depthOutput.connection(with: .depthData) != nil && videoOutput.connection(with: .video) != nil {
-            synchronizer = AVCaptureDataOutputSynchronizer(dataOutputs: [videoOutput, depthOutput])
-            synchronizer?.setDelegate(self, queue: syncQueue)
-        } else {
-            // Fallback for devices without LiDAR or if depth is not available in current format
-            videoOutput.setSampleBufferDelegate(self, queue: syncQueue)
-        }
+        videoOutput.setSampleBufferDelegate(self, queue: syncQueue)
         
-        // Restoration of hardware defaults and state
         self.device = cam
-        self.configureLensSmudgeDetection(for: cam)
-        if let largest = cam.activeFormat.supportedMaxPhotoDimensions.max(by: {
-            Int($0.width) * Int($0.height) < Int($1.width) * Int($1.height)
-        }) {
-            self.photoOutput.maxPhotoDimensions = largest
-        }
         self.buildAvailableFormats()
         self.updateDeviceRanges()
         self.normalizeFlashModeForCurrentDevice()
@@ -572,7 +381,6 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
         
         if let format = defaults.string(forKey: "defaultFileFormat"), let mode = CaptureMode(rawValue: format) {
             self.defaultFileFormat = mode
-            // Prime the active mode immediately so the UI reflects the saved state during launch.
             self.captureMode = mode
         }
         
@@ -585,12 +393,6 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
             self.defaultResolution = rPref
         }
         
-        if let filter = defaults.string(forKey: "defaultPhotoFilter"),
-           let defaultPhotoFilter = PhotoFilter(rawValue: filter) {
-            self.defaultPhotoFilter = defaultPhotoFilter
-        }
-        self.selectedPhotoFilter = defaultPhotoFilter
-        
         if let histSmall = defaults.string(forKey: "defaultHistogramSmall"), let hMode = HistogramMode(rawValue: histSmall) {
             self.defaultHistogramSmall = hMode
         }
@@ -602,7 +404,6 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
     
     // MARK: - Formats & ranges
     func buildAvailableFormats() {
-        // We only enforce this logic if the device is ready.
         guard device != nil else { return }
         
         let zoomBlocksRAW = (device?.videoZoomFactor ?? 1.0) > 1.0
@@ -626,7 +427,7 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
                     case .jpeg, .heif:
                         return true
                     case .raw:
-                        return !zoomBlocksRAW && !isMacroEnabled
+                        return !zoomBlocksRAW
                 }
             }
         } else {
@@ -636,7 +437,6 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
             enabledFormats = modes
         }
         
-        // SMART SWITCH: Keep the current selection if valid, else fallback to preference, else base fallback.
         let targetMode: CaptureMode
         if modes.contains(captureMode) {
             targetMode = captureMode
@@ -650,38 +450,25 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
             captureMode = targetMode
         }
         
-        let isCropLens = activeLens == .tele2x || activeLens == .tele8x
-        
+        // On iOS 15 we don't have supportedMaxPhotoDimensions — show a single resolution entry
         let visibleOptions: [ResolutionOption]
         if isFront {
             visibleOptions = []
         } else {
-            let outputMax = photoOutput.maxPhotoDimensions
-            let allDims = (device?.activeFormat.supportedMaxPhotoDimensions ?? [])
-                .filter { $0.width <= outputMax.width && $0.height <= outputMax.height }
-                .sorted { Int($0.width) * Int($0.height) < Int($1.width) * Int($1.height) }
-            
-            var deduped: [ResolutionOption] = []
-            for dim in allDims {
-                let opt = ResolutionOption(width: dim.width, height: dim.height)
-                if !deduped.contains(where: { abs($0.id - opt.id) < 2_000_000 }) {
-                    deduped.append(opt)
-                }
-            }
-            // Always show 12MP + 48MP for back optical lenses
-            let smallest = deduped.first
-            let largest = deduped.last
-            if let s = smallest, let l = largest, s.id != l.id {
-                visibleOptions = [s, l]
+            if let fmt = device?.activeFormat {
+                let desc = fmt.formatDescription
+                let dims = CMVideoFormatDescriptionGetDimensions(desc)
+                let opt = ResolutionOption(width: dims.width, height: dims.height)
+                visibleOptions = [opt]
             } else {
-                visibleOptions = deduped
+                visibleOptions = []
             }
         }
         
         let enabledOptions: [ResolutionOption]
         if isFront {
             enabledOptions = []
-        } else if isCropLens || isMacroEnabled || captureMode == .raw {
+        } else if captureMode == .raw {
             enabledOptions = visibleOptions.first.map { [$0] } ?? []
         } else {
             enabledOptions = visibleOptions
@@ -700,10 +487,8 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
         }
         
         if !sameEnabledOptions {
-            // Options change (Format or Lens switch): re-apply resolution preference
             selectedResolution = defaultResolution == .max ? enabledOptions.last : enabledOptions.first
         } else if let current = selectedResolution, !enabledOptions.contains(where: { $0.id == current.id }) {
-            // Current selection became invalid
             selectedResolution = defaultResolution == .max ? enabledOptions.last : enabledOptions.first
         }
     }
@@ -713,35 +498,16 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
         if lens.isFront {
             visibleOptions = []
         } else {
-            let outputMax = device.activeFormat.supportedMaxPhotoDimensions.max(by: {
-                Int($0.width) * Int($0.height) < Int($1.width) * Int($1.height)
-            }) ?? photoOutput.maxPhotoDimensions
-            let allDims = device.activeFormat.supportedMaxPhotoDimensions
-                .filter { $0.width <= outputMax.width && $0.height <= outputMax.height }
-                .sorted { Int($0.width) * Int($0.height) < Int($1.width) * Int($1.height) }
-            
-            var deduped: [ResolutionOption] = []
-            for dim in allDims {
-                let opt = ResolutionOption(width: dim.width, height: dim.height)
-                if !deduped.contains(where: { abs($0.id - opt.id) < 2_000_000 }) {
-                    deduped.append(opt)
-                }
-            }
-            
-            let smallest = deduped.first
-            let largest = deduped.last
-            if let s = smallest, let l = largest, s.id != l.id {
-                visibleOptions = [s, l]
-            } else {
-                visibleOptions = deduped
-            }
+            let fmt = device.activeFormat
+            let dims = CMVideoFormatDescriptionGetDimensions(fmt.formatDescription)
+            let opt = ResolutionOption(width: dims.width, height: dims.height)
+            visibleOptions = [opt]
         }
         
-        let isCropLens = lens == .tele2x || lens == .tele8x
         let enabledOptions: [ResolutionOption]
         if lens.isFront {
             enabledOptions = []
-        } else if isCropLens || isMacroEnabled || captureMode == .raw {
+        } else if captureMode == .raw {
             enabledOptions = visibleOptions.first.map { [$0] } ?? []
         } else {
             enabledOptions = visibleOptions
@@ -775,9 +541,6 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
     func enforceExposureModeConstraints() {
         if !isAutoExposure {
             flashMode = .off
-            if isMacroEnabled {
-                isMacroEnabled = false
-            }
             if captureMode != .raw {
                 captureMode = .raw
             }
@@ -802,25 +565,8 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
         maxExposureBias = d.maxExposureTargetBias
         minimumFocusDistanceForAnalysis = d.minimumFocusDistance > 0 ? Float(d.minimumFocusDistance) / 1000.0 : 0
         
-        // Always clamp iso to the new device's valid range (handles lens switches where minISO changes)
         let newISO = max(minISO, min(maxISO, iso))
         if newISO != iso { iso = newISO }
-        
-        // Update EV slider value (EV bounds are fixed -4...4 so this never crashes)
-        if let ev = evControl {
-            let clampedEV = max(-4.0, min(4.0, exposureBias))
-            ev.value = round(clampedEV * 10) / 10.0
-        }
-        
-        // For ISO and Shutter, we skip setting their .value here because their min/max
-        // bounds depend on the active device. switchLens() calls setupCameraControls()
-        // right after this, which rebuilds the sliders with the correct bounds and seeds
-        // their values safely. Setting them here on stale bounds causes crashes.
-        
-        // If controls weren't set up yet (e.g. at launch), try again now
-        if lensControl == nil || evControl == nil || isoControl == nil || ssControl == nil {
-            setupCameraControls()
-        }
     }
     
     private func generateShutterStops(for device: AVCaptureDevice) -> [CMTime] {
@@ -863,28 +609,22 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
         
         exposureDebounceTask?.cancel()
         _pendingCaptureModeBox.value = captureMode
-        _pendingPhotoFilterBox.value = selectedPhotoFilter
         
-        // Update orientation based on current physical position
         updateCaptureOrientation()
         
-        // For manual exposure, wait for hardware to confirm values are applied before firing.
-        // setExposureModeCustom is async — the completionHandler fires once the sensor has
-        // actually settled on the requested ISO/shutter, then we fire the shutter.
         if !isAutoExposure, let d = device {
-            // Use manualShutterDenominator if set (in-app slider), else fall back to shutterIndex stop
             let duration: CMTime
             if manualShutterDenominator > 0 {
                 duration = CMTimeMake(value: 1, timescale: CMTimeScale(manualShutterDenominator))
             } else if shutterSpeeds.indices.contains(shutterIndex) {
                 duration = shutterSpeeds[shutterIndex]
             } else {
-                return  // no valid shutter duration available, skip
+                return
             }
             let isoValue = max(d.activeFormat.minISO, min(d.activeFormat.maxISO, iso))
             try? d.lockForConfiguration()
             d.setExposureModeCustom(duration: duration, iso: isoValue) { [weak self] _ in
-                guard let self else { return }
+                guard let self = self else { return }
                 Task { @MainActor in
                     self.photoOutput.capturePhoto(with: self.buildPhotoSettings(), delegate: self)
                 }
@@ -897,7 +637,6 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
     
     private func buildPhotoSettings() -> AVCapturePhotoSettings {
         let zoomBlocksRAW = (device?.videoZoomFactor ?? 1.0) > 1.0
-        let dims = captureDimensions()
         
         switch captureMode {
             case .raw:
@@ -906,7 +645,6 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
                        !AVCapturePhotoOutput.isAppleProRAWPixelFormat($0)
                    }) ?? photoOutput.availableRawPhotoPixelFormatTypes.first {
                     let s = AVCapturePhotoSettings(rawPixelFormatType: fmt)
-                    s.maxPhotoDimensions = dims
                     applyFlashModeIfSupported(to: s)
                     return s
                 }
@@ -914,14 +652,12 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
             case .heif:
                 if photoOutput.availablePhotoCodecTypes.contains(.hevc) {
                     let s = AVCapturePhotoSettings(format: [AVVideoCodecKey: AVVideoCodecType.hevc])
-                    s.maxPhotoDimensions = dims
                     applyFlashModeIfSupported(to: s)
                     return s
                 }
                 fallthrough
             case .jpeg:
                 let s = AVCapturePhotoSettings()
-                s.maxPhotoDimensions = dims
                 applyFlashModeIfSupported(to: s)
                 return s
         }
@@ -933,36 +669,26 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
         let (gx, gy, gz) = lastGravity
         let isFront = activeLens.isFront
         
-        // Determine rotation based on gravity
-        let degrees: CGFloat
+        if abs(gz) > 0.75 { return }
         
-        if abs(gz) > 0.75 {
-            // Device is flat - keep current
-            return
-        }
-        
+        let orientation: AVCaptureVideoOrientation
         if abs(gy) > abs(gx) {
-            // Portrait orientation
             if gy < 0 {
-                // Normal portrait
-                degrees = isFront ? 0 : 90
+                orientation = isFront ? .portrait : .landscapeRight
             } else {
-                // Upside down portrait
-                degrees = isFront ? 180 : 270
+                orientation = isFront ? .portraitUpsideDown : .landscapeLeft
             }
         } else {
-            // Landscape orientation  
             if gx > 0 {
-                // Landscape right (home button on right)
-                degrees = isFront ? 270 : 180
+                orientation = isFront ? .landscapeLeft : .portrait
             } else {
-                // Landscape left (home button on left)
-                degrees = isFront ? 90 : 0
+                orientation = isFront ? .landscapeRight : .portraitUpsideDown
             }
         }
         
-        // Update the photo connection rotation
-        photoConnection.videoRotationAngle = degrees
+        if photoConnection.isVideoOrientationSupported {
+            photoConnection.videoOrientation = orientation
+        }
     }
     
     private func applyFlashModeIfSupported(to settings: AVCapturePhotoSettings) {
@@ -977,49 +703,4 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
         }
     }
     
-    private func captureDimensions() -> CMVideoDimensions {
-        if let selected = selectedResolution { return selected.dimensions }
-        guard let d = device else { return photoOutput.maxPhotoDimensions }
-        let outputMax = photoOutput.maxPhotoDimensions
-        return d.activeFormat.supportedMaxPhotoDimensions
-            .filter { $0.width <= outputMax.width && $0.height <= outputMax.height }
-            .max { Int($0.width) * Int($0.height) < Int($1.width) * Int($1.height) }
-        ?? outputMax
-    }
-    
-    func applyMacroMode() {
-        if isMacroEnabled {
-            // 1. Switch to Ultra Wide if it's not already active
-            if activeLens != .ultraWide {
-                // We use the internal switchLens but skip the recursive applyMacroMode
-                // This will be handled by the UI toggle
-            }
-            
-            guard let d = device else { return }
-            try? d.lockForConfiguration()
-            
-            // 2. Apply "Macro" zoom (typically 2.0x on UW to match 1x FOV)
-            if activeLens == .ultraWide {
-                d.videoZoomFactor = 2.0
-            }
-            
-            // 3. Optimize focus for near objects if supported
-            if d.isAutoFocusRangeRestrictionSupported {
-                d.autoFocusRangeRestriction = .near
-            }
-            
-            d.unlockForConfiguration()
-        } else {
-            guard let d = device else { return }
-            try? d.lockForConfiguration()
-            if d.isAutoFocusRangeRestrictionSupported {
-                d.autoFocusRangeRestriction = .none
-            }
-            // Reset zoom if we were in the macro-zoom state
-            if activeLens == .ultraWide && d.videoZoomFactor == 2.0 {
-                d.videoZoomFactor = 1.0
-            }
-            d.unlockForConfiguration()
-        }
-    }
 }

@@ -190,7 +190,7 @@ struct HistogramView: View {
         GeometryReader { _ in
             ZStack(alignment: .bottomLeading) {
                 RoundedRectangle(cornerRadius: cornerRadius)
-                    .fill(.black.opacity(backgroundOpacity))
+                    .fill(Color.black.opacity(backgroundOpacity))
                 
                 if size == .small {
                     Canvas { ctx, sz in
@@ -202,7 +202,7 @@ struct HistogramView: View {
                             case .none: return
                         }
                     }
-                    .clipShape(.rect(cornerRadius: cornerRadius))
+                    .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
                     .frame(width: 80, height: 30)
                 } else {
                     Canvas { ctx, sz in
@@ -214,7 +214,7 @@ struct HistogramView: View {
                             case .none: return
                         }
                     }
-                    .clipShape(.rect(cornerRadius: cornerRadius))
+                    .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
                     
                     Text(mode.rawValue.uppercased())
                         .font(.system(size: 8, weight: .bold, design: .monospaced))

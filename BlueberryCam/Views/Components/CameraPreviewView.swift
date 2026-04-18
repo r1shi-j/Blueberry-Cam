@@ -1,5 +1,4 @@
-internal import AVFoundation
-import AVKit
+import AVFoundation
 import SwiftUI
 
 final class PreviewViewProxy {
@@ -12,55 +11,46 @@ final class PreviewViewProxy {
 
 struct CameraPreviewView: UIViewRepresentable {
     let session: AVCaptureSession
-    let onCapture: () -> Void
     let proxy: PreviewViewProxy
     
     func makeUIView(context: Context) -> PreviewUIView {
         let view = PreviewUIView()
-        view.session = session
-        view.onCapture = onCapture
         proxy.view = view
+        // Always set session on main thread to avoid exclusivity conflicts
+        DispatchQueue.main.async {
+            view.setSession(session)
+        }
         return view
     }
     
     func updateUIView(_ uiView: PreviewUIView, context: Context) {
         proxy.view = uiView
+        // Re-apply session only if it has actually changed
+        if uiView.previewLayer.session !== session {
+            DispatchQueue.main.async {
+                uiView.setSession(session)
+            }
+        }
     }
 }
 
 final class PreviewUIView: UIView {
     override class var layerClass: AnyClass { AVCaptureVideoPreviewLayer.self }
     
-    var onCapture: (() -> Void)?
-    private var eventInteraction: AVCaptureEventInteraction?
-    
     var previewLayer: AVCaptureVideoPreviewLayer {
+        // swiftlint:disable:next force_cast
         layer as! AVCaptureVideoPreviewLayer
     }
     
-    var session: AVCaptureSession? {
-        get { previewLayer.session }
-        set {
-            previewLayer.session = newValue
-            previewLayer.videoGravity = .resizeAspect
-            
-            if let conn = previewLayer.connection, conn.isVideoMirroringSupported {
-                conn.automaticallyAdjustsVideoMirroring = true
-            }
-            
-            setupInteraction()
-        }
-    }
-    
-    private func setupInteraction() {
-        if eventInteraction == nil {
-            let interaction = AVCaptureEventInteraction { [weak self] event in
-                if event.phase == .ended {
-                    self?.onCapture?()
-                }
-            }
-            addInteraction(interaction)
-            eventInteraction = interaction
+    /// Safely attach a session to the preview layer.
+    /// Must be called on the main thread; does nothing if already set.
+    func setSession(_ session: AVCaptureSession) {
+        assert(Thread.isMainThread, "setSession must be called on the main thread")
+        guard previewLayer.session !== session else { return }
+        previewLayer.session = session
+        previewLayer.videoGravity = .resizeAspect
+        if let conn = previewLayer.connection, conn.isVideoMirroringSupported {
+            conn.automaticallyAdjustsVideoMirroring = true
         }
     }
 }

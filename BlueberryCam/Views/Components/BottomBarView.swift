@@ -1,16 +1,13 @@
 import SwiftUI
+import UIKit
 
 extension CameraModel {
     fileprivate var shutterTint: Color {
-        captureMode == .raw ? .blue.mix(with: .mint, by: 0.5).opacity(0.4) : .white.opacity(0.2)
+        captureMode == .raw ? Color.blue.opacity(0.4) : Color.white.opacity(0.2)
     }
 }
 
 extension BottomBarView {
-    private var photosLinkSymbolName: String {
-        "photo.on.rectangle.angled.fill"
-    }
-    
     private func openPhotosApp() {
         guard let url = URL(string: "photos-redirect://") else { return }
         UIApplication.shared.open(url)
@@ -18,40 +15,38 @@ extension BottomBarView {
 }
 
 struct BottomBarView: View {
-    @Bindable var cameraModel: CameraModel
+    @ObservedObject var cameraModel: CameraModel
     @Binding var shutterCount: Int
+    private let haptic = UIImpactFeedbackGenerator(style: .medium)
     
     var body: some View {
-        VStack() {
+        VStack {
             HStack(alignment: .center, spacing: 0) {
                 // MARK: - Photos app shortcut
                 if !cameraModel.showSimpleView {
                     Button(action: openPhotosApp) {
-                        Image(systemName: photosLinkSymbolName)
-                            .font(.system(size: 20))
+                        Image(systemName: "photo.fill")
+                            .font(.system(size: 18))
                             .symbolRenderingMode(.hierarchical)
-                            .tint(.primary)
+                            .foregroundColor(.primary)
                             .padding()
-                            .clipShape(.circle)
-                            .glassEffect(.regular.interactive().tint(.black.mix(with: .white, by: 0.2)), in: .circle)
+                            .background(Color.white.opacity(0.15))
+                            .clipShape(Circle())
                     }
-                    .frame(height: 82)
+                    .frame(height: 72)
                     .frame(maxWidth: .infinity)
-                    .overlay {
-                        Text(String(shutterCount))
-                            .font(.caption)
-                            .fontWidth(.expanded)
-                            .foregroundColor(.white.opacity(0.6))
-                            .offset(y: 41)
-                    }
                 }
                 
                 // MARK: - Shutter button
                 ZStack {
                     Circle()
-                        .frame(width: 82, height: 82)
-                        .glassEffect(.regular.tint(cameraModel.shutterTint).interactive())
+                        .fill(cameraModel.shutterTint)
+                        .frame(width: 72, height: 72)
+                    Circle()
+                        .stroke(Color.white.opacity(0.25), lineWidth: 2)
+                        .frame(width: 72, height: 72)
                     Button {
+                        haptic.impactOccurred()
                         cameraModel.capturePhoto {
                             withAnimation { cameraModel.changeCapturingState(to: true) }
                             DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
@@ -61,26 +56,19 @@ struct BottomBarView: View {
                         shutterCount += 1
                     } label: {
                         Circle()
-                            .fill(.white)
-                            .frame(width: 69, height: 69)
+                            .fill(Color.white)
+                            .frame(width: 59, height: 59)
                     }
-                    .glassEffect(.regular.interactive())
-                    .sensoryFeedback(.selection, trigger: shutterCount)
                 }
                 .frame(maxWidth: .infinity)
                 
                 // MARK: - Placeholder
                 if !cameraModel.showSimpleView {
-                    Button {
-                        
-                    } label: {
-                        Image(systemName: "applelogo")
-                            .font(.system(size: 20))
-                            .foregroundColor(.white.opacity(0.8))
-                    }
-                    .frame(height: 82)
-                    .frame(maxWidth: .infinity)
-                    .disabled(true)
+                    Text(String(shutterCount))
+                        .font(.caption)
+                        .foregroundColor(Color.white.opacity(0.6))
+                        .frame(height: 72)
+                        .frame(maxWidth: .infinity)
                 }
             }
         }

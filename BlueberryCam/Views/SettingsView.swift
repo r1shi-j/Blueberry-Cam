@@ -1,62 +1,69 @@
 import SwiftUI
 
+// iOS 15-compatible replacement for LabeledContent
+private struct SettingsRow<Content: View>: View {
+    let label: String
+    let content: Content
+    
+    init(_ label: String, @ViewBuilder content: () -> Content) {
+        self.label = label
+        self.content = content()
+    }
+    
+    var body: some View {
+        HStack {
+            Text(label)
+                .foregroundColor(.primary)
+            Spacer()
+            content
+        }
+    }
+}
+
 struct SettingsView: View {
     @Environment(\.dismiss) var dismiss
-    @Bindable var cameraModel: CameraModel
+    @ObservedObject var cameraModel: CameraModel
     let resetShutterCount: () -> Void
     @State private var isShowingConfirmationAlert = false
     
     var body: some View {
-        NavigationStack {
+        NavigationView {
             List {
+                // MARK: - Defaults
                 Section {
-                    LabeledContent("Format ") {
+                    SettingsRow("Format") {
                         Picker("", selection: $cameraModel.defaultFileFormat) {
                             ForEach(CaptureMode.allCases, id: \.self) { format in
-                                Text(format.rawValue)
-                                    .tag(format)
+                                Text(format.rawValue).tag(format)
                             }
                         }
                         .pickerStyle(.segmented)
-                        .frame(maxWidth: 200)
+                        .frame(maxWidth: 150)
                     }
                     
-                    LabeledContent("Resolution ") {
+                    SettingsRow("Resolution") {
                         Picker("", selection: $cameraModel.defaultResolution) {
                             ForEach(ResolutionPreference.allCases, id: \.self) { pref in
-                                Text(pref.rawValue)
-                                    .tag(pref)
+                                Text(pref.rawValue).tag(pref)
                             }
                         }
                         .pickerStyle(.segmented)
-                        .frame(maxWidth: 200)
+                        .frame(maxWidth: 150)
                     }
                     
-                    LabeledContent("Filter ") {
-                        Picker("", selection: $cameraModel.defaultPhotoFilter) {
-                            ForEach(PhotoFilter.allCases, id: \.self) { filter in
-                                Text(filter.rawValue)
-                                    .tag(filter)
-                            }
-                        }
-                        .pickerStyle(.menu)
-                    }
-                    
-                    LabeledContent("Small Histogram ") {
+                    SettingsRow("Small Histogram") {
                         Picker("", selection: $cameraModel.defaultHistogramSmall) {
-                            ForEach(HistogramMode.allCases, id: \.self) { format in
-                                Text(format.rawValue)
-                                    .tag(format)
+                            ForEach(HistogramMode.allCases, id: \.self) { mode in
+                                Text(mode.rawValue).tag(mode)
                             }
                         }
                         .pickerStyle(.menu)
                     }
                     
-                    LabeledContent("Large Histogram ") {
+                    SettingsRow("Large Histogram") {
                         Picker("", selection: $cameraModel.defaultHistogramLarge) {
-                            ForEach(HistogramMode.allCases, id: \.self) { format in
-                                Text(format.rawValue)
-                                    .tag(format)
+                            ForEach(HistogramMode.allCases, id: \.self) { mode in
+                                Text(mode.rawValue).tag(mode)
                             }
                         }
                         .pickerStyle(.menu)
@@ -64,73 +71,95 @@ struct SettingsView: View {
                 } header: {
                     Text("Defaults")
                 } footer: {
-                    Text("These are all used as startup defaults. To cycle through histograms, simply tap each histogram.")
+                    Text("These are startup defaults. Tap a histogram to cycle modes.")
                 }
                 
+                // MARK: - Customization
                 Section {
-                    LabeledContent("Geotag Location ") {
+                    SettingsRow("Geotag Location") {
                         Toggle("", isOn: $cameraModel.shouldGeotagLocation)
+                            .labelsHidden()
                     }
                     
-                    LabeledContent("Recognize Barcodes ") {
+                    SettingsRow("Recognize Barcodes") {
                         Toggle("", isOn: $cameraModel.recognizeBarcodes)
+                            .labelsHidden()
                     }
                     
-                    LabeledContent("Show Grid ") {
+                    SettingsRow("Show Grid") {
                         Toggle("", isOn: $cameraModel.shouldShowGrid)
+                            .labelsHidden()
                     }
                     
-                    LabeledContent("Show Level/Crosshair ") {
+                    SettingsRow("Show Level/Crosshair") {
                         Toggle("", isOn: $cameraModel.shouldShowLevel)
+                            .labelsHidden()
                     }
                 } header: {
                     Text("Customization")
-                } footer : {
-                    Text("This app supports lens smudge detection and is always enabled.")
+                } footer: {
+                    Text("Clean UI hides all overlays and controls, leaving just the viewfinder and shutter. Double-tap the viewfinder to switch cameras.")
                 }
                 
-                Section("About") {
-                    Text("This app supports LockedCameraCapture which enables the app to be opened from camera control, control centre and from the lock screen action buttons. However when the app is opened from the lock screen some features arent available, these include: Histograms, Zebras, Highlight Clipping, Focus Peaking, Focus Loupe, Level, Grid, Selfie Cameras, Embedding Location and Recognising Barcodes. Settings, Clean UI view and filters will also not be available as camera control isn't available. Additionally the default image format and resolution will not be applied, this required a paid Apple Developer account. The defaults used will be Efficient High Efficiency (HEIF 12MP). To open the full app click the app icon in the bottom left (left of the shutter).")
-                    Text("Photos library usage is only required to search for the album to save photos taken with this app, you can set it to limited access and select no photos, the app still work.")
-                    Text("With auto focus and auto exposure, tap sets focus and exposure at the selected point, and hold locks both focus and exposure. With auto focus and manual exposure, tap sets focus and hold locks focus. With manual focus and auto exposure, tap sets exposure at the selected point.")
+                // MARK: - About
+                Section {
+                    Text("With auto focus and auto exposure, tap sets focus/exposure at that point; hold locks both. With auto focus and manual exposure, tap sets focus; hold locks it. With manual focus and auto exposure, tap sets exposure at that point.")
+                        .font(.footnote)
+                        .foregroundColor(.secondary)
+                    Text("Photos library access is only needed to save photos. You can set it to limited with no photos selected; the app still works.")
+                        .font(.footnote)
+                        .foregroundColor(.secondary)
                     Button("Reset Shutter Count") {
                         isShowingConfirmationAlert = true
                     }
-                    .tint(.red)
+                    .foregroundColor(.red)
+                } header: {
+                    Text("About")
                 }
                 
+                // MARK: - Contact
                 Section {
                     Button {
-                        openMail(subject: "Bug Report", description: "Enter your bug report with screenshots (recommended) below this line.")
+                        openMail(
+                            subject: "Bug Report",
+                            description: "Enter your bug report with screenshots (recommended) below this line."
+                        )
                     } label: {
-                        LabeledContent("Bug Report") { Image(systemName: "mail") }
-                            .tint(.red)
+                        HStack {
+                            Text("Bug Report").foregroundColor(.red)
+                            Spacer()
+                            Image(systemName: "mail").foregroundColor(.red)
+                        }
                     }
                     Button {
-                        openMail(subject: "Feature Request", description: "Enter your feature request with any mockup sketches below this line. Describe your feature in detail to the best of your extent.")
+                        openMail(
+                            subject: "Feature Request",
+                            description: "Enter your feature request below this line."
+                        )
                     } label: {
-                        LabeledContent("Feature Request") { Image(systemName: "mail") }
-                            .tint(.blue)
+                        HStack {
+                            Text("Feature Request").foregroundColor(.blue)
+                            Spacer()
+                            Image(systemName: "mail").foregroundColor(.blue)
+                        }
                     }
                 } header: {
                     Text("Contact")
                 } footer: {
-                    Text("© 2026 Rishi Jansari . All Rights Reserved.")
+                    Text("© 2026 Rishi Jansari. All Rights Reserved.")
                 }
             }
             .navigationTitle("Settings")
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Close") {
-                        dismiss()
-                    }
-                }
-            }
-            .alert("Are you sure you want to reset the shutter count, this cannot be undone.", isPresented: $isShowingConfirmationAlert) {
+            .navigationBarItems(trailing: Button("Close") { dismiss() })
+            .alert(
+                "Are you sure you want to reset the shutter count? This cannot be undone.",
+                isPresented: $isShowingConfirmationAlert
+            ) {
                 Button("Cancel", role: .cancel) { }
                 Button("Reset", role: .destructive, action: resetShutterCount)
             }
         }
+        .navigationViewStyle(.stack)
     }
     
     private func openMail(subject: String, description: String) {
@@ -141,11 +170,11 @@ struct SettingsView: View {
         let os = "\(UIDevice.current.systemName) \(UIDevice.current.systemVersion)"
         
         let body = """
-    ————————————————————————
+    ————————————————————
     App: \(appName) \(version) (\(build))
     Device: \(model), \(os)
     \(description)
-    ————————————————————————
+    ————————————————————
     """
         
         let encodedBody = body.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
@@ -158,7 +187,8 @@ struct SettingsView: View {
     }
 }
 
-#Preview {
-    @Previewable @State var cameraModel = CameraModel()
-    SettingsView(cameraModel: cameraModel) { }
+struct SettingsView_Previews: PreviewProvider {
+    static var previews: some View {
+        SettingsView(cameraModel: CameraModel()) { }
+    }
 }

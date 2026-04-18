@@ -8,7 +8,7 @@ struct FocusLoupeView: View {
     let loupeImage: CGImage?
     
     var body: some View {
-        if let loupeImage {
+        if let loupeImage = loupeImage {
             Image(decorative: loupeImage, scale: 1.0)
                 .resizable()
                 .scaledToFill()

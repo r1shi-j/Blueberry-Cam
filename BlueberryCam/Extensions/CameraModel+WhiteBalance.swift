@@ -1,4 +1,4 @@
-internal import AVFoundation
+import AVFoundation
 import Foundation
 
 extension CameraModel {
@@ -11,7 +11,6 @@ extension CameraModel {
     
     private func applyManualWhiteBalanceLocked() {
         guard let d = device else { return }
-        // Expanded bounding from 2000K (very cool/blue) to 10000K (very warm/orange)
         let kelvin = max(2000, min(10000, whiteBalanceTargetKelvin))
         let tempAndTint = AVCaptureDevice.WhiteBalanceTemperatureAndTintValues(temperature: kelvin, tint: 0)
         let rawGains = d.deviceWhiteBalanceGains(for: tempAndTint)

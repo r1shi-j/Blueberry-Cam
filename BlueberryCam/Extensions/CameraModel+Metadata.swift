@@ -1,11 +1,10 @@
-internal import AVFoundation
+import AVFoundation
 import CoreImage
 import Foundation
 import UIKit
 
 extension CameraModel: AVCaptureMetadataOutputObjectsDelegate {
     nonisolated func metadataOutput(_ output: AVCaptureMetadataOutput, didOutput metadataObjects: [AVMetadataObject], from connection: AVCaptureConnection) {
-        // Extract values before crossing isolation boundary (metadataObjects is non-Sendable)
         let firstString = (metadataObjects.first as? AVMetadataMachineReadableCodeObject)?.stringValue
         
         Task { @MainActor in
@@ -15,13 +14,10 @@ extension CameraModel: AVCaptureMetadataOutputObjectsDelegate {
             }
             
             if let stringValue = firstString {
-                
-                // If it's the code we just ignored, check the cooldown
                 if let ignoreDate = self.ignoredCodes[stringValue] {
                     if Date().timeIntervalSince(ignoreDate) < 30 {
                         return
                     } else {
-                        // Cooldown expired, we can process it again
                         self.ignoredCodes.removeValue(forKey: stringValue)
                     }
                 }
@@ -30,21 +26,18 @@ extension CameraModel: AVCaptureMetadataOutputObjectsDelegate {
                 if let url = URL(string: stringValue), url.scheme != nil {
                     targetURL = url
                 } else {
-                    // It's a barcode (numbers/text), provide a search link
                     let encoded = stringValue.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? stringValue
                     targetURL = URL(string: "https://www.google.com/search?q=\(encoded)")
                 }
                 
                 guard let finalURL = targetURL else { return }
                 
-                // Avoid rapid UI flickering if it's the same URL
                 if self.detectedCodeURL != finalURL {
                     self.detectedCodeURL = finalURL
                     self.detectedCodeString = stringValue
                     UIPasteboard.general.string = stringValue
                 }
                 
-                // Reset the task since we just saw the code
                 self.barcodeResetTask?.cancel()
                 self.barcodeResetTask = Task { @MainActor in
                     try? await Task.sleep(nanoseconds: 2_000_000_000)
