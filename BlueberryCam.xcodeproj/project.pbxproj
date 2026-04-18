@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		5B43BB8C2F937B1600EB6E7E /* blueberrycam-development.txt in Resources */ = {isa = PBXBuildFile; fileRef = 5B43BB8B2F937B1600EB6E7E /* blueberrycam-development.txt */; };
 		5B5FC8352F648F8E00532B15 /* BlueberryCamCapture.appex in Embed ExtensionKit Extensions */ = {isa = PBXBuildFile; fileRef = 5B5FC82C2F648F8E00532B15 /* BlueberryCamCapture.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		5B5FC84C2F64AC3800532B15 /* LockedCameraCapture.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 5B5FC84B2F64AC3800532B15 /* LockedCameraCapture.framework */; };
 		5B5FC8532F64B32E00532B15 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 5B5FC8522F64B32E00532B15 /* WidgetKit.framework */; };
@@ -60,6 +61,7 @@
 
 /* Begin PBXFileReference section */
 		5B3325092F5C7A3200874430 /* BlueberryCam.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = BlueberryCam.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		5B43BB8B2F937B1600EB6E7E /* blueberrycam-development.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "blueberrycam-development.txt"; sourceTree = "<group>"; };
 		5B5FC82C2F648F8E00532B15 /* BlueberryCamCapture.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.extensionkit-extension"; includeInIndex = 0; path = BlueberryCamCapture.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		5B5FC84B2F64AC3800532B15 /* LockedCameraCapture.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = LockedCameraCapture.framework; path = System/Library/Frameworks/LockedCameraCapture.framework; sourceTree = SDKROOT; };
 		5B5FC8512F64B32E00532B15 /* BlueberryCamWidgetExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = BlueberryCamWidgetExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -185,6 +187,7 @@
 				5BD3EC112F5F6C9400B83A36 /* AGENTS.md */,
 				5BD3EC132F5F6C9500B83A36 /* Journal.md */,
 				5B5FC84A2F64AC3800532B15 /* Frameworks */,
+				5B43BB8B2F937B1600EB6E7E /* blueberrycam-development.txt */,
 			);
 			sourceTree = "<group>";
 		};
@@ -329,6 +332,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				5BD3EC122F5F6C9400B83A36 /* AGENTS.md in Resources */,
+				5B43BB8C2F937B1600EB6E7E /* blueberrycam-development.txt in Resources */,
 				5BD3EC142F5F6C9500B83A36 /* Journal.md in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
