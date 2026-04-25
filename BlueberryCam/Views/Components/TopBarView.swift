@@ -37,22 +37,29 @@ extension TopBarView {
         }
     }
     
-    private func readoutButton(control: ManualControl) -> some View {
-        let isSelected = selectedControl == control
-        let color = readoutColor(for: control)
-        return Button {
-            withAnimation(.spring()) {
-                selectedControl = isSelected ? nil : control
-            }
-        } label: {
-            Text(readoutTitle(for: control))
-                .font(Fonts.manualValue)
-                .foregroundColor(isSelected ? .black : color)
-                .padding(.horizontal, IconStyle.pillH)
-                .padding(.vertical, IconStyle.pillV)
-                .background(isSelected ? color : Colors.buttonBackground)
-                .clipShape(Capsule())
+    private func isReadoutUnderlined(for control: ManualControl) -> Bool {
+        (control == ManualControl.ev && cameraModel.exposureBias != 0.0) ||
+        (control == ManualControl.iso && !cameraModel.isAutoExposure) ||
+        (control == ManualControl.ss && !cameraModel.isAutoExposure) ||
+        (control == ManualControl.f && !cameraModel.isAutoFocus) ||
+        (control == ManualControl.wb && !cameraModel.isAutoWhiteBalance)
+    }
+    
+    private func readoutText(for control: ManualControl) -> Text {
+        var str = AttributedString(readoutTitle(for: control))
+        if isReadoutUnderlined(for: control) {
+            str.underlineStyle = .single
+            str.underlineColor = .yellow
         }
+        return Text(str)
+    }
+    
+    private func isReadoutDisabled(for control: ManualControl) -> Bool {
+        (control == ManualControl.ev && !cameraModel.isAutoExposure) ||
+        (control == ManualControl.iso && cameraModel.isAutoExposure) ||
+        (control == ManualControl.ss && cameraModel.isAutoExposure) ||
+        (control == ManualControl.f && cameraModel.isAutoFocus) ||
+        (control == ManualControl.wb && cameraModel.isAutoWhiteBalance)
     }
     
     // MARK: - Unified icon button (circle, SF Symbol)
@@ -65,7 +72,7 @@ extension TopBarView {
         action: @escaping () -> Void
     ) -> some View {
         Button {
-            haptic.impactOccurred()
+            hapticLight.impactOccurred()
             action()
         } label: {
             Image(systemName: symbol)
@@ -86,7 +93,7 @@ extension TopBarView {
         action: @escaping () -> Void
     ) -> some View {
         Button {
-            haptic.impactOccurred()
+            hapticLight.impactOccurred()
             action()
         } label: {
             Text(label)
@@ -106,7 +113,7 @@ extension TopBarView {
         action: @escaping () -> Void
     ) -> some View {
         Button {
-            haptic.impactOccurred()
+            hapticLight.impactOccurred()
             action()
         } label: {
             Text(label)
@@ -124,44 +131,13 @@ extension TopBarView {
     
     private func histogramButton() -> some View {
         ZStack {
-            if cameraModel.histogramModeSmall != .none {
-                HistogramView(
-                    mode: cameraModel.histogramModeSmall,
-                    size: .small,
-                    lumaData: cameraModel.histogramData,
-                    redData: cameraModel.redHistogram,
-                    greenData: cameraModel.greenHistogram,
-                    blueData: cameraModel.blueHistogram,
-                    waveformData: cameraModel.waveformData
-                )
-                .onTapGesture {
-                    haptic.impactOccurred()
-                    cameraModel.cycleHistogramMode(mode: &cameraModel.histogramModeSmall)
-                }
-                .onLongPressGesture {
-                    haptic.impactOccurred()
-                    cameraModel.hideHistogram(for: .small)
-                }
-                .transition(.scale(scale: 0.5, anchor: .center).combined(with: .opacity))
-            } else if cameraModel.histogramModeLarge != .none {
-                // Large histogram is showing — icon acts as hide button
+            if cameraModel.histogramModeSmall == .none && cameraModel.histogramModeLarge == .none {
                 Button {
-                    haptic.impactOccurred()
-                    cameraModel.hideHistogram(for: .large)
-                } label: {
-                    Image(systemName: chartSymbol)
-                        .font(IconStyle.symbolFont)
-                        .foregroundColor(.black)
-                        .padding(.horizontal, IconStyle.pillH)
-                        .padding(.vertical, IconStyle.pillV)
-                        .background(Color.yellow)
-                        .clipShape(Capsule())
-                }
-            } else {
-                Button {
-                    haptic.impactOccurred()
-                    cameraModel.cycleHistogramMode(mode: &cameraModel.histogramModeSmall, size: .small)
-                    cameraModel.cycleHistogramMode(mode: &cameraModel.histogramModeLarge, size: .large)
+                    hapticLight.impactOccurred()
+                    withAnimation(.spring()) {
+                        cameraModel.cycleHistogramMode(mode: &cameraModel.histogramModeSmall, size: .small)
+                        cameraModel.cycleHistogramMode(mode: &cameraModel.histogramModeLarge, size: .large)
+                    }
                 } label: {
                     Image(systemName: chartSymbol)
                         .font(IconStyle.symbolFont)
@@ -169,6 +145,22 @@ extension TopBarView {
                         .padding(.horizontal, IconStyle.pillH)
                         .padding(.vertical, IconStyle.pillV)
                         .background(Colors.buttonBackground)
+                        .clipShape(Capsule())
+                }
+            } else {
+                Button {
+                    hapticLight.impactOccurred()
+                    withAnimation(.spring()) {
+                        cameraModel.hideHistogram(for: .small)
+                        cameraModel.hideHistogram(for: .large)
+                    }
+                } label: {
+                    Image(systemName: chartSymbol)
+                        .font(IconStyle.symbolFont)
+                        .foregroundColor(.black)
+                        .padding(.horizontal, IconStyle.pillH)
+                        .padding(.vertical, IconStyle.pillV)
+                        .background(Color.yellow)
                         .clipShape(Capsule())
                 }
             }
@@ -210,14 +202,13 @@ extension TopBarView {
 struct TopBarView: View {
     @ObservedObject var cameraModel: CameraModel
     @Binding var selectedControl: ManualControl?
-    let haptic = UIImpactFeedbackGenerator(style: .light)
+    private let hapticLight = UIImpactFeedbackGenerator(style: .light)
+    private let hapticSoft = UIImpactFeedbackGenerator(style: .soft)
     
     var body: some View {
         VStack(spacing: 0) {
-            // MARK: - Icon row (histogram / Z / P / format / flash / fullscreen / gear)
-            //            ScrollView(.horizontal, showsIndicators: false) {
+            // MARK: Row 1
             HStack(alignment: .center, spacing: 8) {
-                
                 histogramButton()
                 
                 // Zebra
@@ -234,51 +225,27 @@ struct TopBarView: View {
                     bg: cameraModel.showClipping ? .yellow : Colors.buttonBackground
                 ) { cameraModel.toggleClipping() }
                 
-                // Format / resolution (back camera only)
-                if !cameraModel.activeLens.isFront {
-                    // -- TEMPORARY hardcoded buttons --
-                    pillButton(label: "RAW", fg: .black, bg: .yellow) { }
-                    
-                    pillButton(label: "12MP", fg: Colors.buttonText, bg: Colors.buttonBackground) { }
-                    
-                    // -- REAL code (swap in when model is wired up) --
-                    //                        ForEach(cameraModel.availableFormats) { mode in
-                    //                            let isEnabled = cameraModel.isFormatEnabled(mode)
-                    //                            let isSelected = cameraModel.captureMode == mode
-                    //                            Button {
-                    //                                haptic.impactOccurred()
-                    //                                cameraModel.changeCaptureFormat(to: mode)
-                    //                            } label: {
-                    //                                Text(mode.rawValue)
-                    //                                    .font(IconStyle.textFont)
-                    //                                    .foregroundColor(isSelected ? .black : (isEnabled ? Colors.buttonText : Colors.buttonText.opacity(0.3)))
-                    //                                    .padding(.horizontal, IconStyle.pillH)
-                    //                                    .padding(.vertical, IconStyle.pillV)
-                    //                                    .background(isSelected ? Color.yellow : (isEnabled ? Colors.buttonBackground : Colors.buttonBackground.opacity(0.3)))
-                    //                                    .clipShape(Capsule())
-                    //                            }
-                    //                            .disabled(!isEnabled)
-                    //                        }
-                    //
-                    //                        Divider().frame(height: IconStyle.size * 0.6)
-                    //
-                    //                        ForEach(cameraModel.availableResolutions) { opt in
-                    //                            let isSelected = cameraModel.selectedResolution?.id == opt.id
-                    //                            let isEnabled = cameraModel.isResolutionEnabled(opt)
-                    //                            Button {
-                    //                                haptic.impactOccurred()
-                    //                                cameraModel.selectResolution(opt)
-                    //                            } label: {
-                    //                                Text(opt.label)
-                    //                                    .font(IconStyle.textFont)
-                    //                                    .foregroundColor(isSelected ? .black : (isEnabled ? Colors.buttonText : Colors.buttonText.opacity(0.3)))
-                    //                                    .padding(.horizontal, IconStyle.pillH)
-                    //                                    .padding(.vertical, IconStyle.pillV)
-                    //                                    .background(isSelected ? Color.yellow : (isEnabled ? Colors.buttonBackground : Colors.buttonBackground.opacity(0.3)))
-                    //                                    .clipShape(Capsule())
-                    //                            }
-                    //                            .disabled(!isEnabled)
-                    //                        }
+                // Only show format/resolution row when there's something to pick
+                if !cameraModel.activeLens.isFront && cameraModel.availableFormats.count > 1 {
+                    HStack {
+                        ForEach(cameraModel.availableFormats) { mode in
+                            let isEnabled = cameraModel.isFormatEnabled(mode)
+                            let isSelected = cameraModel.captureMode == mode
+                            Button {
+                                hapticLight.impactOccurred()
+                                cameraModel.changeCaptureFormat(to: mode)
+                            } label: {
+                                Text(mode.rawValue)
+                                    .font(IconStyle.textFont)
+                                    .foregroundColor(isSelected ? .black : (isEnabled ? Colors.buttonText : Colors.buttonText.opacity(0.3)))
+                                    .padding(.horizontal, IconStyle.pillH)
+                                    .padding(.vertical, IconStyle.pillV)
+                                    .background(isSelected ? Color.yellow : (isEnabled ? Colors.buttonBackground : Colors.buttonBackground.opacity(0.3)))
+                                    .clipShape(Capsule())
+                            }
+                            .disabled(!isEnabled)
+                        }
+                    }
                 }
                 
                 flashButton()
@@ -291,24 +258,41 @@ struct TopBarView: View {
                 cleanUIButton()
             }
             .padding(.horizontal, 6)
-            .padding(.top, 6)
-            .padding(.bottom, 4)
-            //            }
-            
-            // MARK: - Readout bar (EV / ISO / SS / F / WB)
-            //            ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                readoutButton(control: .ev)
-                readoutButton(control: .iso)
-                readoutButton(control: .ss)
-                readoutButton(control: .f)
-                readoutButton(control: .wb)
-            }
-            .padding(.horizontal, 12)
-            .padding(.top, 5)
+            .padding(.top, 8)
             .padding(.bottom, 6)
+            
+            // MARK: Row 2
+            HStack(alignment: .center, spacing: 10) {
+                // MARK: - Readout values
+                ForEach(ManualControl.allCases, id: \.self) { control in
+                    readoutText(for: control)
+                        .padding(.horizontal, 4)
+                        .font(.system(size: 12, weight: selectedControl == control ? .black : .regular, design: .monospaced))
+                        .foregroundColor(readoutColor(for: control))
+                        .onTapGesture(count: 2) {
+                            hapticSoft.impactOccurred()
+                            withAnimation(.bouncy) {
+                                cameraModel.resetControl(for: control)
+                            }
+                        }
+                        .onLongPressGesture {
+                            hapticSoft.impactOccurred()
+                            withAnimation(.bouncy) {
+                                cameraModel.resetControl(for: control)
+                            }
+                        }
+                        .disabled(isReadoutDisabled(for: control))
+                        .onTapGesture {
+                            hapticLight.impactOccurred()
+                            withAnimation(.bouncy) {
+                                selectedControl = selectedControl == control ? nil : control
+                            }
+                        }
+                }
+            }
+            .padding(.top, 3)
+            .padding(.bottom, 8)
         }
-        //        }
         .frame(maxWidth: .infinity)
     }
 }

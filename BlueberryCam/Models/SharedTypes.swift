@@ -12,7 +12,7 @@ enum Colors {
 
 enum Fonts {
     static let manualLabel: Font = .system(size: 10, weight: .bold, design: .monospaced)
-    static let manualValue: Font = .system(size: 12, weight: .medium, design: .monospaced)
+    static let manualValue: Font = .system(size: 11, weight: .medium, design: .monospaced)
 }
 
 // MARK: Thread-safe

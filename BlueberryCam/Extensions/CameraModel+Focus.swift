@@ -107,7 +107,9 @@ extension CameraModel {
         beginManualFocusAdjustment()
         guard d.isLockingFocusWithCustomLensPositionSupported else {
             try? d.lockForConfiguration()
-            d.focusMode = .continuousAutoFocus
+            if d.isFocusModeSupported(.continuousAutoFocus) {
+                d.focusMode = .continuousAutoFocus
+            }
             d.unlockForConfiguration()
             isAutoFocus = true
             return
@@ -122,7 +124,9 @@ extension CameraModel {
         clearTapPointInteraction(resetDeviceState: false)
         endManualFocusAdjustment()
         try? d.lockForConfiguration()
-        d.focusMode = .continuousAutoFocus
+        if d.isFocusModeSupported(.continuousAutoFocus) {
+            d.focusMode = .continuousAutoFocus
+        }
         d.unlockForConfiguration()
     }
     

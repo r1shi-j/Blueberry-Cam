@@ -28,12 +28,12 @@ struct BottomBarView: View {
                         Image(systemName: "photo.fill")
                             .font(.system(size: 18))
                             .symbolRenderingMode(.hierarchical)
-                            .foregroundColor(.primary)
+                            .foregroundColor(.white)
                             .padding()
                             .background(Color.white.opacity(0.15))
                             .clipShape(Circle())
                     }
-                    .frame(height: 72)
+                    .frame(height: 65)
                     .frame(maxWidth: .infinity)
                 }
                 
@@ -41,10 +41,10 @@ struct BottomBarView: View {
                 ZStack {
                     Circle()
                         .fill(cameraModel.shutterTint)
-                        .frame(width: 72, height: 72)
+                        .frame(width: 65, height: 65)
                     Circle()
                         .stroke(Color.white.opacity(0.25), lineWidth: 2)
-                        .frame(width: 72, height: 72)
+                        .frame(width: 65, height: 65)
                     Button {
                         haptic.impactOccurred()
                         cameraModel.capturePhoto {
@@ -57,7 +57,7 @@ struct BottomBarView: View {
                     } label: {
                         Circle()
                             .fill(Color.white)
-                            .frame(width: 59, height: 59)
+                            .frame(width: 55, height: 55)
                     }
                 }
                 .frame(maxWidth: .infinity)
@@ -67,7 +67,7 @@ struct BottomBarView: View {
                     Text(String(shutterCount))
                         .font(.caption)
                         .foregroundColor(Color.white.opacity(0.6))
-                        .frame(height: 72)
+                        .frame(height: 65)
                         .frame(maxWidth: .infinity)
                 }
             }

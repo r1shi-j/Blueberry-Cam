@@ -206,7 +206,6 @@ struct CaptureView: View {
                                     }
                                 }
                         )
-                        .border(cameraModel.showSimpleView ? .clear : .blue)
                     
                     if !cameraModel.showSimpleView {
                         // MARK: - Zebras
@@ -252,14 +251,12 @@ struct CaptureView: View {
                         if cameraModel.shouldShowGrid {
                             CropOverlayView(aspectRatio: cameraModel.captureAspectRatio)
                                 .ignoresSafeArea()
-                                .border(cameraModel.showSimpleView ? .clear : .green)
                         }
                         
                         // MARK: - Level / Horizon overlay
                         if cameraModel.shouldShowLevel {
                             LevelOverlayView(model: levelModel)
                                 .ignoresSafeArea()
-                                .border(cameraModel.showSimpleView ? .clear : .green)
                         }
                     }
                     
@@ -342,7 +339,36 @@ struct CaptureView: View {
                 VStack(spacing: 0) {
                     if !cameraModel.showSimpleView {
                         TopBarView(cameraModel: cameraModel, selectedControl: $selectedControl)
-                            .border(cameraModel.showSimpleView ? .clear : .purple)
+                        
+                        ZStack {
+                            HStack {
+                                if cameraModel.histogramModeSmall != .none {
+                                    HistogramView(
+                                        mode: cameraModel.histogramModeSmall,
+                                        size: .small,
+                                        lumaData: cameraModel.histogramData,
+                                        redData: cameraModel.redHistogram,
+                                        greenData: cameraModel.greenHistogram,
+                                        blueData: cameraModel.blueHistogram,
+                                        waveformData: cameraModel.waveformData
+                                    )
+                                    .frame(maxWidth: 80, maxHeight: 20)
+                                    .onTapGesture {
+                                        impactLight.impactOccurred()
+                                        cameraModel.cycleHistogramMode(mode: &cameraModel.histogramModeSmall)
+                                    }
+                                    .onLongPressGesture {
+                                        impactSoft.impactOccurred()
+                                        cameraModel.hideHistogram(for: .small)
+                                    }
+                                    .transition(.scale(scale: 0.5, anchor: .center).combined(with: .opacity))
+                                }
+                                Spacer()
+                            }
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 12)
+                        }
+                        .animation(.spring(), value: cameraModel.histogramModeSmall)
                         
                         Spacer()
                         
@@ -366,7 +392,9 @@ struct CaptureView: View {
                                 }
                                 .onLongPressGesture {
                                     impactSoft.impactOccurred()
-                                    cameraModel.hideHistogram(for: .large)
+                                    withAnimation(.spring()) {
+                                        cameraModel.hideHistogram(for: .large)
+                                    }
                                 }
                                 .transition(.scale(scale: 0.5, anchor: .center).combined(with: .opacity))
                             }
@@ -377,8 +405,6 @@ struct CaptureView: View {
                             ManualControlsView(cameraModel: cameraModel, control: selectedControl)
                                 .padding(.bottom, 8)
                         }
-                        
-                        
                     } else {
                         // MARK: Exit Clean UI Button
                         VStack {
@@ -399,7 +425,7 @@ struct CaptureView: View {
                                         .background(isClean ? .yellow : Colors.buttonBackground)
                                         .clipShape(Circle())
                                 }
-                                .padding(6)
+                                .padding(8)
                             }
                         }
                         
@@ -407,7 +433,7 @@ struct CaptureView: View {
                     }
                     
                     BottomBarView(cameraModel: cameraModel, shutterCount: $shutterCount)
-                        .border(cameraModel.showSimpleView ? .clear : .purple)
+                        .padding(.bottom, 2)
                 }
                 
                 // MARK: - Capture flash
@@ -471,6 +497,11 @@ struct CaptureView: View {
         }
         .onChange(of: cameraModel.appView) { new in
             levelModel.setLevelDisplayEnabled(new == .standard && cameraModel.shouldShowLevel)
+            if new == .settings {
+                cameraModel.stopSession()
+            } else {
+                cameraModel.startSession()
+            }
         }
         .onChange(of: cameraModel.activeLens) { newLens in
             cameraModel.clearTapPointInteraction(resetDeviceState: false)

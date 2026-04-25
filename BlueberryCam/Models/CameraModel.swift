@@ -265,11 +265,10 @@ class CameraModel: NSObject, ObservableObject {
         return !photoOutput.supportedFlashModes.isEmpty
     }
     
-    // flashIsOff = bolt.slash, flashAuto = bolt.badge.automatic, flashOn = bolt.fill
     var flashLabel: (systemImage: String, isActive: Bool) {
         switch flashMode {
             case .off: return ("bolt.slash", false)
-            case .auto: return ("bolt.badge.automatic", true)
+            case .auto: return ("bolt.badge.a.fill", true)
             case .on: return ("bolt.fill", true)
             @unknown default: return ("bolt.slash", false)
         }
@@ -352,11 +351,10 @@ class CameraModel: NSObject, ObservableObject {
         
         // Set video orientation on connections (iOS 15 compatible)
         let isFront = activeLens.isFront
-        let orientation: AVCaptureVideoOrientation = isFront ? .portrait : .landscapeRight
         for conn in [photoOutput.connection(with: .video),
                      videoOutput.connection(with: .video)].compactMap({ $0 }) {
             if conn.isVideoOrientationSupported {
-                conn.videoOrientation = orientation
+                conn.videoOrientation = .portrait
             }
             conn.isVideoMirrored = isFront
         }
@@ -674,15 +672,15 @@ class CameraModel: NSObject, ObservableObject {
         let orientation: AVCaptureVideoOrientation
         if abs(gy) > abs(gx) {
             if gy < 0 {
-                orientation = isFront ? .portrait : .landscapeRight
+                orientation = .portrait
             } else {
-                orientation = isFront ? .portraitUpsideDown : .landscapeLeft
+                orientation = .portraitUpsideDown
             }
         } else {
             if gx > 0 {
-                orientation = isFront ? .landscapeLeft : .portrait
+                orientation = isFront ? .landscapeLeft : .landscapeRight
             } else {
-                orientation = isFront ? .landscapeRight : .portraitUpsideDown
+                orientation = isFront ? .landscapeRight : .landscapeLeft
             }
         }
         

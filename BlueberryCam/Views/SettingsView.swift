@@ -33,7 +33,7 @@ struct SettingsView: View {
                 Section {
                     SettingsRow("Format") {
                         Picker("", selection: $cameraModel.defaultFileFormat) {
-                            ForEach(CaptureMode.allCases, id: \.self) { format in
+                            ForEach(cameraModel.availableFormats) { format in
                                 Text(format.rawValue).tag(format)
                             }
                         }
@@ -41,14 +41,16 @@ struct SettingsView: View {
                         .frame(maxWidth: 150)
                     }
                     
-                    SettingsRow("Resolution") {
-                        Picker("", selection: $cameraModel.defaultResolution) {
-                            ForEach(ResolutionPreference.allCases, id: \.self) { pref in
-                                Text(pref.rawValue).tag(pref)
+                    if cameraModel.availableResolutions.count > 1 {
+                        SettingsRow("Resolution") {
+                            Picker("", selection: $cameraModel.defaultResolution) {
+                                ForEach(ResolutionPreference.allCases, id: \.self) { pref in
+                                    Text(pref.rawValue).tag(pref)
+                                }
                             }
+                            .pickerStyle(.segmented)
+                            .frame(maxWidth: 150)
                         }
-                        .pickerStyle(.segmented)
-                        .frame(maxWidth: 150)
                     }
                     
                     SettingsRow("Small Histogram") {

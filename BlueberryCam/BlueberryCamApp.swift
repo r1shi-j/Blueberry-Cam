@@ -23,8 +23,12 @@ struct BlueberryCamApp: App {
 
 // TODO:
 /// app icon
-/// using manual controls
-/// raw / formats / resolutions
-/// geotag/flash
-/// qr code / z / p / focus loupe / level / histograms
-/// remove focus peaking toggle?
+/// using manual controls: ss at slowest?
+/// haptics
+
+/// What changed:
+/// Removed focus peaking, heif format, other lens and resolutions, blurred lens detection
+/// Top bar / status bar merged, small histogram moved
+/// Added clean UI and settings buttons to top bar
+/// No macro, camera control, filters
+/// Moved shutter count to bottom right

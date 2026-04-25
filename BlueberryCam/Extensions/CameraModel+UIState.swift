@@ -42,11 +42,10 @@ extension CameraModel {
             }
             
             // Set orientation on connections (iOS 15 compatible)
-            let orientation: AVCaptureVideoOrientation = lensIsFront ? .portrait : .landscapeRight
             for conn in [self.photoOutput.connection(with: .video),
                          self.videoOutput.connection(with: .video)].compactMap({ $0 }) {
                 if conn.isVideoOrientationSupported {
-                    conn.videoOrientation = orientation
+                    conn.videoOrientation = .portrait
                 }
                 conn.isVideoMirrored = lensIsFront
             }
