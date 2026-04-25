@@ -26,11 +26,13 @@ extension LockedCameraModel: AVCapturePhotoCaptureDelegate {
         }
         
         let ext = isDNG ? "dng" : (isHEIF ? "heic" : "jpg")
-        let filename = "IMG_\(Int(Date().timeIntervalSince1970)).\(ext)"
+        let milliseconds = Int(Date().timeIntervalSince1970 * 1000)
+        let filename = "IMG_\(milliseconds)_\(UUID().uuidString.prefix(8)).\(ext)"
         let fileURL = sessionURL.appendingPathComponent(filename)
         
         do {
             try data.write(to: fileURL)
+            Self.appendToCaptureList(filename: filename, sessionURL: sessionURL)
         } catch {
             Task { @MainActor in self.errorMessage = error.localizedDescription; self.showError = true }
             // Still attempt to save directly to Photos even if the session file write fails.
@@ -38,10 +40,10 @@ extension LockedCameraModel: AVCapturePhotoCaptureDelegate {
         
         // Always save to Photos — the manifest write happens inside the completion handler
         // once we have a confirmed localIdentifier, so the ordering is guaranteed.
-        saveDirectlyToPhotos(data: data, isDNG: isDNG, isHEIF: isHEIF, sessionURL: sessionURL)
+        saveDirectlyToPhotos(data: data, isDNG: isDNG, isHEIF: isHEIF, sessionURL: sessionURL, originalFilename: filename)
     }
     
-    private nonisolated func saveDirectlyToPhotos(data: Data, isDNG: Bool, isHEIF: Bool, sessionURL: URL?) {
+    private nonisolated func saveDirectlyToPhotos(data: Data, isDNG: Bool, isHEIF: Bool, sessionURL: URL?, originalFilename: String? = nil) {
         let currentStatus = PHPhotoLibrary.authorizationStatus(for: .addOnly)
         
         guard currentStatus == .authorized || currentStatus == .limited else {
@@ -52,10 +54,10 @@ extension LockedCameraModel: AVCapturePhotoCaptureDelegate {
             return
         }
         
-        performDirectSave(data: data, isDNG: isDNG, isHEIF: isHEIF, sessionURL: sessionURL)
+        performDirectSave(data: data, isDNG: isDNG, isHEIF: isHEIF, sessionURL: sessionURL, originalFilename: originalFilename)
     }
 
-    private nonisolated func performDirectSave(data: Data, isDNG: Bool, isHEIF: Bool, sessionURL: URL?) {
+    private nonisolated func performDirectSave(data: Data, isDNG: Bool, isHEIF: Bool, sessionURL: URL?, originalFilename: String?) {
         // Use a local to capture the placeholder ID safely within the performChanges closure.
         // Declared as a class wrapper so it can be mutated inside the closure without a data race.
         final class Box<T>: @unchecked Sendable { var value: T; init(_ v: T) { value = v } }
@@ -64,6 +66,7 @@ extension LockedCameraModel: AVCapturePhotoCaptureDelegate {
         PHPhotoLibrary.shared().performChanges({
             let opts = PHAssetResourceCreationOptions()
             opts.uniformTypeIdentifier = BundleIDs.UTI(isDNG: isDNG, isHEIF: isHEIF)
+            opts.originalFilename = originalFilename
             let req = PHAssetCreationRequest.forAsset()
             req.addResource(with: .photo, data: data, options: opts)
             // Capture the identifier while still inside the performChanges block —
@@ -85,7 +88,16 @@ extension LockedCameraModel: AVCapturePhotoCaptureDelegate {
     /// Appends a single asset local identifier to the session manifest file.
     /// Uses a file-system-level atomic replace so rapid concurrent calls never corrupt the file.
     private nonisolated static func appendToManifest(id: String, sessionURL: URL) {
-        let manifestURL = sessionURL.appendingPathComponent("manifest.txt")
+        appendLine(id, to: "manifest.txt", sessionURL: sessionURL)
+    }
+    
+    /// Appends a captured filename to a lightweight recovery list before PhotoKit finishes.
+    private nonisolated static func appendToCaptureList(filename: String, sessionURL: URL) {
+        appendLine(filename, to: "captures.txt", sessionURL: sessionURL)
+    }
+    
+    private nonisolated static func appendLine(_ line: String, to fileName: String, sessionURL: URL) {
+        let manifestURL = sessionURL.appendingPathComponent(fileName)
         
         // Serialize manifest writes for this session URL using a dedicated queue.
         // The label includes the session path so different sessions get different queues.
@@ -93,8 +105,8 @@ extension LockedCameraModel: AVCapturePhotoCaptureDelegate {
         queue.sync {
             var existing = (try? String(contentsOf: manifestURL, encoding: .utf8)) ?? ""
             // Guard against duplicate entries (e.g. a retry that already wrote this ID).
-            guard !existing.contains(id) else { return }
-            existing += id + "\n"
+            guard !existing.components(separatedBy: "\n").contains(line) else { return }
+            existing += line + "\n"
             // Write atomically — replaces the file as a single operation so a crash mid-write
             // leaves the previous version intact rather than a partial file.
             try? existing.write(to: manifestURL, atomically: true, encoding: .utf8)
