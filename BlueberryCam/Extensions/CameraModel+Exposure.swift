@@ -14,7 +14,7 @@ extension CameraModel {
         }
         exposureDebounceTask?.cancel()
         exposureDebounceTask = Task {
-            try? await Task.sleep(nanoseconds: 50_000_000)
+            try? await Task.sleep(for: .milliseconds(50))
             guard !Task.isCancelled, let d = device, shutterSpeeds.indices.contains(shutterIndex) else { return }
             try? d.lockForConfiguration()
             let clampedISO = max(d.activeFormat.minISO, min(d.activeFormat.maxISO, iso))
@@ -28,7 +28,7 @@ extension CameraModel {
         clearTapPointInteraction(resetDeviceState: false)
         exposureDebounceTask?.cancel()
         exposureDebounceTask = Task {
-            try? await Task.sleep(nanoseconds: 50_000_000)
+            try? await Task.sleep(for: .milliseconds(50))
             guard !Task.isCancelled, let d = device else { return }
             try? d.lockForConfiguration()
             let clampedISO = max(d.activeFormat.minISO, min(d.activeFormat.maxISO, iso))

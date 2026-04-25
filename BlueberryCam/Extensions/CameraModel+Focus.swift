@@ -2,7 +2,7 @@ internal import AVFoundation
 import Foundation
 
 extension CameraModel {
-    private var tapFocusHideDelayNanoseconds: UInt64 { 2_000_000_000 }
+    private var tapFocusHideDelay: Duration { .seconds(2) }
     private var tapFocusAdjustmentIgnoreDuration: TimeInterval { 1.0 }
     private var tapFocusLensPositionChangeThreshold: Float { 0.05 }
     
@@ -145,7 +145,7 @@ extension CameraModel {
     func scheduleTapFocusIndicatorHide() {
         tapFocusHideTask?.cancel()
         tapFocusHideTask = Task { @MainActor in
-            try? await Task.sleep(nanoseconds: tapFocusHideDelayNanoseconds)
+            try? await Task.sleep(for: tapFocusHideDelay)
             guard !Task.isCancelled, !self.isTapFocusInteractionActive else { return }
             self.isTapFocusIndicatorDimmed = self.tapFocusLockLabel == nil
         }
@@ -247,7 +247,7 @@ extension CameraModel {
         tapFocusLensPositionMonitorTask?.cancel()
         tapFocusLensPositionBaseline = nil
         tapFocusLensPositionMonitorTask = Task { @MainActor in
-            try? await Task.sleep(nanoseconds: UInt64(tapFocusAdjustmentIgnoreDuration * 1_000_000_000))
+            try? await Task.sleep(for: .seconds(tapFocusAdjustmentIgnoreDuration))
             guard !Task.isCancelled,
                   ignoredTapFocusAdjustmentEvents == 0 || ignoredTapFocusAdjustmentDeadline == nil,
                   tapFocusIndicatorPoint != nil,
@@ -298,7 +298,7 @@ extension CameraModel {
     private func scheduleTapPointLock(focus: Bool, exposure: Bool) {
         tapFocusLockTask?.cancel()
         tapFocusLockTask = Task { @MainActor in
-            try? await Task.sleep(nanoseconds: 250_000_000)
+            try? await Task.sleep(for: .milliseconds(250))
             guard !Task.isCancelled, let d = self.device else { return }
             try? d.lockForConfiguration()
             if focus {
@@ -324,7 +324,7 @@ extension CameraModel {
     func endManualFocusAdjustment() {
         focusPeakingHoldTask?.cancel()
         focusPeakingHoldTask = Task { @MainActor in
-            try? await Task.sleep(nanoseconds: 700_000_000)
+            try? await Task.sleep(for: .milliseconds(700))
             guard !Task.isCancelled else { return }
             self.isAdjustingManualFocus = false
         }

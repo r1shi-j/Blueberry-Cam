@@ -103,7 +103,7 @@ extension BlueberryCamApp {
                 return result
             }
             guard attempt < maxAttempts else { break }
-            try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+            try? await Task.sleep(for: .seconds(1))
             delay = min(delay * 2, 4.0)
         }
         
