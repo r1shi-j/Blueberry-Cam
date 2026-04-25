@@ -42,7 +42,8 @@ struct BlueberryCamApp: App {
 // Localise for all iPhones iOS 26+
 // Add tips, welcome screen and tutorials
 
-// Implement 3rd row on TopBarView: Macro, portrait, dual cam, burst, flash, timer buttons
+// Implement 3rd row on TopBarView: Macro, dual cam, burst, flash, timer buttons
+// Raw burst
 // Selfie cam horizontal mode and centre stage, photographic styles
 // Improve lens picker UI (liquid glass sliding), move to bottom right?
 // Click on any readout -> shows vertical slider right side screen like halide (and add animations to knock on effects)

@@ -32,36 +32,6 @@ extension LockedCameraModel {
         isMacroEnabled ? .yellow : Colors.buttonBackground
     }
     
-    fileprivate var macroButtonOpacity: Double {
-        (supportsMacro && isAutoExposure) ? 1.0 : 0.3
-    }
-    
-    fileprivate var isMacroButtonDisabled: Bool {
-        !(supportsMacro && isAutoExposure)
-    }
-    
-    // MARK: Portrait properties
-    fileprivate var portraitButtonSymbol: String {
-        isMacroEnabled ? "camera.macro" : "camera.macro.slash"
-        // disabled: "person.slash.fill" no .slash if enabled
-    }
-    
-    fileprivate var portraitButtonForeground: Color {
-        isMacroEnabled ? .black : Colors.buttonText
-    }
-    
-    fileprivate var portraitButtonBackground: Color {
-        isMacroEnabled ? .yellow : Colors.buttonBackground
-    }
-    
-    fileprivate var portraitButtonOpacity: Double {
-        (supportsMacro && isAutoExposure) ? 1.0 : 0.3
-    }
-    
-    fileprivate var isPortraitButtonDisabled: Bool {
-        !(supportsMacro && isAutoExposure)
-    }
-    
     // MARK: Dual Camera properties
     fileprivate var dualcamButtonSymbol: String {
         isMacroEnabled ? "camera.macro" : "camera.macro.slash"
@@ -319,26 +289,9 @@ struct LockedTopBarView: View {
                             .background(cameraModel.macroButtonBackground)
                             .clipShape(.capsule)
                     }
-                    .disabled(cameraModel.isMacroButtonDisabled)
-                    .opacity(cameraModel.macroButtonOpacity)
                     .animation(.bouncy, value: cameraModel.activeLens)
                     .transition(.opacity.combined(with: .scale))
                 }
-                
-                // MARK: - Portrait
-                Button {
-                    hapticTrigger += 1
-                } label: {
-                    Image(systemName: cameraModel.portraitButtonSymbol)
-                        .font(.system(size: 12, weight: .bold))
-                        .foregroundColor(cameraModel.portraitButtonForeground)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 5)
-                        .background(cameraModel.portraitButtonBackground)
-                        .clipShape(.capsule)
-                }
-                .disabled(cameraModel.isPortraitButtonDisabled)
-                .opacity(cameraModel.portraitButtonOpacity)
                 
                 // MARK: - Dual Camera
                 Button {
