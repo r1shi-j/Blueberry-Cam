@@ -518,7 +518,7 @@ struct CaptureView: View {
             }
         }
         .onChange(of: cameraModel.detectedCodeURL) { url in
-            if url != nil { AudioServicesPlaySystemSound(4095) }
+            if url != nil { AudioServicesPlayAlertSound(SystemSoundID(kSystemSoundID_Vibrate)) }
         }
         .onReceive(NotificationCenter.default.publisher(for: UIDevice.deviceDidShakeNotification)) { _ in
             if let url = cameraModel.detectedCodeURL {

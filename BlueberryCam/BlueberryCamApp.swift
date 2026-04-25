@@ -21,10 +21,6 @@ struct BlueberryCamApp: App {
     }
 }
 
-// TODO:
-/// app icon
-/// using manual controls: ss at slowest?
-
 /// What changed:
 /// Removed focus peaking, heif format, other lens and resolutions, blurred lens detection
 /// Top bar / status bar merged, small histogram moved
