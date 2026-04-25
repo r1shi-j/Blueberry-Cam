@@ -89,7 +89,7 @@ struct BottomBarView: View {
                                 .frame(width: 69, height: 69)
                         }
                         .glassEffect(.regular.interactive())
-                        .sensoryFeedback(.selection, trigger: displayedShutterCountLabel)
+                        .sensoryFeedback(isShowingBurstCount ? .impact : .selection, trigger: displayedShutterCountLabel)
                     }
                     .frame(maxWidth: .infinity)
                     .transition(.opacity)

@@ -49,13 +49,14 @@ struct BlueberryCamApp: App {
 
 // Implement 3rd row on TopBarView: Macro, dual cam, (raw) burst, flash, timer buttons
 // Dual cam
-// Selfie cam horizontal mode and centre stage
+// ProRaw
+// Live filter preview
+// Customisable accent colours (shutter color per state, top bar pickers)
 // Improve lens picker UI (liquid glass sliding), move to bottom right?
 // Click on any readout -> shows vertical slider right side screen like halide (and add animations to knock on effects)
 /// slider shows the auto value constantly updating, manually changing it turns on manual mode, for ss/iso have left iso right ss?
+// Selfie cam horizontal mode and centre stage
 // View outside frame
-// ProRaw
 
 // MARK: - FIXME
 // Some situations where photos taken in locked camera not being detected
-// fixed buton height for top bar

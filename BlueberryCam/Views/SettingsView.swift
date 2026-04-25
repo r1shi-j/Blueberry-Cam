@@ -209,5 +209,5 @@ private enum ShutterCountResetTarget {
         cameraModel: cameraModel,
         shutterCount: $shutterCount,
         shutterCountBurst: $shutterCountBurst
-    ) { } resetBurstShutterCount: { }
+    )
 }

@@ -32,28 +32,6 @@ extension LockedCameraModel {
         isMacroEnabled ? .yellow : Colors.buttonBackground
     }
     
-    // MARK: Dual Camera properties
-    fileprivate var dualcamButtonSymbol: String {
-        isMacroEnabled ? "camera.macro" : "camera.macro.slash"
-        // "inset.filled.rectangle.and.person.filled.slash") // no .slash if enabled
-    }
-    
-    fileprivate var dualcamButtonForeground: Color {
-        isMacroEnabled ? .black : Colors.buttonText
-    }
-    
-    fileprivate var dualcamButtonBackground: Color {
-        isMacroEnabled ? .yellow : Colors.buttonBackground
-    }
-    
-    fileprivate var dualcamButtonOpacity: Double {
-        (supportsMacro && isAutoExposure) ? 1.0 : 0.3
-    }
-    
-    fileprivate var isDualcamButtonDisabled: Bool {
-        !(supportsMacro && isAutoExposure)
-    }
-    
     // MARK: Timer properties
     fileprivate var timerButtonSymbol: String {
         "timer"
@@ -253,6 +231,7 @@ struct LockedTopBarView: View {
                     } label: {
                         Image(systemName: cameraModel.macroButtonSymbol)
                             .font(.system(size: 12, weight: .bold))
+                            .frame(height: 18)
                             .foregroundStyle(cameraModel.macroButtonForeground)
                             .padding(.horizontal, 8)
                             .padding(.vertical, 5)
@@ -263,21 +242,6 @@ struct LockedTopBarView: View {
                     .transition(.opacity.combined(with: .scale))
                 }
                 
-                // MARK: - Dual Camera
-                Button {
-                    hapticTrigger += 1
-                } label: {
-                    Image(systemName: cameraModel.dualcamButtonSymbol)
-                        .font(.system(size: 12, weight: .bold))
-                        .foregroundStyle(cameraModel.dualcamButtonForeground)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 5)
-                        .background(cameraModel.dualcamButtonBackground)
-                        .clipShape(.capsule)
-                }
-                .disabled(cameraModel.isDualcamButtonDisabled)
-                .opacity(cameraModel.dualcamButtonOpacity)
-                
                 // MARK: - Timer
                 Button {
                     hapticTrigger += 1
@@ -287,7 +251,7 @@ struct LockedTopBarView: View {
                 } label: {
                     HStack(spacing: 4) {
                         Image(systemName: cameraModel.timerButtonSymbol)
-                            .font(.system(size: 14, weight: .bold))
+                            .font(.system(size: 12, weight: .bold))
                         
                         if cameraModel.timerMode != .off {
                             Text(cameraModel.timerMode.label)

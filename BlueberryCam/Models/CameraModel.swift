@@ -114,7 +114,10 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
         didSet { UserDefaults.standard.set(detailedCountdownTimer, forKey: "detailedCountdownTimer") }
     }
     var shouldHideUIWhileCountingDown = true {
-        didSet { UserDefaults.standard.set(shouldHideUIWhileCountingDown, forKey: "shouldHideUIWhileCountingDown") }
+        didSet {
+            UserDefaults.standard.set(shouldHideUIWhileCountingDown, forKey: "shouldHideUIWhileCountingDown")
+            updateAnalysisPauseState()
+        }
     }
     var shouldPrioritizeBurstSpeed = true {
         didSet {
@@ -155,7 +158,7 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
     }
     private(set) var isBurstCapturing: Bool = false {
         didSet {
-            burstDisablesAnalysis = isBurstCapturing
+            updateAnalysisPauseState()
             updateMetadataOutputStatus()
             if isBurstCapturing {
                 detectedCodeURL = nil
@@ -169,7 +172,7 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
     @ObservationIgnored
     var burstCaptureTask: Task<Void, Never>?
     @ObservationIgnored
-    nonisolated(unsafe) private(set) var burstDisablesAnalysis = false
+    nonisolated(unsafe) private(set) var shouldPauseAnalysis = false
     var isMacroEnabled: Bool = false {
         didSet {
             if oldValue != isMacroEnabled {
@@ -183,6 +186,7 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
     var isTimerCountingDown = false {
         didSet {
             guard oldValue != isTimerCountingDown else { return }
+            updateAnalysisPauseState()
             updateMetadataOutputStatus()
             if isTimerCountingDown {
                 detectedCodeURL = nil
@@ -342,6 +346,7 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
     var lensSwitchCompletionCount: Int = 0
     var appView: AppView = .standard {
         didSet {
+            updateAnalysisPauseState()
             if oldValue != appView && (appView == .settings || oldValue == .settings) {
                 setupCameraControls()
             }
@@ -494,6 +499,10 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
     
     var showSimpleView: Bool {
         appView == .clean || appView == .settings || isBurstCapturing || (isTimerCountingDown && shouldHideUIWhileCountingDown)
+    }
+    
+    private func updateAnalysisPauseState() {
+        shouldPauseAnalysis = showSimpleView
     }
     
     // MARK: - Configure

@@ -28,7 +28,7 @@ extension CameraModel: AVCaptureDataOutputSynchronizerDelegate, AVCaptureVideoDa
     }
     
     nonisolated func processFrame(pixelBuffer: CVPixelBuffer, depthData: AVDepthData?) {
-        guard !burstDisablesAnalysis else { return }
+        guard !shouldPauseAnalysis else { return }
 
         Task { @MainActor in
             if let d = self.device {

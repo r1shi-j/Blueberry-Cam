@@ -34,24 +34,23 @@ extension CameraModel {
     
     // MARK: Dual Camera properties
     fileprivate var dualcamButtonSymbol: String {
-        isMacroEnabled ? "camera.macro" : "camera.macro.slash"
-        // "inset.filled.rectangle.and.person.filled.slash") // no .slash if enabled
+        "inset.filled.rectangle.and.person.filled"
     }
     
     fileprivate var dualcamButtonForeground: Color {
-        isMacroEnabled ? .black : Colors.buttonText
+        Colors.buttonText
     }
     
     fileprivate var dualcamButtonBackground: Color {
-        isMacroEnabled ? .yellow : Colors.buttonBackground
+        Colors.buttonBackground
     }
     
     fileprivate var dualcamButtonOpacity: Double {
-        (supportsMacro && isAutoExposure) ? 1.0 : 0.3
+        0.3
     }
     
     fileprivate var isDualcamButtonDisabled: Bool {
-        !(supportsMacro && isAutoExposure)
+        true
     }
     
     // MARK: Burst properties
@@ -65,14 +64,6 @@ extension CameraModel {
     
     fileprivate var burstButtonBackground: Color {
         isBurstModeEnabled ? .yellow : Colors.buttonBackground
-    }
-    
-    fileprivate var burstButtonOpacity: Double {
-        1.0
-    }
-    
-    fileprivate var isBurstButtonDisabled: Bool {
-        isTimerCountingDown
     }
     
     // MARK: Timer properties
@@ -277,6 +268,7 @@ struct TopBarView: View {
                     } label: {
                         Image(systemName: cameraModel.macroButtonSymbol)
                             .font(.system(size: 12, weight: .bold))
+                            .frame(height: 18)
                             .foregroundStyle(cameraModel.macroButtonForeground)
                             .padding(.horizontal, 8)
                             .padding(.vertical, 5)
@@ -293,6 +285,7 @@ struct TopBarView: View {
                 } label: {
                     Image(systemName: cameraModel.dualcamButtonSymbol)
                         .font(.system(size: 12, weight: .bold))
+                        .frame(height: 18)
                         .foregroundStyle(cameraModel.dualcamButtonForeground)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 5)
@@ -311,14 +304,13 @@ struct TopBarView: View {
                 } label: {
                     Image(systemName: cameraModel.burstButtonSymbol)
                         .font(.system(size: 12, weight: .bold))
+                        .frame(height: 18)
                         .foregroundStyle(cameraModel.burstButtonForeground)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 5)
                         .background(cameraModel.burstButtonBackground)
                         .clipShape(.capsule)
                 }
-                .disabled(cameraModel.isBurstButtonDisabled)
-                .opacity(cameraModel.burstButtonOpacity)
                 
                 // MARK: - Timer
                 Button {
@@ -329,7 +321,7 @@ struct TopBarView: View {
                 } label: {
                     HStack(spacing: 4) {
                         Image(systemName: cameraModel.timerButtonSymbol)
-                            .font(.system(size: 14, weight: .bold))
+                            .font(.system(size: 12, weight: .bold))
 
                         if cameraModel.timerMode != .off {
                             Text(cameraModel.timerMode.label)
