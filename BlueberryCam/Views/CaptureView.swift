@@ -498,7 +498,7 @@ struct CaptureView: View {
             levelModel.setLevelDisplayEnabled(new && cameraModel.appView == .standard)
         }
         .onChange(of: scenePhase) { _, newPhase in
-            if newPhase == .active {    
+            if newPhase == .active {
                 cameraModel.startSession()
                 levelModel.startUpdates() // Always start
                 levelModel.setLevelDisplayEnabled(cameraModel.shouldShowLevel && cameraModel.appView == .standard)
