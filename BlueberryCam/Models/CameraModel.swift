@@ -16,6 +16,7 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
     nonisolated let frameCounter = FrameCounter()
     let _pendingCaptureModeBox = CaptureModeBox()
     let _pendingPhotoFilterBox = PhotoFilterBox()
+    let _burstCaptureTracker = BurstCaptureTracker()
     
     // MARK: - Barcode Detection
     nonisolated let metadataOutput = AVCaptureMetadataOutput()
@@ -115,6 +116,12 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
     var shouldHideUIWhileCountingDown = true {
         didSet { UserDefaults.standard.set(shouldHideUIWhileCountingDown, forKey: "shouldHideUIWhileCountingDown") }
     }
+    var shouldPrioritizeBurstSpeed = true {
+        didSet {
+            UserDefaults.standard.set(shouldPrioritizeBurstSpeed, forKey: "shouldPrioritizeBurstSpeed")
+            updateFastCapturePrioritization()
+        }
+    }
     
     // MARK: - Capture format
     var captureMode: CaptureMode = .raw {
@@ -139,6 +146,30 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
     var activeLens: Lens = .wide
     var flipRotation: Double = 0
     var flashMode: AVCaptureDevice.FlashMode = .off
+    var isBurstModeEnabled: Bool = false {
+        didSet {
+            if isBurstModeEnabled {
+                flashMode = .off
+            }
+        }
+    }
+    private(set) var isBurstCapturing: Bool = false {
+        didSet {
+            burstDisablesAnalysis = isBurstCapturing
+            updateMetadataOutputStatus()
+            if isBurstCapturing {
+                detectedCodeURL = nil
+                detectedCodeString = nil
+                barcodeResetTask?.cancel()
+                barcodeResetTask = nil
+            }
+        }
+    }
+    private(set) var burstCapturedCount: Int = 0
+    @ObservationIgnored
+    var burstCaptureTask: Task<Void, Never>?
+    @ObservationIgnored
+    nonisolated(unsafe) private(set) var burstDisablesAnalysis = false
     var isMacroEnabled: Bool = false {
         didSet {
             if oldValue != isMacroEnabled {
@@ -462,7 +493,7 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
     }
     
     var showSimpleView: Bool {
-        appView == .clean || appView == .settings || (isTimerCountingDown && shouldHideUIWhileCountingDown)
+        appView == .clean || appView == .settings || isBurstCapturing || (isTimerCountingDown && shouldHideUIWhileCountingDown)
     }
     
     // MARK: - Configure
@@ -493,6 +524,8 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
     }
     
     deinit {
+        burstCaptureTask?.cancel()
+        _burstCaptureTracker.cancelAll()
         if let subjectAreaChangeObserver {
             NotificationCenter.default.removeObserver(subjectAreaChangeObserver)
         }
@@ -586,6 +619,7 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
         self.updateDeviceRanges()
         self.normalizeFlashModeForCurrentDevice()
         self.enforceExposureModeConstraints()
+        self.updateFastCapturePrioritization()
     }
     
     private func loadSettings() {
@@ -603,6 +637,7 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
         self.shouldShowLevel = defaults.object(forKey: "shouldShowLevel") as? Bool ?? true
         self.detailedCountdownTimer = defaults.object(forKey: "detailedCountdownTimer") as? Bool ?? false
         self.shouldHideUIWhileCountingDown = defaults.object(forKey: "shouldHideUIWhileCountingDown") as? Bool ?? true
+        self.shouldPrioritizeBurstSpeed = defaults.object(forKey: "shouldPrioritizeBurstSpeed") as? Bool ?? true
         
         if let res = defaults.string(forKey: "defaultResolution"), let rPref = ResolutionPreference(rawValue: res) {
             self.defaultResolution = rPref
@@ -621,6 +656,11 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
         if let histLarge = defaults.string(forKey: "defaultHistogramLarge"), let hMode = HistogramMode(rawValue: histLarge) {
             self.defaultHistogramLarge = hMode
         }
+    }
+
+    private func updateFastCapturePrioritization() {
+        guard photoOutput.isFastCapturePrioritizationSupported else { return }
+        photoOutput.isFastCapturePrioritizationEnabled = shouldPrioritizeBurstSpeed
     }
     
     // MARK: - Formats & ranges
@@ -880,6 +920,116 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
     func changeCapturingState(to new: Bool) {
         isCapturing = new
     }
+
+    func toggleBurstMode() {
+        guard !isBurstCapturing else {
+            stopBurstCapture()
+            return
+        }
+
+        isBurstModeEnabled.toggle()
+    }
+
+    func handleShutterButton(onCapture: @escaping @MainActor @Sendable () -> Void,
+                             onBurstPhotoCaptured: @escaping @MainActor @Sendable () -> Void = {}) {
+        if isBurstModeEnabled {
+            if isBurstCapturing {
+                stopBurstCapture()
+            } else {
+                startBurstCapture(onCapture: onCapture, onBurstPhotoCaptured: onBurstPhotoCaptured)
+            }
+            return
+        }
+
+        capturePhoto(onCapture: onCapture)
+    }
+
+    private func startBurstCapture(onCapture: @escaping @MainActor @Sendable () -> Void,
+                                   onBurstPhotoCaptured: @escaping @MainActor @Sendable () -> Void) {
+        guard burstCaptureTask == nil else { return }
+        guard canStartBurstCapture else {
+            if !isAutoExposure && !manualExposureIsFastEnoughForBurst {
+                errorMessage = "Raw Bursts in manual exposure require shutter speed of 1/100s or faster."
+                showError = true
+            }
+            return
+        }
+
+        flashMode = .off
+        timerCountdownTask?.cancel()
+        timerCountdownTask = nil
+        isTimerCountingDown = false
+        timerCountdownValue = nil
+        burstCapturedCount = 0
+        isBurstCapturing = true
+        onCapture()
+
+        let startDate = Date()
+        burstCaptureTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+
+            defer {
+                let elapsed = Date().timeIntervalSince(startDate)
+                let fps = elapsed > 0 ? Double(self.burstCapturedCount) / elapsed : 0
+                print("Burst finished: \(self.burstCapturedCount) photos in \(elapsed.formatted(.number.precision(.fractionLength(2))))s (\(fps.formatted(.number.precision(.fractionLength(2)))) fps)")
+                self.isBurstCapturing = false
+                self.burstCaptureTask = nil
+                self._burstCaptureTracker.cancelAll()
+            }
+
+            while !Task.isCancelled, self.isBurstModeEnabled {
+                guard self.canContinueBurstCapture else { break }
+                self.exposureDebounceTask?.cancel()
+                self._pendingCaptureModeBox.value = self.captureMode
+                self._pendingPhotoFilterBox.value = self.selectedPhotoFilter
+                self.updateCaptureOrientation()
+
+                guard let settings = await self.buildNextBurstPhotoSettings() else { break }
+                let success = await self._burstCaptureTracker.waitForCapture(uniqueID: settings.uniqueID) { [photoOutput = self.photoOutput, weak self] in
+                    guard let self else { return }
+                    photoOutput.capturePhoto(with: settings, delegate: self)
+                }
+
+                if success {
+                    self.burstCapturedCount += 1
+                    onBurstPhotoCaptured()
+                }
+
+                await Task.yield()
+            }
+        }
+    }
+
+    func stopBurstCapture() {
+        burstCaptureTask?.cancel()
+        _burstCaptureTracker.cancelAll()
+    }
+
+    private var canStartBurstCapture: Bool {
+        guard session.isRunning, !isTimerCountingDown else { return false }
+        guard isAutoExposure || manualExposureIsFastEnoughForBurst else { return false }
+        return true
+    }
+
+    private var canContinueBurstCapture: Bool {
+        canStartBurstCapture && isBurstCapturing
+    }
+
+    private var manualExposureIsFastEnoughForBurst: Bool {
+        guard !isAutoExposure else { return true }
+        guard let duration = currentManualExposureDuration else { return false }
+        return CMTimeGetSeconds(duration) <= 0.01
+    }
+
+    private var currentManualExposureDuration: CMTime? {
+        if manualShutterDenominator > 0 {
+            return CMTimeMake(value: 1, timescale: CMTimeScale(manualShutterDenominator))
+        } else if shutterSpeeds.indices.contains(shutterIndex) {
+            return shutterSpeeds[shutterIndex]
+        } else {
+            return nil
+        }
+    }
     
     func capturePhoto(onCapture: @escaping @MainActor @Sendable () -> Void) {
         guard timerCountdownTask == nil else { return }
@@ -988,6 +1138,29 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
                 return s
         }
     }
+
+    private func buildNextBurstPhotoSettings() async -> AVCapturePhotoSettings? {
+        if !isAutoExposure {
+            guard let duration = currentManualExposureDuration,
+                  let d = device else { return nil }
+            let isoValue = max(d.activeFormat.minISO, min(d.activeFormat.maxISO, iso))
+
+            await withCheckedContinuation { continuation in
+                try? d.lockForConfiguration()
+                d.setExposureModeCustom(duration: duration, iso: isoValue) { _ in
+                    continuation.resume()
+                }
+                d.unlockForConfiguration()
+            }
+        }
+
+        let settings = buildPhotoSettings()
+        settings.flashMode = .off
+        if shouldPrioritizeBurstSpeed {
+            settings.photoQualityPrioritization = .speed
+        }
+        return settings
+    }
     
     private func updateCaptureOrientation() {
         guard session.isRunning, let photoConnection = photoOutput.connection(with: .video), photoConnection.isActive else { return }
@@ -1028,7 +1201,7 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
     }
     
     private func applyFlashModeIfSupported(to settings: AVCapturePhotoSettings) {
-        guard isAutoExposure, supportsFlash else {
+        guard !isBurstModeEnabled, isAutoExposure, supportsFlash else {
             settings.flashMode = .off
             return
         }

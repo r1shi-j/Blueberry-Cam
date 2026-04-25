@@ -11,11 +11,16 @@ import SwiftUI
 struct BlueberryCamApp: App {
     @Environment(\.scenePhase) private var scenePhase
     @AppStorage("shutterCount") var shutterCount = 0
+    @AppStorage("shutterCountBurst") var shutterCountBurst = 0
     @State var permissionModel = PermissionModel()
     
     var body: some Scene {
         WindowGroup {
-            CaptureView(shutterCount: $shutterCount, permissionModel: permissionModel)
+            CaptureView(
+                shutterCount: $shutterCount,
+                shutterCountBurst: $shutterCountBurst,
+                permissionModel: permissionModel
+            )
                 .task {
                     await permissionModel.checkAndRequest()
                     await scanExistingSessions()
@@ -42,9 +47,9 @@ struct BlueberryCamApp: App {
 // Localise for all iPhones iOS 26+
 // Add tips, welcome screen and tutorials
 
-// Implement 3rd row on TopBarView: Macro, dual cam, burst, flash, timer buttons
-// Raw burst
-// Selfie cam horizontal mode and centre stage, photographic styles
+// Implement 3rd row on TopBarView: Macro, dual cam, (raw) burst, flash, timer buttons
+// Dual cam
+// Selfie cam horizontal mode and centre stage
 // Improve lens picker UI (liquid glass sliding), move to bottom right?
 // Click on any readout -> shows vertical slider right side screen like halide (and add animations to knock on effects)
 /// slider shows the auto value constantly updating, manually changing it turns on manual mode, for ss/iso have left iso right ss?
@@ -53,6 +58,4 @@ struct BlueberryCamApp: App {
 
 // MARK: - FIXME
 // Some situations where photos taken in locked camera not being detected
-// foregroundColor -> foregroundStyle
-// Maybe remove slashes
-// remove .nanoseconds
+// fixed buton height for top bar

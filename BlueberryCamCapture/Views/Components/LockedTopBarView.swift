@@ -54,28 +54,6 @@ extension LockedCameraModel {
         !(supportsMacro && isAutoExposure)
     }
     
-    // MARK: Burst properties
-    fileprivate var burstButtonSymbol: String {
-        isMacroEnabled ? "camera.macro" : "camera.macro.slash"
-        //        "square.stack.3d.down.right") // .fill if enabled
-    }
-    
-    fileprivate var burstButtonForeground: Color {
-        isMacroEnabled ? .black : Colors.buttonText
-    }
-    
-    fileprivate var burstButtonBackground: Color {
-        isMacroEnabled ? .yellow : Colors.buttonBackground
-    }
-    
-    fileprivate var burstButtonOpacity: Double {
-        (supportsMacro && isAutoExposure) ? 1.0 : 0.3
-    }
-    
-    fileprivate var isBurstButtonDisabled: Bool {
-        !(supportsMacro && isAutoExposure)
-    }
-    
     // MARK: Timer properties
     fileprivate var timerButtonSymbol: String {
         "timer"
@@ -299,21 +277,6 @@ struct LockedTopBarView: View {
                 }
                 .disabled(cameraModel.isDualcamButtonDisabled)
                 .opacity(cameraModel.dualcamButtonOpacity)
-                
-                // MARK: - Burst
-                Button {
-                    hapticTrigger += 1
-                } label: {
-                    Image(systemName: cameraModel.burstButtonSymbol)
-                        .font(.system(size: 12, weight: .bold))
-                        .foregroundStyle(cameraModel.burstButtonForeground)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 5)
-                        .background(cameraModel.burstButtonBackground)
-                        .clipShape(.capsule)
-                }
-                .disabled(cameraModel.isBurstButtonDisabled)
-                .opacity(cameraModel.burstButtonOpacity)
                 
                 // MARK: - Timer
                 Button {

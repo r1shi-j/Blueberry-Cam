@@ -32,6 +32,40 @@ final class PhotoFilterBox: @unchecked Sendable {
     nonisolated(unsafe) var value: PhotoFilter = .off
 }
 
+final class BurstCaptureTracker: @unchecked Sendable {
+    private let lock = NSLock()
+    nonisolated(unsafe) private var continuations: [Int64: CheckedContinuation<Bool, Never>] = [:]
+
+    nonisolated func waitForCapture(uniqueID: Int64, startCapture: @Sendable () -> Void) async -> Bool {
+        await withCheckedContinuation { continuation in
+            lock.lock()
+            continuations[uniqueID] = continuation
+            lock.unlock()
+
+            startCapture()
+        }
+    }
+
+    nonisolated func completeCapture(uniqueID: Int64, success: Bool) {
+        lock.lock()
+        let continuation = continuations.removeValue(forKey: uniqueID)
+        lock.unlock()
+
+        continuation?.resume(returning: success)
+    }
+
+    nonisolated func cancelAll() {
+        lock.lock()
+        let pending = continuations
+        continuations.removeAll()
+        lock.unlock()
+
+        for continuation in pending.values {
+            continuation.resume(returning: false)
+        }
+    }
+}
+
 final class SessionURLBox: @unchecked Sendable {
     nonisolated(unsafe) var value: URL? = nil
 }

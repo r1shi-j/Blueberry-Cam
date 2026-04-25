@@ -9,7 +9,7 @@ extension CameraModel: AVCaptureMetadataOutputObjectsDelegate {
         let firstString = (metadataObjects.first as? AVMetadataMachineReadableCodeObject)?.stringValue
         
         Task { @MainActor in
-            guard self.recognizeBarcodes, !self.isTimerCountingDown else {
+            guard self.recognizeBarcodes, !self.isTimerCountingDown, !self.isBurstCapturing else {
                 self.detectedCodeURL = nil
                 self.detectedCodeString = nil
                 return
@@ -59,7 +59,7 @@ extension CameraModel: AVCaptureMetadataOutputObjectsDelegate {
     }
     
     func updateMetadataOutputStatus() {
-        let isEnabled = recognizeBarcodes && !isTimerCountingDown
+        let isEnabled = recognizeBarcodes && !isTimerCountingDown && !isBurstCapturing
         let types = supportedMetadataTypes
         
         sessionQueue.async { [weak self] in

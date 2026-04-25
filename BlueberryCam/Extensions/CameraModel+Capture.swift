@@ -10,10 +10,12 @@ extension CameraModel: AVCapturePhotoCaptureDelegate {
                                  didFinishProcessingPhoto photo: AVCapturePhoto,
                                  error: Error?) {
         if let error {
+            self._burstCaptureTracker.completeCapture(uniqueID: photo.resolvedSettings.uniqueID, success: false)
             Task { @MainActor in self.errorMessage = error.localizedDescription; self.showError = true }
             return
         }
         guard let data = photo.fileDataRepresentation() else {
+            self._burstCaptureTracker.completeCapture(uniqueID: photo.resolvedSettings.uniqueID, success: false)
             Task { @MainActor in self.errorMessage = "Failed to get photo data."; self.showError = true }
             return
         }
@@ -28,6 +30,7 @@ extension CameraModel: AVCapturePhotoCaptureDelegate {
                 isHEIF: isHeif
             ) ?? data
             self.saveToPhotos(data: filteredData, location: loc, isDNG: photo.isRawPhoto, isHEIF: isHeif)
+            self._burstCaptureTracker.completeCapture(uniqueID: photo.resolvedSettings.uniqueID, success: true)
         }
     }
     

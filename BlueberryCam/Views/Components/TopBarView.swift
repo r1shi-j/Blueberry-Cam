@@ -12,11 +12,11 @@ extension CameraModel {
     }
     
     fileprivate var flashButtonOpacity: Double {
-        (supportsFlash && isAutoExposure) ? 1.0 : 0.3
+        (supportsFlash && isAutoExposure && !isBurstModeEnabled) ? 1.0 : 0.3
     }
     
     fileprivate var isFlashButtonDisabled: Bool {
-        !(supportsFlash && isAutoExposure)
+        !(supportsFlash && isAutoExposure && !isBurstModeEnabled)
     }
     
     // MARK: Macro properties
@@ -56,24 +56,23 @@ extension CameraModel {
     
     // MARK: Burst properties
     fileprivate var burstButtonSymbol: String {
-        isMacroEnabled ? "camera.macro" : "camera.macro.slash"
-//        "square.stack.3d.down.right") // .fill if enabled
+        "square.stack.3d.down.right"
     }
     
     fileprivate var burstButtonForeground: Color {
-        isMacroEnabled ? .black : Colors.buttonText
+        isBurstModeEnabled ? .black : Colors.buttonText
     }
     
     fileprivate var burstButtonBackground: Color {
-        isMacroEnabled ? .yellow : Colors.buttonBackground
+        isBurstModeEnabled ? .yellow : Colors.buttonBackground
     }
     
     fileprivate var burstButtonOpacity: Double {
-        (supportsMacro && isAutoExposure) ? 1.0 : 0.3
+        1.0
     }
     
     fileprivate var isBurstButtonDisabled: Bool {
-        !(supportsMacro && isAutoExposure)
+        isTimerCountingDown
     }
     
     // MARK: Timer properties
@@ -306,6 +305,9 @@ struct TopBarView: View {
                 // MARK: - Burst
                 Button {
                     hapticTrigger += 1
+                    withAnimation(.bouncy) {
+                        cameraModel.toggleBurstMode()
+                    }
                 } label: {
                     Image(systemName: cameraModel.burstButtonSymbol)
                         .font(.system(size: 12, weight: .bold))

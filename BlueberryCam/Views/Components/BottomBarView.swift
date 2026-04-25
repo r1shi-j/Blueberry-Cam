@@ -2,7 +2,9 @@ import SwiftUI
 
 extension CameraModel {
     fileprivate var shutterTint: Color {
-        captureMode == .raw ? .blue.mix(with: .mint, by: 0.5).opacity(0.4) : .white.opacity(0.2)
+        if isBurstCapturing { return .yellow.mix(with: .orange, by: 0.4).opacity(0.7) }
+        if isBurstModeEnabled { return .yellow.opacity(0.7) }
+        return captureMode == .raw ? .blue.mix(with: .mint, by: 0.5).opacity(0.4) : .white.opacity(0.2)
     }
 }
 
@@ -20,6 +22,19 @@ extension BottomBarView {
 struct BottomBarView: View {
     @Bindable var cameraModel: CameraModel
     @Binding var shutterCount: Int
+    @Binding var shutterCountBurst: Int
+    
+    private var isShowingBurstCount: Bool {
+        cameraModel.isBurstModeEnabled
+    }
+    
+    private var displayedShutterCount: Int {
+        isShowingBurstCount ? shutterCountBurst : shutterCount
+    }
+    
+    private var displayedShutterCountLabel: String {
+        displayedShutterCount.formatted()
+    }
     
     var body: some View {
         VStack() {
@@ -38,10 +53,11 @@ struct BottomBarView: View {
                     .frame(height: 82)
                     .frame(maxWidth: .infinity)
                     .overlay {
-                        Text(String(shutterCount))
+                        Text(displayedShutterCountLabel)
                             .font(.caption)
                             .fontWidth(.expanded)
                             .foregroundStyle(.white.opacity(0.6))
+                            .contentTransition(.numericText())
                             .offset(y: 41)
                     }
                     .transition(.opacity)
@@ -54,21 +70,26 @@ struct BottomBarView: View {
                             .frame(width: 82, height: 82)
                             .glassEffect(.regular.tint(cameraModel.shutterTint).interactive())
                         Button {
-                            cameraModel.capturePhoto {
+                            let shouldIncrementShutterCount = !cameraModel.isBurstModeEnabled
+                            cameraModel.handleShutterButton {
                                 withAnimation { cameraModel.changeCapturingState(to: true) }
                                 Task { @MainActor in
                                     try? await Task.sleep(for: .milliseconds(150))
                                     withAnimation { cameraModel.changeCapturingState(to: false) }
                                 }
+                            } onBurstPhotoCaptured: {
+                                shutterCountBurst += 1
                             }
-                            shutterCount += 1
+                            if shouldIncrementShutterCount {
+                                shutterCount += 1
+                            }
                         } label: {
                             Circle()
                                 .fill(.white)
                                 .frame(width: 69, height: 69)
                         }
                         .glassEffect(.regular.interactive())
-                        .sensoryFeedback(.selection, trigger: shutterCount)
+                        .sensoryFeedback(.selection, trigger: displayedShutterCountLabel)
                     }
                     .frame(maxWidth: .infinity)
                     .transition(.opacity)

@@ -3,8 +3,9 @@ import SwiftUI
 struct SettingsView: View {
     @Environment(\.dismiss) var dismiss
     @Bindable var cameraModel: CameraModel
-    let resetShutterCount: () -> Void
-    @State private var isShowingConfirmationAlert = false
+    @Binding var shutterCount: Int
+    @Binding var shutterCountBurst: Int
+    @State private var countResetTarget: ShutterCountResetTarget?
     
     var body: some View {
         NavigationStack {
@@ -69,16 +70,19 @@ struct SettingsView: View {
                 
                 Section {
                     Toggle("Geotag Location", isOn: $cameraModel.shouldGeotagLocation)
-                    
-                    Toggle("Recognize Barcodes", isOn: $cameraModel.recognizeBarcodes)
-                    
-                    Toggle("Show Grid", isOn: $cameraModel.shouldShowGrid)
-                    
-                    Toggle("Show Level/Crosshair", isOn: $cameraModel.shouldShowLevel)
-                    
-                    Toggle("Detailed Countdown Timer", isOn: $cameraModel.detailedCountdownTimer)
-                    
+                    Toggle("Prioritize Burst Speed Over Quality", isOn: $cameraModel.shouldPrioritizeBurstSpeed)
+                } header: {
+                    Text("Photo Settings")
+                } footer: {
+                    Text("When on, burst captures prefer speed over maximum processed quality.")
+                }
+                
+                Section {
+                    Toggle("Grid", isOn: $cameraModel.shouldShowGrid)
+                    Toggle("Level/Crosshair", isOn: $cameraModel.shouldShowLevel)
+                    Toggle("Pro Timer", isOn: $cameraModel.detailedCountdownTimer)
                     Toggle("Hide UI When Counting Down", isOn: $cameraModel.shouldHideUIWhileCountingDown)
+                    Toggle("Recognize Barcodes", isOn: $cameraModel.recognizeBarcodes)
                 } header: {
                     Text("Customization")
                 } footer : {
@@ -89,10 +93,23 @@ struct SettingsView: View {
                     Text("This app supports LockedCameraCapture which enables the app to be opened from camera control, control centre and from the lock screen action buttons. However when the app is opened from the lock screen some features arent available, these include: Histograms, Zebras, Highlight Clipping, Focus Peaking, Focus Loupe, Level, Grid, Selfie Cameras, Embedding Location and Recognising Barcodes. Settings, Clean UI view and filters will also not be available as camera control isn't available. Additionally the default image format and resolution will not be applied, this required a paid Apple Developer account. The defaults used will be Efficient High Efficiency (HEIF 12MP). To open the full app click the app icon in the bottom left (left of the shutter).")
                     Text("Photos library usage is only required to search for the album to save photos taken with this app, you can set it to limited access and select no photos, the app still work.")
                     Text("With auto focus and auto exposure, tap sets focus and exposure at the selected point, and hold locks both focus and exposure. With auto focus and manual exposure, tap sets focus and hold locks focus. With manual focus and auto exposure, tap sets exposure at the selected point.")
-                    Button("Reset Shutter Count") {
-                        isShowingConfirmationAlert = true
+                    LabeledContent {
+                        Text(shutterCount.formatted())
+                    } label: {
+                        Button("Reset Shutter Count") {
+                            countResetTarget = .standard
+                        }
+                        .tint(.red)
                     }
-                    .tint(.red)
+                    
+                    LabeledContent {
+                        Text(shutterCountBurst.formatted())
+                    } label: {
+                        Button("Reset Burst Shutter Count") {
+                            countResetTarget = .burst
+                        }
+                        .tint(.red)
+                    }
                 }
                 
                 Section {
@@ -122,9 +139,25 @@ struct SettingsView: View {
                     }
                 }
             }
-            .alert("Are you sure you want to reset the shutter count, this cannot be undone.", isPresented: $isShowingConfirmationAlert) {
+            .alert(countResetTarget?.confirmationTitle ?? "", isPresented: Binding(get: {
+                countResetTarget != nil
+            }, set: { isPresented in
+                if !isPresented {
+                    countResetTarget = nil
+                }
+            })) {
                 Button("Cancel", role: .cancel) { }
-                Button("Reset", role: .destructive, action: resetShutterCount)
+                Button("Reset", role: .destructive) {
+                    switch countResetTarget {
+                        case .standard:
+                            shutterCount = 0
+                        case .burst:
+                            shutterCountBurst = 0
+                        case nil:
+                            break
+                    }
+                    countResetTarget = nil
+                }
             }
         }
     }
@@ -154,7 +187,27 @@ struct SettingsView: View {
     }
 }
 
+private enum ShutterCountResetTarget {
+    case standard
+    case burst
+    
+    var confirmationTitle: String {
+        switch self {
+            case .standard:
+                "Are you sure you want to reset the shutter count, this cannot be undone."
+            case .burst:
+                "Are you sure you want to reset the burst shutter count, this cannot be undone."
+        }
+    }
+}
+
 #Preview {
     @Previewable @State var cameraModel = CameraModel()
-    SettingsView(cameraModel: cameraModel) { }
+    @Previewable @State var shutterCount = 0
+    @Previewable @State var shutterCountBurst = 0
+    SettingsView(
+        cameraModel: cameraModel,
+        shutterCount: $shutterCount,
+        shutterCountBurst: $shutterCountBurst
+    ) { } resetBurstShutterCount: { }
 }

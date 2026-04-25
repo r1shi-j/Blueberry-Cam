@@ -179,6 +179,7 @@ struct CaptureView: View {
     @Environment(\.scenePhase) private var scenePhase
     
     @Binding var shutterCount: Int
+    @Binding var shutterCountBurst: Int
     @Bindable var permissionModel: PermissionModel
     @State private var cameraModel = CameraModel()
     @State private var levelModel = LevelMotionModel()
@@ -216,7 +217,7 @@ struct CaptureView: View {
                 ZStack {
                     // MARK: - Viewfinder
                     CameraPreviewView(session: cameraModel.session, onCapture: {
-                        cameraModel.capturePhoto {
+                        cameraModel.handleShutterButton {
                             withAnimation { cameraModel.changeCapturingState(to: true) }
                             Task { @MainActor in
                                 try? await Task.sleep(for: .milliseconds(150))
@@ -231,7 +232,7 @@ struct CaptureView: View {
                     .animation(.easeInOut, value: scenePhase)
                     .frame(width: previewRect.width, height: previewRect.height)
                     .position(x: previewRect.midX, y: previewRect.midY)
-                    .allowsHitTesting(!cameraModel.isTimerCountingDown)
+                    .allowsHitTesting(!cameraModel.isTimerCountingDown && !cameraModel.isBurstCapturing)
                     .gesture(
                         DragGesture(minimumDistance: 0)
                             .onChanged { value in
@@ -318,7 +319,7 @@ struct CaptureView: View {
                     }
                     
                     // MARK: - Tap to focus overlay
-                    if cameraModel.isTapFocusIndicatorVisible, let indicatorPoint = cameraModel.tapFocusIndicatorPoint {
+                    if !cameraModel.isBurstCapturing, cameraModel.isTapFocusIndicatorVisible, let indicatorPoint = cameraModel.tapFocusIndicatorPoint {
                         FocusReticleView(
                             lockLabel: cameraModel.tapFocusLockLabel,
                             exposureOffset: cameraModel.tapFocusIndicatorOffset,
@@ -331,7 +332,7 @@ struct CaptureView: View {
                     
                     // MARK: - Focus lock overlay
                     ZStack {
-                        if let lockLabel = cameraModel.tapFocusLockLabel {
+                        if !cameraModel.isBurstCapturing, let lockLabel = cameraModel.tapFocusLockLabel {
                             Text(lockLabel)
                                 .font(.system(size: 12, weight: .bold))
                                 .foregroundStyle(.yellow)
@@ -346,7 +347,7 @@ struct CaptureView: View {
                     
                     // MARK: - QR Code
                     ZStack {
-                        if !cameraModel.isTimerCountingDown, let url = cameraModel.detectedCodeURL {
+                        if !cameraModel.isTimerCountingDown, !cameraModel.isBurstCapturing, let url = cameraModel.detectedCodeURL {
                             VStack(spacing: 4) {
                                 Text(copiedString)
                                     .font(.system(size: 10, weight: .bold))
@@ -385,7 +386,7 @@ struct CaptureView: View {
                     
                     // MARK: - Lens Cleaning Hint
                     ZStack {
-                        if !cameraModel.isTimerCountingDown, cameraModel.shouldShowLensCleaningHint {
+                        if !cameraModel.isTimerCountingDown, !cameraModel.isBurstCapturing, cameraModel.shouldShowLensCleaningHint {
                             VStack(spacing: 4) {
                                 Button {
                                     hapticTriggerR += 1
@@ -469,7 +470,11 @@ struct CaptureView: View {
                         Spacer()
                     }
                     
-                    BottomBarView(cameraModel: cameraModel, shutterCount: $shutterCount)
+                    BottomBarView(
+                        cameraModel: cameraModel,
+                        shutterCount: $shutterCount,
+                        shutterCountBurst: $shutterCountBurst
+                    )
                         .padding(.bottom, 30)
                 }
                 .allowsHitTesting(!cameraModel.isTimerCountingDown)
@@ -506,6 +511,7 @@ struct CaptureView: View {
             }
         }
         .animation(.easeInOut(duration: 0.2), value: cameraModel.showSimpleView)
+        .animation(.easeInOut(duration: 0.2), value: cameraModel.isBurstCapturing)
     }
     
     var body: some View {
@@ -615,6 +621,7 @@ struct CaptureView: View {
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: UIDevice.deviceDidShakeNotification)) { _ in
+            guard !cameraModel.isBurstCapturing else { return }
             if let url = cameraModel.detectedCodeURL {
                 UIApplication.shared.open(url)
                 cameraModel.ignoreCurrentCode()
@@ -630,9 +637,11 @@ struct CaptureView: View {
         }, set: { _, _ in
             cameraModel.hideSettings()
         })) {
-            SettingsView(cameraModel: cameraModel) {
-                shutterCount = 0
-            }
+            SettingsView(
+                cameraModel: cameraModel,
+                shutterCount: $shutterCount,
+                shutterCountBurst: $shutterCountBurst
+            )
         }
     }
 }
