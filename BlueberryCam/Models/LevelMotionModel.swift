@@ -23,7 +23,6 @@ final class LevelMotionModel: ObservableObject {
     
     private let motionManager = CMMotionManager()
     private let updateInterval: TimeInterval = 1.0 / 30.0
-    private var impactGenerator = UIImpactFeedbackGenerator(style: .light)
     
     private let flatGZThreshold: Double = 0.85
     private let uprightGZThreshold: Double = 0.42
@@ -45,8 +44,6 @@ final class LevelMotionModel: ObservableObject {
     func startUpdates() {
         guard motionManager.isDeviceMotionAvailable else { return }
         UIDevice.current.beginGeneratingDeviceOrientationNotifications()
-        impactGenerator = UIImpactFeedbackGenerator(style: .light)
-        impactGenerator.prepare()
         motionManager.deviceMotionUpdateInterval = updateInterval
         motionManager.startDeviceMotionUpdates(to: .main) { [weak self] motion, _ in
             guard let self = self, let motion = motion else { return }
@@ -100,13 +97,11 @@ final class LevelMotionModel: ObservableObject {
         let remainder = tiltAngleDeg.truncatingRemainder(dividingBy: 90.0)
         let deviation = min(abs(remainder), 90.0 - abs(remainder))
         let newIsAligned = displayMode == .level && deviation < snapThreshold
-        if newIsAligned && !prevIsAligned { impactGenerator.impactOccurred() }
         prevIsAligned = newIsAligned
         isAligned = newIsAligned
         
         let xyMag = sqrt(gravityX * gravityX + gravityY * gravityY)
         let newIsCrosshairAligned = displayMode == .flat && xyMag < flatAlignThreshold
-        if newIsCrosshairAligned && !prevIsCrosshairAligned { impactGenerator.impactOccurred() }
         prevIsCrosshairAligned = newIsCrosshairAligned
         isCrosshairAligned = newIsCrosshairAligned
     }

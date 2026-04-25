@@ -244,7 +244,6 @@ extension CameraModel {
             scheduleTapPointLock(focus: true, exposure: false)
             showTapFocusIndicator(at: previewPoint, lockLabel: "AF LOCK", persist: true)
         }
-        tap​Focus​Lock​Haptic​Trigger += 1
     }
     
     private func scheduleTapFocusLensPositionMonitoring() {

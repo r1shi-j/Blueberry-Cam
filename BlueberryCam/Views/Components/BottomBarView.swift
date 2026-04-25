@@ -17,7 +17,6 @@ extension BottomBarView {
 struct BottomBarView: View {
     @ObservedObject var cameraModel: CameraModel
     @Binding var shutterCount: Int
-    private let haptic = UIImpactFeedbackGenerator(style: .medium)
     
     var body: some View {
         VStack {
@@ -46,7 +45,6 @@ struct BottomBarView: View {
                         .stroke(Color.white.opacity(0.25), lineWidth: 2)
                         .frame(width: 65, height: 65)
                     Button {
-                        haptic.impactOccurred()
                         cameraModel.capturePhoto {
                             withAnimation { cameraModel.changeCapturingState(to: true) }
                             DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {

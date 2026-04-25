@@ -1,3 +1,4 @@
+import AudioToolbox
 import SwiftUI
 import UIKit
 
@@ -147,10 +148,6 @@ struct CaptureView: View {
     @StateObject private var levelModel = LevelMotionModel()
     @State private var selectedControl: ManualControl?
     
-    // Haptics - driven imperatively with UIKit
-    private let impactLight = UIImpactFeedbackGenerator(style: .light)
-    private let impactSoft = UIImpactFeedbackGenerator(style: .medium)
-    
     // Preview focus
     @State var previewProxy = PreviewViewProxy()
     @State var previewInteractionStartPoint: CGPoint?
@@ -200,7 +197,6 @@ struct CaptureView: View {
                         .simultaneousGesture(
                             TapGesture(count: 2)
                                 .onEnded {
-                                    impactLight.impactOccurred()
                                     withAnimation(.spring()) {
                                         cameraModel.toggleSelfie()
                                     }
@@ -354,11 +350,9 @@ struct CaptureView: View {
                                     )
                                     .frame(maxWidth: 80, maxHeight: 20)
                                     .onTapGesture {
-                                        impactLight.impactOccurred()
                                         cameraModel.cycleHistogramMode(mode: &cameraModel.histogramModeSmall)
                                     }
                                     .onLongPressGesture {
-                                        impactSoft.impactOccurred()
                                         cameraModel.hideHistogram(for: .small)
                                     }
                                     .transition(.scale(scale: 0.5, anchor: .center).combined(with: .opacity))
@@ -387,11 +381,9 @@ struct CaptureView: View {
                                 .padding(.horizontal, 20)
                                 .padding(.bottom, 8)
                                 .onTapGesture {
-                                    impactLight.impactOccurred()
                                     cameraModel.cycleHistogramMode(mode: &cameraModel.histogramModeLarge)
                                 }
                                 .onLongPressGesture {
-                                    impactSoft.impactOccurred()
                                     withAnimation(.spring()) {
                                         cameraModel.hideHistogram(for: .large)
                                     }
@@ -413,7 +405,6 @@ struct CaptureView: View {
                                 
                                 let isClean = cameraModel.appView == .clean
                                 Button {
-                                    impactLight.impactOccurred()
                                     withAnimation(.spring()) {
                                         cameraModel.appView = isClean ? .standard : .clean
                                     }
@@ -466,8 +457,6 @@ struct CaptureView: View {
         .animation(.easeInOut(duration: 0.4), value: permissionModel.anyDenied)
         .statusBarHidden()
         .onAppear {
-            impactLight.prepare()
-            impactSoft.prepare()
             cameraModel.configure()
             levelModel.startUpdates()
             levelModel.setLevelDisplayEnabled(cameraModel.shouldShowLevel && cameraModel.appView == .standard)
@@ -528,11 +517,8 @@ struct CaptureView: View {
                 }
             }
         }
-        .onChange(of: cameraModel.tap​Focus​Lock​Haptic​Trigger) { _ in
-            impactSoft.impactOccurred()
-        }
         .onChange(of: cameraModel.detectedCodeURL) { url in
-            if url != nil { impactSoft.impactOccurred() }
+            if url != nil { AudioServicesPlaySystemSound(4095) }
         }
         .onReceive(NotificationCenter.default.publisher(for: UIDevice.deviceDidShakeNotification)) { _ in
             if let url = cameraModel.detectedCodeURL {

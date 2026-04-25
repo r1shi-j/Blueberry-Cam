@@ -224,7 +224,6 @@ class CameraModel: NSObject, ObservableObject {
     @Published var tapFocusIndicatorOffset: CGFloat = 0
     @Published var tapFocusLockLabel: String? = nil
     @Published var tapExposureBias: Float = 0
-    @Published var tap​Focus​Lock​Haptic​Trigger: Int = 0
     var tapFocusHideTask: Task<Void, Never>?
     var tapFocusLockTask: Task<Void, Never>?
     var subjectAreaChangeObserver: NSObjectProtocol?

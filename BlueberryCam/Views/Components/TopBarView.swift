@@ -71,10 +71,7 @@ extension TopBarView {
         opacity: Double = 1.0,
         action: @escaping () -> Void
     ) -> some View {
-        Button {
-            hapticLight.impactOccurred()
-            action()
-        } label: {
+        Button(action: action) {
             Image(systemName: symbol)
                 .font(IconStyle.symbolFont)
                 .foregroundColor(fg)
@@ -92,10 +89,7 @@ extension TopBarView {
         bg: Color,
         action: @escaping () -> Void
     ) -> some View {
-        Button {
-            hapticLight.impactOccurred()
-            action()
-        } label: {
+        Button(action: action) {
             Text(label)
                 .font(IconStyle.textFont)
                 .foregroundColor(fg)
@@ -112,10 +106,7 @@ extension TopBarView {
         bg: Color,
         action: @escaping () -> Void
     ) -> some View {
-        Button {
-            hapticLight.impactOccurred()
-            action()
-        } label: {
+        Button(action: action) {
             Text(label)
                 .font(IconStyle.textFont)
                 .foregroundColor(fg)
@@ -133,7 +124,6 @@ extension TopBarView {
         ZStack {
             if cameraModel.histogramModeSmall == .none && cameraModel.histogramModeLarge == .none {
                 Button {
-                    hapticLight.impactOccurred()
                     withAnimation(.spring()) {
                         cameraModel.cycleHistogramMode(mode: &cameraModel.histogramModeSmall, size: .small)
                         cameraModel.cycleHistogramMode(mode: &cameraModel.histogramModeLarge, size: .large)
@@ -149,7 +139,6 @@ extension TopBarView {
                 }
             } else {
                 Button {
-                    hapticLight.impactOccurred()
                     withAnimation(.spring()) {
                         cameraModel.hideHistogram(for: .small)
                         cameraModel.hideHistogram(for: .large)
@@ -202,8 +191,6 @@ extension TopBarView {
 struct TopBarView: View {
     @ObservedObject var cameraModel: CameraModel
     @Binding var selectedControl: ManualControl?
-    private let hapticLight = UIImpactFeedbackGenerator(style: .light)
-    private let hapticSoft = UIImpactFeedbackGenerator(style: .soft)
     
     var body: some View {
         VStack(spacing: 0) {
@@ -232,7 +219,6 @@ struct TopBarView: View {
                             let isEnabled = cameraModel.isFormatEnabled(mode)
                             let isSelected = cameraModel.captureMode == mode
                             Button {
-                                hapticLight.impactOccurred()
                                 cameraModel.changeCaptureFormat(to: mode)
                             } label: {
                                 Text(mode.rawValue)
@@ -270,20 +256,17 @@ struct TopBarView: View {
                         .font(.system(size: 12, weight: selectedControl == control ? .black : .regular, design: .monospaced))
                         .foregroundColor(readoutColor(for: control))
                         .onTapGesture(count: 2) {
-                            hapticSoft.impactOccurred()
                             withAnimation(.bouncy) {
                                 cameraModel.resetControl(for: control)
                             }
                         }
                         .onLongPressGesture {
-                            hapticSoft.impactOccurred()
                             withAnimation(.bouncy) {
                                 cameraModel.resetControl(for: control)
                             }
                         }
                         .disabled(isReadoutDisabled(for: control))
                         .onTapGesture {
-                            hapticLight.impactOccurred()
                             withAnimation(.bouncy) {
                                 selectedControl = selectedControl == control ? nil : control
                             }
