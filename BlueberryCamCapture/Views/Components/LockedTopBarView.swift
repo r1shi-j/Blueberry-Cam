@@ -2,26 +2,7 @@ internal import AVFoundation
 import SwiftUI
 
 extension LockedCameraModel {
-    fileprivate var macroButtonSymbol: String {
-        isMacroEnabled ? "camera.macro" : "camera.macro.slash"
-    }
-    
-    fileprivate var macroButtonForeground: Color {
-        isMacroEnabled ? .black : Colors.buttonText
-    }
-    
-    fileprivate var macroButtonBackground: Color {
-        isMacroEnabled ? .yellow : Colors.buttonBackground
-    }
-    
-    fileprivate var macroButtonOpacity: Double {
-        (supportsMacro && isAutoExposure) ? 1.0 : 0.3
-    }
-
-    fileprivate var isMacroButtonDisabled: Bool {
-        !(supportsMacro && isAutoExposure)
-    }
-    
+    // MARK: Flash properties
     fileprivate var flashButtonForeground: Color {
         flashMode == .off || !supportsFlash ? Colors.buttonText : .black
     }
@@ -38,6 +19,116 @@ extension LockedCameraModel {
         !(supportsFlash && isAutoExposure)
     }
     
+    // MARK: Macro properties
+    fileprivate var macroButtonSymbol: String {
+        isMacroEnabled ? "camera.macro" : "camera.macro.slash"
+    }
+    
+    fileprivate var macroButtonForeground: Color {
+        isMacroEnabled ? .black : Colors.buttonText
+    }
+    
+    fileprivate var macroButtonBackground: Color {
+        isMacroEnabled ? .yellow : Colors.buttonBackground
+    }
+    
+    fileprivate var macroButtonOpacity: Double {
+        (supportsMacro && isAutoExposure) ? 1.0 : 0.3
+    }
+    
+    fileprivate var isMacroButtonDisabled: Bool {
+        !(supportsMacro && isAutoExposure)
+    }
+    
+    // MARK: Portrait properties
+    fileprivate var portraitButtonSymbol: String {
+        isMacroEnabled ? "camera.macro" : "camera.macro.slash"
+        // disabled: "person.slash.fill" no .slash if enabled
+    }
+    
+    fileprivate var portraitButtonForeground: Color {
+        isMacroEnabled ? .black : Colors.buttonText
+    }
+    
+    fileprivate var portraitButtonBackground: Color {
+        isMacroEnabled ? .yellow : Colors.buttonBackground
+    }
+    
+    fileprivate var portraitButtonOpacity: Double {
+        (supportsMacro && isAutoExposure) ? 1.0 : 0.3
+    }
+    
+    fileprivate var isPortraitButtonDisabled: Bool {
+        !(supportsMacro && isAutoExposure)
+    }
+    
+    // MARK: Dual Camera properties
+    fileprivate var dualcamButtonSymbol: String {
+        isMacroEnabled ? "camera.macro" : "camera.macro.slash"
+        // "inset.filled.rectangle.and.person.filled.slash") // no .slash if enabled
+    }
+    
+    fileprivate var dualcamButtonForeground: Color {
+        isMacroEnabled ? .black : Colors.buttonText
+    }
+    
+    fileprivate var dualcamButtonBackground: Color {
+        isMacroEnabled ? .yellow : Colors.buttonBackground
+    }
+    
+    fileprivate var dualcamButtonOpacity: Double {
+        (supportsMacro && isAutoExposure) ? 1.0 : 0.3
+    }
+    
+    fileprivate var isDualcamButtonDisabled: Bool {
+        !(supportsMacro && isAutoExposure)
+    }
+    
+    // MARK: Burst properties
+    fileprivate var burstButtonSymbol: String {
+        isMacroEnabled ? "camera.macro" : "camera.macro.slash"
+        //        "square.stack.3d.down.right") // .fill if enabled
+    }
+    
+    fileprivate var burstButtonForeground: Color {
+        isMacroEnabled ? .black : Colors.buttonText
+    }
+    
+    fileprivate var burstButtonBackground: Color {
+        isMacroEnabled ? .yellow : Colors.buttonBackground
+    }
+    
+    fileprivate var burstButtonOpacity: Double {
+        (supportsMacro && isAutoExposure) ? 1.0 : 0.3
+    }
+    
+    fileprivate var isBurstButtonDisabled: Bool {
+        !(supportsMacro && isAutoExposure)
+    }
+    
+    // MARK: Timer properties
+    fileprivate var timerButtonSymbol: String {
+        isMacroEnabled ? "camera.macro" : "camera.macro.slash"
+        // "timer" but would need a string label for 3 or 10 seconds, could create custom one
+    }
+    
+    fileprivate var timerButtonForeground: Color {
+        isMacroEnabled ? .black : Colors.buttonText
+    }
+    
+    fileprivate var timerButtonBackground: Color {
+        isMacroEnabled ? .yellow : Colors.buttonBackground
+    }
+    
+    fileprivate var timerButtonOpacity: Double {
+        (supportsMacro && isAutoExposure) ? 1.0 : 0.3
+    }
+    
+    fileprivate var isTimerButtonDisabled: Bool {
+        !(supportsMacro && isAutoExposure)
+    }
+    
+    // MARK: Format/resolution properties
     fileprivate func resolutionForeground(for isSelected: Bool, isEnabled: Bool) -> Color {
         guard isEnabled else { return Colors.buttonText.opacity(0.3) }
         return isSelected ? .black : .white
@@ -163,7 +254,7 @@ struct LockedTopBarView: View {
                 }
                 .clipShape(.rect(cornerRadius: 6))
                 .overlay(RoundedRectangle(cornerRadius: 6).stroke(.white.opacity(0.2), lineWidth: 1))
-                .animation(.spring(duration: 0.3), value: cameraModel.availableResolutions)
+                .animation(.bouncy, value: cameraModel.availableResolutions)
                 
                 // MARK: - Format picker
                 HStack(spacing: 0) {
@@ -188,12 +279,30 @@ struct LockedTopBarView: View {
                 }
                 .clipShape(.rect(cornerRadius: 6))
                 .overlay(RoundedRectangle(cornerRadius: 6).stroke(.white.opacity(0.2), lineWidth: 1))
-                .animation(.spring(duration: 0.3), value: cameraModel.availableResolutions)
+                .animation(.bouncy, value: cameraModel.availableResolutions)
             }
             .padding(.horizontal, 8)
             
             // MARK: Row 3
             HStack(alignment: .center, spacing: 16) {
+                // MARK: - Flash
+                Button {
+                    hapticTrigger += 1
+                    withAnimation(.bouncy) {
+                        cameraModel.cycleFlashMode()
+                    }
+                } label: {
+                    Image(systemName: cameraModel.flashLabel)
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundColor(cameraModel.flashButtonForeground)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 5)
+                        .background(cameraModel.flashButtonBackground)
+                        .clipShape(.capsule)
+                }
+                .opacity(cameraModel.flashButtonOpacity)
+                .disabled(cameraModel.isFlashButtonDisabled)
+                
                 // MARK: - Macro
                 if cameraModel.supportsMacro {
                     Button {
@@ -212,91 +321,69 @@ struct LockedTopBarView: View {
                     }
                     .disabled(cameraModel.isMacroButtonDisabled)
                     .opacity(cameraModel.macroButtonOpacity)
+                    .animation(.bouncy, value: cameraModel.activeLens)
+                    .transition(.opacity.combined(with: .scale))
                 }
                 
-                // MARK: - Flash
+                // MARK: - Portrait
                 Button {
                     hapticTrigger += 1
-                    withAnimation(.bouncy) {
-                        cameraModel.cycleFlashMode()
-                    }
                 } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: cameraModel.flashLabel.systemImage)
-                            .font(.system(size: 12, weight: .bold))
-                        if !cameraModel.flashLabel.label.isEmpty {
-                            Text(cameraModel.flashLabel.label)
-                                .font(.system(size: 12, weight: .bold, design: .monospaced))
-                        }
-                    }
-                    .foregroundColor(cameraModel.flashButtonForeground)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 5)
-                    .background(cameraModel.flashButtonBackground)
-                    .clipShape(.capsule)
+                    Image(systemName: cameraModel.portraitButtonSymbol)
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundColor(cameraModel.portraitButtonForeground)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 5)
+                        .background(cameraModel.portraitButtonBackground)
+                        .clipShape(.capsule)
                 }
-                .opacity(cameraModel.flashButtonOpacity)
-                .disabled(cameraModel.isFlashButtonDisabled)
+                .disabled(cameraModel.isPortraitButtonDisabled)
+                .opacity(cameraModel.portraitButtonOpacity)
                 
+                // MARK: - Dual Camera
                 Button {
-                    
+                    hapticTrigger += 1
                 } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: "applelogo")
-                            .font(.system(size: 12, weight: .bold))
-                    }
-                    .foregroundColor(cameraModel.flashButtonForeground)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 5)
-                    .background(cameraModel.flashButtonBackground)
-                    .clipShape(.capsule)
+                    Image(systemName: cameraModel.dualcamButtonSymbol)
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundColor(cameraModel.dualcamButtonForeground)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 5)
+                        .background(cameraModel.dualcamButtonBackground)
+                        .clipShape(.capsule)
                 }
-                .disabled(true)
+                .disabled(cameraModel.isDualcamButtonDisabled)
+                .opacity(cameraModel.dualcamButtonOpacity)
                 
+                // MARK: - Burst
                 Button {
-                    
+                    hapticTrigger += 1
                 } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: "applelogo")
-                            .font(.system(size: 12, weight: .bold))
-                    }
-                    .foregroundColor(cameraModel.flashButtonForeground)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 5)
-                    .background(cameraModel.flashButtonBackground)
-                    .clipShape(.capsule)
+                    Image(systemName: cameraModel.burstButtonSymbol)
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundColor(cameraModel.burstButtonForeground)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 5)
+                        .background(cameraModel.burstButtonBackground)
+                        .clipShape(.capsule)
                 }
-                .disabled(true)
+                .disabled(cameraModel.isBurstButtonDisabled)
+                .opacity(cameraModel.burstButtonOpacity)
                 
+                // MARK: - Timer
                 Button {
-                    
+                    hapticTrigger += 1
                 } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: "applelogo")
-                            .font(.system(size: 12, weight: .bold))
-                    }
-                    .foregroundColor(cameraModel.flashButtonForeground)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 5)
-                    .background(cameraModel.flashButtonBackground)
-                    .clipShape(.capsule)
+                    Image(systemName: cameraModel.timerButtonSymbol)
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundColor(cameraModel.timerButtonForeground)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 5)
+                        .background(cameraModel.timerButtonBackground)
+                        .clipShape(.capsule)
                 }
-                .disabled(true)
-                
-                Button {
-                    
-                } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: "applelogo")
-                            .font(.system(size: 12, weight: .bold))
-                    }
-                    .foregroundColor(cameraModel.flashButtonForeground)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 5)
-                    .background(cameraModel.flashButtonBackground)
-                    .clipShape(.capsule)
-                }
-                .disabled(true)
+                .disabled(cameraModel.isTimerButtonDisabled)
+                .opacity(cameraModel.timerButtonOpacity)
             }
             .padding(.horizontal, 8)
         }

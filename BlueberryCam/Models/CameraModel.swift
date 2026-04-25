@@ -431,12 +431,12 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
         return !photoOutput.supportedFlashModes.isEmpty
     }
     
-    var flashLabel: (systemImage: String, label: String) {
+    var flashLabel: String {
         switch flashMode {
-            case .off: return ("flashlight.slash", "")
-            case .auto: return ("flashlight.on.fill", "A")
-            case .on: return ("flashlight.on.fill", "ON")
-            @unknown default: return ("flashlight.slash", "?")
+            case .off: "bolt.slash.fill"
+            case .auto: "bolt.badge.automatic.fill"
+            case .on: "bolt.fill"
+            @unknown default: "bolt.badge.xmark.fill"
         }
     }
     
