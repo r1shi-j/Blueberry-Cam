@@ -39,6 +39,7 @@ class LockedCameraModel: NSObject {
     private(set) var enabledResolutions: [ResolutionOption] = []
     var selectedResolution: ResolutionOption? = nil
     var activeLens: Lens = .wide
+    var timerMode: TimerMode = .off
     var flashMode: AVCaptureDevice.FlashMode = .off
     var isMacroEnabled: Bool = false {
         didSet {
@@ -48,6 +49,14 @@ class LockedCameraModel: NSObject {
             }
         }
     }
+    @ObservationIgnored
+    var timerCountdownTask: Task<Void, Never>?
+    var isTimerCountingDown = false {
+        didSet {
+            guard oldValue != isTimerCountingDown else { return }
+        }
+    }
+    var timerCountdownValue: Double? = nil
     @ObservationIgnored
     nonisolated(unsafe) var lastGravity: (x: Double, y: Double, z: Double) = (0, -1, 0)
     @ObservationIgnored
@@ -158,6 +167,8 @@ class LockedCameraModel: NSObject {
     var tapFocusLensPositionBaseline: Float?
     @ObservationIgnored
     var tapFocusLensPositionMonitorTask: Task<Void, Never>?
+    var detailedCountdownTimer = false
+    var shouldHideUIWhileCountingDown = true
     
     // MARK: - Computed properties
     var captureAspectRatio: CGFloat { 3.0 / 4.0 }
@@ -197,6 +208,10 @@ class LockedCameraModel: NSObject {
             case .on: "bolt.fill"
             @unknown default: "bolt.badge.xmark.fill"
         }
+    }
+    
+    var showSimpleView: Bool {
+        isTimerCountingDown && shouldHideUIWhileCountingDown
     }
     
     // MARK: - Configure
@@ -495,7 +510,47 @@ class LockedCameraModel: NSObject {
         isCapturing = new
     }
     
-    func capturePhoto(onCapture: () -> ()) {
+    func capturePhoto(onCapture: @escaping @MainActor @Sendable () -> Void) {
+        guard timerCountdownTask == nil else { return }
+        
+        if let totalSeconds = timerMode.seconds {
+            isTimerCountingDown = true
+            timerCountdownValue = Double(totalSeconds)
+            timerCountdownTask = Task { @MainActor [weak self] in
+                guard let self else { return }
+                let usesDetailedCountdown = self.detailedCountdownTimer
+                
+                defer {
+                    self.isTimerCountingDown = false
+                    self.timerCountdownValue = nil
+                    self.timerCountdownTask = nil
+                }
+                
+                let endDate = Date().addingTimeInterval(TimeInterval(totalSeconds))
+                let updateInterval: Duration = usesDetailedCountdown ? .milliseconds(16) : .milliseconds(100)
+                
+                while true {
+                    let remaining = endDate.timeIntervalSinceNow
+                    guard remaining > 0 else { break }
+                    
+                    self.timerCountdownValue = remaining
+                    do {
+                        try await Task.sleep(for: updateInterval)
+                    } catch {
+                        return
+                    }
+                }
+                
+                self.performPhotoCapture(onCapture: onCapture)
+            }
+            return
+        }
+        
+        performPhotoCapture(onCapture: onCapture)
+    }
+    
+    
+    private func performPhotoCapture(onCapture: @escaping @MainActor @Sendable () -> Void) {
         onCapture()
         
         exposureDebounceTask?.cancel()

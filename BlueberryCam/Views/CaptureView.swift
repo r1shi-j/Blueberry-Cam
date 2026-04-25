@@ -33,6 +33,12 @@ extension CaptureView {
     private var tapMoveTolerance: CGFloat { 18 }
     private var focusReticleSliderXTolerance: CGFloat { 24 }
     private var focusReticleSliderYTolerance: CGFloat { 96 }
+    private var countdownTextTransition: AnyTransition {
+        .asymmetric(
+            insertion: .scale(scale: 2.6).combined(with: .opacity),
+            removal: .scale(scale: 0.2).combined(with: .opacity)
+        )
+    }
     
     private func makePreviewRect(in geo: GeometryProxy) -> CGRect {
         let size = geo.size
@@ -55,6 +61,16 @@ extension CaptureView {
         let dx = abs(sliderCenterX - point.x)
         let dy = abs(sliderCenterY - point.y)
         return dx <= focusReticleSliderXTolerance && dy <= focusReticleSliderYTolerance
+    }
+
+    private func countdownText(for value: Double) -> String {
+        let clampedValue = max(value, 0)
+
+        if cameraModel.detailedCountdownTimer {
+            return clampedValue.formatted(.number.precision(.fractionLength(3)))
+        }
+
+        return Int(ceil(clampedValue)).formatted()
     }
     
     private func beginPreviewInteraction(at location: CGPoint) {
@@ -136,6 +152,27 @@ extension CaptureView {
             cameraModel.handleTapPointHold(devicePoint: devicePoint, previewPoint: location)
         }
     }
+
+    @ViewBuilder
+    private func timerCountdownOverlay(in previewRect: CGRect) -> some View {
+        if cameraModel.isTimerCountingDown {
+            ZStack {
+                if let countdownValue = cameraModel.timerCountdownValue {
+                    Text(countdownText(for: countdownValue))
+                        .font(.system(size: cameraModel.detailedCountdownTimer ? 58 : 84, weight: .bold, design: cameraModel.detailedCountdownTimer ? .rounded : .default))
+                        .fontWidth(cameraModel.detailedCountdownTimer ? .standard : .expanded)
+                        .monospacedDigit()
+                        .contentTransition(.numericText(countsDown: true))
+                        .foregroundStyle(.white)
+                        .shadow(color: .black.opacity(0.35), radius: 12, x: 0, y: 4)
+                        .position(x: previewRect.midX, y: previewRect.midY)
+                        .transition(countdownTextTransition)
+                }
+            }
+            .animation(.spring(response: 0.45, dampingFraction: 0.8), value: cameraModel.isTimerCountingDown)
+            .animation(.easeInOut(duration: 0.12), value: cameraModel.timerCountdownValue)
+        }
+    }
 }
 
 struct CaptureView: View {
@@ -193,6 +230,7 @@ struct CaptureView: View {
                     .animation(.easeInOut, value: scenePhase)
                     .frame(width: previewRect.width, height: previewRect.height)
                     .position(x: previewRect.midX, y: previewRect.midY)
+                    .allowsHitTesting(!cameraModel.isTimerCountingDown)
                     .gesture(
                         DragGesture(minimumDistance: 0)
                             .onChanged { value in
@@ -307,7 +345,7 @@ struct CaptureView: View {
                     
                     // MARK: - QR Code
                     ZStack {
-                        if let url = cameraModel.detectedCodeURL {
+                        if !cameraModel.isTimerCountingDown, let url = cameraModel.detectedCodeURL {
                             VStack(spacing: 4) {
                                 Text(copiedString)
                                     .font(.system(size: 10, weight: .bold))
@@ -346,7 +384,7 @@ struct CaptureView: View {
                     
                     // MARK: - Lens Cleaning Hint
                     ZStack {
-                        if cameraModel.shouldShowLensCleaningHint {
+                        if !cameraModel.isTimerCountingDown, cameraModel.shouldShowLensCleaningHint {
                             VStack(spacing: 4) {
                                 Button {
                                     hapticTriggerR += 1
@@ -381,48 +419,51 @@ struct CaptureView: View {
                 // MARK: - UI Overlays
                 VStack(spacing: 0) {
                     if !cameraModel.showSimpleView {
-                        TopBarView(cameraModel: cameraModel, selectedControl: $selectedControl)
-                            .offset(y:-10)
-                        
-                        Spacer()
-                        
-                        ZStack {
-                            if cameraModel.histogramModeLarge != .none {
-                                HistogramView(
-                                    mode: cameraModel.histogramModeLarge,
-                                    size: .large,
-                                    lumaData: cameraModel.histogramData,
-                                    redData: cameraModel.redHistogram,
-                                    greenData: cameraModel.greenHistogram,
-                                    blueData: cameraModel.blueHistogram,
-                                    waveformData: cameraModel.waveformData
-                                )
-                                .frame(height: 60)
-                                .padding(.horizontal, 20)
-                                .padding(.bottom, 8)
-                                .onTapGesture {
-                                    hapticTrigger += 1
-                                    cameraModel.cycleHistogramMode(mode: &cameraModel.histogramModeLarge)
+                        VStack(spacing: 0) {
+                            TopBarView(cameraModel: cameraModel, selectedControl: $selectedControl)
+                                .offset(y:-10)
+                            
+                            Spacer()
+                            
+                            ZStack {
+                                if cameraModel.histogramModeLarge != .none {
+                                    HistogramView(
+                                        mode: cameraModel.histogramModeLarge,
+                                        size: .large,
+                                        lumaData: cameraModel.histogramData,
+                                        redData: cameraModel.redHistogram,
+                                        greenData: cameraModel.greenHistogram,
+                                        blueData: cameraModel.blueHistogram,
+                                        waveformData: cameraModel.waveformData
+                                    )
+                                    .frame(height: 60)
+                                    .padding(.horizontal, 20)
+                                    .padding(.bottom, 8)
+                                    .onTapGesture {
+                                        hapticTrigger += 1
+                                        cameraModel.cycleHistogramMode(mode: &cameraModel.histogramModeLarge)
+                                    }
+                                    .onLongPressGesture {
+                                        hapticTriggerR += 1
+                                        cameraModel.hideHistogram(for: .large)
+                                    }
+                                    .transition(.scale(scale: 0.5, anchor: .center).combined(with: .opacity))
                                 }
-                                .onLongPressGesture {
-                                    hapticTriggerR += 1
-                                    cameraModel.hideHistogram(for: .large)
-                                }
-                                .transition(.scale(scale: 0.5, anchor: .center).combined(with: .opacity))
                             }
+                            .animation(.bouncy, value: cameraModel.histogramModeLarge)
+                            
+                            if let selectedControl {
+                                ManualControlsView(cameraModel: cameraModel, control: selectedControl)
+                                    .padding(.bottom, 8)
+                            }
+                            
+                            ZStack {
+                                LensSelectorView(cameraModel: cameraModel)
+                                    .padding(.bottom, 30)
+                            }
+                            .animation(.bouncy, value: cameraModel.activeLens)
                         }
-                        .animation(.bouncy, value: cameraModel.histogramModeLarge)
-                        
-                        if let selectedControl {
-                            ManualControlsView(cameraModel: cameraModel, control: selectedControl)
-                                .padding(.bottom, 8)
-                        }
-                        
-                        ZStack {
-                            LensSelectorView(cameraModel: cameraModel)
-                                .padding(.bottom, 30)
-                        }
-                        .animation(.bouncy, value: cameraModel.activeLens)
+                        .transition(.opacity)
                     } else {
                         Spacer()
                     }
@@ -430,6 +471,11 @@ struct CaptureView: View {
                     BottomBarView(cameraModel: cameraModel, shutterCount: $shutterCount)
                         .padding(.bottom, 30)
                 }
+                .allowsHitTesting(!cameraModel.isTimerCountingDown)
+                .animation(.easeInOut(duration: 0.2), value: cameraModel.showSimpleView)
+                    
+                // MARK: - Timer countdown
+                timerCountdownOverlay(in: previewRect)
                 
                 // MARK: - Capture flash
                 if cameraModel.isCapturing {
@@ -448,14 +494,17 @@ struct CaptureView: View {
                     .ignoresSafeArea()
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .frame(height: .zero)
+                    .transition(.opacity)
             } else {
                 Color.clear
                     .padding()
                     .ignoresSafeArea()
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .frame(height: .zero)
+                    .transition(.opacity)
             }
         }
+        .animation(.easeInOut(duration: 0.2), value: cameraModel.showSimpleView)
     }
     
     var body: some View {
@@ -483,7 +532,7 @@ struct CaptureView: View {
         .onAppear {
             cameraModel.configure()
             levelModel.startUpdates()
-            levelModel.setLevelDisplayEnabled(cameraModel.shouldShowLevel && cameraModel.appView == .standard)
+            levelModel.setLevelDisplayEnabled(cameraModel.shouldShowLevel && !cameraModel.showSimpleView)
             
             // Pass gravity updates to camera model
             levelModel.onGravityUpdate = { gx, gy, gz in
@@ -495,13 +544,13 @@ struct CaptureView: View {
             cameraModel.clearTapPointInteraction(resetDeviceState: false)
         }
         .onChange(of: cameraModel.shouldShowLevel) { _, new in
-            levelModel.setLevelDisplayEnabled(new && cameraModel.appView == .standard)
+            levelModel.setLevelDisplayEnabled(new && !cameraModel.showSimpleView)
         }
         .onChange(of: scenePhase) { _, newPhase in
             if newPhase == .active {
                 cameraModel.startSession()
                 levelModel.startUpdates() // Always start
-                levelModel.setLevelDisplayEnabled(cameraModel.shouldShowLevel && cameraModel.appView == .standard)
+                levelModel.setLevelDisplayEnabled(cameraModel.shouldShowLevel && !cameraModel.showSimpleView)
             } else {
                 cameraModel.stopSession()
                 levelModel.stopUpdates() // Only stop when backgrounded
@@ -510,8 +559,8 @@ struct CaptureView: View {
                 }
             }
         }
-        .onChange(of: cameraModel.appView) { _, new in
-            levelModel.setLevelDisplayEnabled(new == .standard && cameraModel.shouldShowLevel)
+        .onChange(of: cameraModel.showSimpleView) { _, new in
+            levelModel.setLevelDisplayEnabled(!new && cameraModel.shouldShowLevel)
         }
         .onChange(of: cameraModel.activeLens) { oldLens, newLens in
             cameraModel.clearTapPointInteraction(resetDeviceState: false)

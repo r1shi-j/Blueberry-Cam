@@ -9,6 +9,12 @@ extension LockedCaptureView {
     private var tapMoveTolerance: CGFloat { 18 }
     private var focusReticleSliderXTolerance: CGFloat { 24 }
     private var focusReticleSliderYTolerance: CGFloat { 96 }
+    private var countdownTextTransition: AnyTransition {
+        .asymmetric(
+            insertion: .scale(scale: 2.6).combined(with: .opacity),
+            removal: .scale(scale: 0.2).combined(with: .opacity)
+        )
+    }
     
     private func makePreviewRect(in geo: GeometryProxy) -> CGRect {
         let size = geo.size
@@ -31,6 +37,16 @@ extension LockedCaptureView {
         let dx = abs(sliderCenterX - point.x)
         let dy = abs(sliderCenterY - point.y)
         return dx <= focusReticleSliderXTolerance && dy <= focusReticleSliderYTolerance
+    }
+    
+    private func countdownText(for value: Double) -> String {
+        let clampedValue = max(value, 0)
+        
+        if cameraModel.detailedCountdownTimer {
+            return clampedValue.formatted(.number.precision(.fractionLength(3)))
+        }
+        
+        return Int(ceil(clampedValue)).formatted()
     }
     
     private func beginPreviewInteraction(at location: CGPoint) {
@@ -112,6 +128,27 @@ extension LockedCaptureView {
             cameraModel.handleTapPointHold(devicePoint: devicePoint, previewPoint: location)
         }
     }
+    
+    @ViewBuilder
+    private func timerCountdownOverlay(in previewRect: CGRect) -> some View {
+        if cameraModel.isTimerCountingDown {
+            ZStack {
+                if let countdownValue = cameraModel.timerCountdownValue {
+                    Text(countdownText(for: countdownValue))
+                        .font(.system(size: cameraModel.detailedCountdownTimer ? 58 : 84, weight: .bold, design: cameraModel.detailedCountdownTimer ? .rounded : .default))
+                        .fontWidth(cameraModel.detailedCountdownTimer ? .standard : .expanded)
+                        .monospacedDigit()
+                        .contentTransition(.numericText(countsDown: true))
+                        .foregroundStyle(.white)
+                        .shadow(color: .black.opacity(0.35), radius: 12, x: 0, y: 4)
+                        .position(x: previewRect.midX, y: previewRect.midY)
+                        .transition(countdownTextTransition)
+                }
+            }
+            .animation(.spring(response: 0.45, dampingFraction: 0.8), value: cameraModel.isTimerCountingDown)
+            .animation(.easeInOut(duration: 0.12), value: cameraModel.timerCountdownValue)
+        }
+    }
 }
 
 struct LockedCaptureView: View {
@@ -160,6 +197,7 @@ struct LockedCaptureView: View {
                 .opacity(visualOpacity)
                 .frame(width: previewRect.width, height: previewRect.height)
                 .position(x: previewRect.midX, y: previewRect.midY)
+                .allowsHitTesting(!cameraModel.isTimerCountingDown)
                 .gesture(
                     DragGesture(minimumDistance: 0)
                         .onChanged { value in
@@ -202,25 +240,35 @@ struct LockedCaptureView: View {
                 
                 // MARK: - UI Overlays
                 VStack(spacing: 0) {
-                    LockedTopBarView(cameraModel: cameraModel, selectedControl: $selectedControl)
-                        .offset(y:-2)
-                    
-                    Spacer()
-                    
-                    if let selectedControl {
-                        LockedManualControlsView(cameraModel: cameraModel, control: selectedControl)
-                            .padding(.bottom, 8)
+                    if !cameraModel.showSimpleView {
+                        VStack(spacing: 0) {
+                            LockedTopBarView(cameraModel: cameraModel, selectedControl: $selectedControl)
+                                .offset(y:-2)
+                            
+                            Spacer()
+                            
+                            if let selectedControl {
+                                LockedManualControlsView(cameraModel: cameraModel, control: selectedControl)
+                                    .padding(.bottom, 8)
+                            }
+                            
+                            ZStack {
+                                LockedLensSelectorView(cameraModel: cameraModel)
+                                    .padding(.bottom, 30)
+                            }
+                            .animation(.bouncy, value: cameraModel.activeLens)
+                            
+                            LockedBottomBarView(cameraModel: cameraModel, lockedSession: lockedSession)
+                                .padding(.bottom, 30)
+                        }
+                        .transition(.opacity)
                     }
-                    
-                    ZStack {
-                        LockedLensSelectorView(cameraModel: cameraModel)
-                            .padding(.bottom, 30)
-                    }
-                    .animation(.bouncy, value: cameraModel.activeLens)
-                    
-                    LockedBottomBarView(cameraModel: cameraModel, lockedSession: lockedSession)
-                        .padding(.bottom, 30)
                 }
+                .allowsHitTesting(!cameraModel.isTimerCountingDown)
+                .animation(.easeInOut(duration: 0.2), value: cameraModel.showSimpleView)
+                
+                // MARK: - Timer countdown
+                timerCountdownOverlay(in: previewRect)
                 
                 // MARK: - Capture flash
                 if cameraModel.isCapturing {

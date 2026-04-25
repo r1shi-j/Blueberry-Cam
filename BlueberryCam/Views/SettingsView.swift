@@ -68,21 +68,17 @@ struct SettingsView: View {
                 }
                 
                 Section {
-                    LabeledContent("Geotag Location ") {
-                        Toggle("", isOn: $cameraModel.shouldGeotagLocation)
-                    }
+                    Toggle("Geotag Location", isOn: $cameraModel.shouldGeotagLocation)
                     
-                    LabeledContent("Recognize Barcodes ") {
-                        Toggle("", isOn: $cameraModel.recognizeBarcodes)
-                    }
+                    Toggle("Recognize Barcodes", isOn: $cameraModel.recognizeBarcodes)
                     
-                    LabeledContent("Show Grid ") {
-                        Toggle("", isOn: $cameraModel.shouldShowGrid)
-                    }
+                    Toggle("Show Grid", isOn: $cameraModel.shouldShowGrid)
                     
-                    LabeledContent("Show Level/Crosshair ") {
-                        Toggle("", isOn: $cameraModel.shouldShowLevel)
-                    }
+                    Toggle("Show Level/Crosshair", isOn: $cameraModel.shouldShowLevel)
+                    
+                    Toggle("Detailed Countdown Timer", isOn: $cameraModel.detailedCountdownTimer)
+                    
+                    Toggle("Hide UI When Counting Down", isOn: $cameraModel.shouldHideUIWhileCountingDown)
                 } header: {
                     Text("Customization")
                 } footer : {

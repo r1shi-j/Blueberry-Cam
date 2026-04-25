@@ -85,6 +85,38 @@ enum PhotoFilter: String, CaseIterable, Identifiable {
     var id: String { rawValue }
 }
 
+enum TimerMode: String, CaseIterable, Identifiable {
+    case off
+    case threeSeconds
+    case tenSeconds
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+            case .off: ""
+            case .threeSeconds: "3s"
+            case .tenSeconds: "10s"
+        }
+    }
+
+    var duration: Duration? {
+        switch self {
+            case .off: nil
+            case .threeSeconds: .seconds(3)
+            case .tenSeconds: .seconds(10)
+        }
+    }
+
+    var seconds: Int? {
+        switch self {
+            case .off: nil
+            case .threeSeconds: 3
+            case .tenSeconds: 10
+        }
+    }
+}
+
 enum ResolutionPreference: String, CaseIterable, Identifiable {
     case efficient = "Efficient"
     case max = "Max"

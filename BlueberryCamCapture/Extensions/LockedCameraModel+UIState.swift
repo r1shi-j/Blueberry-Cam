@@ -137,19 +137,14 @@ extension LockedCameraModel {
         }
     }
     
-    func toggleMacroMode() {
-        guard supportsMacro, isAutoExposure else { return }
-        
-        if !isMacroEnabled {
-            // Enabling macro: switch to Ultra Wide first
-            if activeLens != .ultraWide {
-                switchLens(to: .ultraWide)
-            }
-            isMacroEnabled = true
-        } else {
-            // Disabling macro
-            isMacroEnabled = false
-        }
+    func selectResolution(_ opt: ResolutionOption) {
+        guard isResolutionEnabled(opt) else { return }
+        selectedResolution = opt
+    }
+    
+    func changeCaptureFormat(to mode: CaptureMode) {
+        guard isFormatEnabled(mode) else { return }
+        captureMode = mode
     }
     
     func cycleFlashMode() {
@@ -173,13 +168,29 @@ extension LockedCameraModel {
         flashMode = .off
     }
     
-    func selectResolution(_ opt: ResolutionOption) {
-        guard isResolutionEnabled(opt) else { return }
-        selectedResolution = opt
+    func toggleMacroMode() {
+        guard supportsMacro, isAutoExposure else { return }
+        
+        if !isMacroEnabled {
+            // Enabling macro: switch to Ultra Wide first
+            if activeLens != .ultraWide {
+                switchLens(to: .ultraWide)
+            }
+            isMacroEnabled = true
+        } else {
+            // Disabling macro
+            isMacroEnabled = false
+        }
     }
     
-    func changeCaptureFormat(to mode: CaptureMode) {
-        guard isFormatEnabled(mode) else { return }
-        captureMode = mode
+    func cycleTimerMode() {
+        switch timerMode {
+            case .off:
+                timerMode = .threeSeconds
+            case .threeSeconds:
+                timerMode = .tenSeconds
+            case .tenSeconds:
+                timerMode = .off
+        }
     }
 }

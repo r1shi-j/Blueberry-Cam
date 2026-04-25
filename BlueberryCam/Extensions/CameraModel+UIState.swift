@@ -131,6 +131,35 @@ extension CameraModel {
         switchLens(to: target)
     }
     
+    func toggleClipping() { showClipping.toggle() }
+    
+    func toggleZebraStripes() { showZebraStripes.toggle() }
+    
+    func cycleHistogramMode(mode: inout HistogramMode, size: HistogramSize? = nil) {
+        switch mode {
+            case .luminance:
+                mode = .color
+            case .color:
+                mode = .waveform
+            case .waveform:
+                mode = .parade
+            case .parade:
+                mode = .luminance
+            case .none:
+                if size == .small {
+                    mode = defaultHistogramSmall == .none ? .waveform : defaultHistogramSmall
+                } else if size == .large {
+                    mode = defaultHistogramLarge == .none ? .luminance : defaultHistogramLarge
+                } else {
+                    mode = .luminance
+                }
+        }
+    }
+    
+    func hideHistogram(for mode: HistogramSize) {
+        mode == .small ? (histogramModeSmall = .none) : (histogramModeLarge = .none)
+    }
+    
     func resetEV() {
         exposureBias = 0.0
     }
@@ -161,19 +190,14 @@ extension CameraModel {
         }
     }
     
-    func toggleMacroMode() {
-        guard supportsMacro, isAutoExposure else { return }
-        
-        if !isMacroEnabled {
-            // Enabling macro: switch to Ultra Wide first
-            if activeLens != .ultraWide {
-                switchLens(to: .ultraWide)
-            }
-            isMacroEnabled = true
-        } else {
-            // Disabling macro
-            isMacroEnabled = false
-        }
+    func selectResolution(_ opt: ResolutionOption) {
+        guard isResolutionEnabled(opt) else { return }
+        selectedResolution = opt
+    }
+    
+    func changeCaptureFormat(to mode: CaptureMode) {
+        guard isFormatEnabled(mode) else { return }
+        captureMode = mode
     }
     
     func cycleFlashMode() {
@@ -197,46 +221,33 @@ extension CameraModel {
         flashMode = .off
     }
     
-    func selectResolution(_ opt: ResolutionOption) {
-        guard isResolutionEnabled(opt) else { return }
-        selectedResolution = opt
+    func toggleMacroMode() {
+        guard supportsMacro, isAutoExposure else { return }
+        
+        if !isMacroEnabled {
+            // Enabling macro: switch to Ultra Wide first
+            if activeLens != .ultraWide {
+                switchLens(to: .ultraWide)
+            }
+            isMacroEnabled = true
+        } else {
+            // Disabling macro
+            isMacroEnabled = false
+        }
     }
     
-    func changeCaptureFormat(to mode: CaptureMode) {
-        guard isFormatEnabled(mode) else { return }
-        captureMode = mode
+    func cycleTimerMode() {
+        switch timerMode {
+            case .off:
+                timerMode = .threeSeconds
+            case .threeSeconds:
+                timerMode = .tenSeconds
+            case .tenSeconds:
+                timerMode = .off
+        }
     }
 
     func changePhotoFilter(to filter: PhotoFilter) {
         selectedPhotoFilter = filter
-    }
-
-    func toggleClipping() { showClipping.toggle() }
-    
-    func toggleZebraStripes() { showZebraStripes.toggle() }
-    
-    func cycleHistogramMode(mode: inout HistogramMode, size: HistogramSize? = nil) {
-        switch mode {
-            case .luminance:
-                mode = .color
-            case .color:
-                mode = .waveform
-            case .waveform:
-                mode = .parade
-            case .parade:
-                mode = .luminance
-            case .none:
-                if size == .small {
-                    mode = defaultHistogramSmall == .none ? .waveform : defaultHistogramSmall
-                } else if size == .large {
-                    mode = defaultHistogramLarge == .none ? .luminance : defaultHistogramLarge
-                } else {
-                    mode = .luminance
-                }
-        }
-    }
-    
-    func hideHistogram(for mode: HistogramSize) {
-        mode == .small ? (histogramModeSmall = .none) : (histogramModeLarge = .none)
     }
 }

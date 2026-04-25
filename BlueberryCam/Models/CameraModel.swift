@@ -109,6 +109,12 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
     var shouldShowLevel = false {
         didSet { UserDefaults.standard.set(shouldShowLevel, forKey: "shouldShowLevel") }
     }
+    var detailedCountdownTimer = false {
+        didSet { UserDefaults.standard.set(detailedCountdownTimer, forKey: "detailedCountdownTimer") }
+    }
+    var shouldHideUIWhileCountingDown = true {
+        didSet { UserDefaults.standard.set(shouldHideUIWhileCountingDown, forKey: "shouldHideUIWhileCountingDown") }
+    }
     
     // MARK: - Capture format
     var captureMode: CaptureMode = .raw {
@@ -129,6 +135,7 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
             syncPhotoFilterToHardware()
         }
     }
+    var timerMode: TimerMode = .off
     var activeLens: Lens = .wide
     var flipRotation: Double = 0
     var flashMode: AVCaptureDevice.FlashMode = .off
@@ -140,6 +147,21 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
             }
         }
     }
+    @ObservationIgnored
+    var timerCountdownTask: Task<Void, Never>?
+    var isTimerCountingDown = false {
+        didSet {
+            guard oldValue != isTimerCountingDown else { return }
+            updateMetadataOutputStatus()
+            if isTimerCountingDown {
+                detectedCodeURL = nil
+                detectedCodeString = nil
+                barcodeResetTask?.cancel()
+                barcodeResetTask = nil
+            }
+        }
+    }
+    var timerCountdownValue: Double? = nil
     @ObservationIgnored
     nonisolated(unsafe) var lastGravity: (x: Double, y: Double, z: Double) = (0, -1, 0)
     @ObservationIgnored
@@ -441,7 +463,7 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
     }
     
     var showSimpleView: Bool {
-        appView == .clean || appView == .settings
+        appView == .clean || appView == .settings || (isTimerCountingDown && shouldHideUIWhileCountingDown)
     }
     
     // MARK: - Configure
@@ -580,6 +602,8 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
         self.recognizeBarcodes = defaults.object(forKey: "recognizeBarcodes") as? Bool ?? true
         self.shouldShowGrid = defaults.object(forKey: "shouldShowGrid") as? Bool ?? true
         self.shouldShowLevel = defaults.object(forKey: "shouldShowLevel") as? Bool ?? true
+        self.detailedCountdownTimer = defaults.object(forKey: "detailedCountdownTimer") as? Bool ?? false
+        self.shouldHideUIWhileCountingDown = defaults.object(forKey: "shouldHideUIWhileCountingDown") as? Bool ?? true
         
         if let res = defaults.string(forKey: "defaultResolution"), let rPref = ResolutionPreference(rawValue: res) {
             self.defaultResolution = rPref
@@ -858,7 +882,46 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
         isCapturing = new
     }
     
-    func capturePhoto(onCapture: () -> ()) {
+    func capturePhoto(onCapture: @escaping @MainActor @Sendable () -> Void) {
+        guard timerCountdownTask == nil else { return }
+
+        if let totalSeconds = timerMode.seconds {
+            isTimerCountingDown = true
+            timerCountdownValue = Double(totalSeconds)
+            timerCountdownTask = Task { @MainActor [weak self] in
+                guard let self else { return }
+                let usesDetailedCountdown = self.detailedCountdownTimer
+
+                defer {
+                    self.isTimerCountingDown = false
+                    self.timerCountdownValue = nil
+                    self.timerCountdownTask = nil
+                }
+
+                let endDate = Date().addingTimeInterval(TimeInterval(totalSeconds))
+                let updateInterval: Duration = usesDetailedCountdown ? .milliseconds(16) : .milliseconds(100)
+
+                while true {
+                    let remaining = endDate.timeIntervalSinceNow
+                    guard remaining > 0 else { break }
+
+                    self.timerCountdownValue = remaining
+                    do {
+                        try await Task.sleep(for: updateInterval)
+                    } catch {
+                        return
+                    }
+                }
+
+                self.performPhotoCapture(onCapture: onCapture)
+            }
+            return
+        }
+
+        performPhotoCapture(onCapture: onCapture)
+    }
+
+    private func performPhotoCapture(onCapture: @escaping @MainActor @Sendable () -> Void) {
         onCapture()
         
         exposureDebounceTask?.cancel()

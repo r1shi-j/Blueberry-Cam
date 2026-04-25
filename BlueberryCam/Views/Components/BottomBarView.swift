@@ -44,30 +44,34 @@ struct BottomBarView: View {
                             .foregroundColor(.white.opacity(0.6))
                             .offset(y: 41)
                     }
+                    .transition(.opacity)
                 }
                 
                 // MARK: - Shutter button
-                ZStack {
-                    Circle()
-                        .frame(width: 82, height: 82)
-                        .glassEffect(.regular.tint(cameraModel.shutterTint).interactive())
-                    Button {
-                        cameraModel.capturePhoto {
-                            withAnimation { cameraModel.changeCapturingState(to: true) }
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-                                withAnimation { cameraModel.changeCapturingState(to: false) }
-                            }
-                        }
-                        shutterCount += 1
-                    } label: {
+                if !(cameraModel.isTimerCountingDown && cameraModel.shouldHideUIWhileCountingDown) {
+                    ZStack {
                         Circle()
-                            .fill(.white)
-                            .frame(width: 69, height: 69)
+                            .frame(width: 82, height: 82)
+                            .glassEffect(.regular.tint(cameraModel.shutterTint).interactive())
+                        Button {
+                            cameraModel.capturePhoto {
+                                withAnimation { cameraModel.changeCapturingState(to: true) }
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                                    withAnimation { cameraModel.changeCapturingState(to: false) }
+                                }
+                            }
+                            shutterCount += 1
+                        } label: {
+                            Circle()
+                                .fill(.white)
+                                .frame(width: 69, height: 69)
+                        }
+                        .glassEffect(.regular.interactive())
+                        .sensoryFeedback(.selection, trigger: shutterCount)
                     }
-                    .glassEffect(.regular.interactive())
-                    .sensoryFeedback(.selection, trigger: shutterCount)
+                    .frame(maxWidth: .infinity)
+                    .transition(.opacity)
                 }
-                .frame(maxWidth: .infinity)
                 
                 // MARK: - Placeholder
                 if !cameraModel.showSimpleView {
@@ -81,8 +85,10 @@ struct BottomBarView: View {
                     .frame(height: 82)
                     .frame(maxWidth: .infinity)
                     .disabled(true)
+                    .transition(.opacity)
                 }
             }
         }
+        .animation(.easeInOut(duration: 0.2), value: cameraModel.showSimpleView)
     }
 }

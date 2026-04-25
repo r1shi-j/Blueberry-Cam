@@ -9,8 +9,9 @@ extension CameraModel: AVCaptureMetadataOutputObjectsDelegate {
         let firstString = (metadataObjects.first as? AVMetadataMachineReadableCodeObject)?.stringValue
         
         Task { @MainActor in
-            guard self.recognizeBarcodes else {
+            guard self.recognizeBarcodes, !self.isTimerCountingDown else {
                 self.detectedCodeURL = nil
+                self.detectedCodeString = nil
                 return
             }
             
@@ -47,7 +48,7 @@ extension CameraModel: AVCaptureMetadataOutputObjectsDelegate {
                 // Reset the task since we just saw the code
                 self.barcodeResetTask?.cancel()
                 self.barcodeResetTask = Task { @MainActor in
-                    try? await Task.sleep(nanoseconds: 2_000_000_000)
+                    try? await Task.sleep(for: .seconds(2))
                     if !Task.isCancelled {
                         self.detectedCodeURL = nil
                         self.detectedCodeString = nil
@@ -58,7 +59,7 @@ extension CameraModel: AVCaptureMetadataOutputObjectsDelegate {
     }
     
     func updateMetadataOutputStatus() {
-        let isEnabled = recognizeBarcodes
+        let isEnabled = recognizeBarcodes && !isTimerCountingDown
         let types = supportedMetadataTypes
         
         sessionQueue.async { [weak self] in
@@ -76,10 +77,11 @@ extension CameraModel: AVCaptureMetadataOutputObjectsDelegate {
             self.session.commitConfiguration()
         }
         
-        if !recognizeBarcodes {
+        if !isEnabled {
             detectedCodeURL = nil
             detectedCodeString = nil
             barcodeResetTask?.cancel()
+            barcodeResetTask = nil
         }
     }
 }

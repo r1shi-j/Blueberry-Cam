@@ -78,24 +78,15 @@ extension LockedCameraModel {
     
     // MARK: Timer properties
     fileprivate var timerButtonSymbol: String {
-        isMacroEnabled ? "camera.macro" : "camera.macro.slash"
-        // "timer" but would need a string label for 3 or 10 seconds, could create custom one
+        "timer"
     }
     
     fileprivate var timerButtonForeground: Color {
-        isMacroEnabled ? .black : Colors.buttonText
+        timerMode == .off ? Colors.buttonText : .black
     }
     
     fileprivate var timerButtonBackground: Color {
-        isMacroEnabled ? .yellow : Colors.buttonBackground
-    }
-    
-    fileprivate var timerButtonOpacity: Double {
-        (supportsMacro && isAutoExposure) ? 1.0 : 0.3
-    }
-    
-    fileprivate var isTimerButtonDisabled: Bool {
-        !(supportsMacro && isAutoExposure)
+        timerMode == .off ? Colors.buttonBackground : .yellow
     }
     
     // MARK: Format/resolution properties
@@ -264,7 +255,8 @@ struct LockedTopBarView: View {
                 } label: {
                     Image(systemName: cameraModel.flashLabel)
                         .font(.system(size: 12, weight: .bold))
-                        .foregroundColor(cameraModel.flashButtonForeground)
+                        .frame(height: 18)
+                        .foregroundStyle(cameraModel.flashButtonForeground)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 5)
                         .background(cameraModel.flashButtonBackground)
@@ -326,17 +318,27 @@ struct LockedTopBarView: View {
                 // MARK: - Timer
                 Button {
                     hapticTrigger += 1
+                    withAnimation(.bouncy) {
+                        cameraModel.cycleTimerMode()
+                    }
                 } label: {
-                    Image(systemName: cameraModel.timerButtonSymbol)
-                        .font(.system(size: 12, weight: .bold))
-                        .foregroundColor(cameraModel.timerButtonForeground)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 5)
-                        .background(cameraModel.timerButtonBackground)
-                        .clipShape(.capsule)
+                    HStack(spacing: 4) {
+                        Image(systemName: cameraModel.timerButtonSymbol)
+                            .font(.system(size: 14, weight: .bold))
+                        
+                        if cameraModel.timerMode != .off {
+                            Text(cameraModel.timerMode.label)
+                                .font(.system(size: 12, weight: .medium, design: .monospaced))
+                        }
+                    }
+                    .frame(height: 18)
+                    .foregroundStyle(cameraModel.timerButtonForeground)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 5)
+                    .background(cameraModel.timerButtonBackground)
+                    .clipShape(.capsule)
                 }
-                .disabled(cameraModel.isTimerButtonDisabled)
-                .opacity(cameraModel.timerButtonOpacity)
+                .animation(.bouncy, value: cameraModel.timerMode)
             }
             .padding(.horizontal, 8)
         }

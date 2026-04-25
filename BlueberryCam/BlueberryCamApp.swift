@@ -53,3 +53,6 @@ struct BlueberryCamApp: App {
 
 // MARK: - FIXME
 // Some situations where photos taken in locked camera not being detected
+// foregroundColor -> foregroundStyle
+// Maybe remove slashes
+// remove .nanoseconds
