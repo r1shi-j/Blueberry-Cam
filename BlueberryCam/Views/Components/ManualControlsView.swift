@@ -21,10 +21,10 @@ extension ManualControlsView {
     private var focusLoupeString: String { "Focus Loupe" }
     private var wbString: String { "White Balance" }
     
-    private var customEVValue: String { String(format: "%+.1f", cameraModel.exposureBias) }
+    private var customEVValue: String { cameraModel.exposureBias.signedSingleDecimalString }
     private var customISOValue: String { "\(Int(cameraModel.iso))" }
     private var customSSValue: String { cameraModel.shutterLabel }
-    private var customFocusValue: String { String(format: "%.2f", cameraModel.lensPosition) }
+    private var customFocusValue: String { Double(cameraModel.lensPosition).formatted(.number.precision(.fractionLength(2))) }
     private var customWBValue: String { "\(Int(cameraModel.whiteBalanceTargetKelvin))K" }
     
     private func conditionalTextColor(for bool: Bool) -> Color {

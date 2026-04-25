@@ -455,9 +455,8 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
     
     var flashLabel: String {
         switch flashMode {
-            case .off: "bolt.slash.fill"
+            case .off, .on: "bolt.fill"
             case .auto: "bolt.badge.automatic.fill"
-            case .on: "bolt.fill"
             @unknown default: "bolt.badge.xmark.fill"
         }
     }
@@ -873,7 +872,7 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
     static func formatShutter(_ time: CMTime) -> String {
         let secs = CMTimeGetSeconds(time)
         guard secs.isFinite && secs > 0 else { return "—" }
-        if secs >= 1.0 { return String(format: "%.1fs", secs) }
+        if secs >= 1.0 { return "\(secs.formatted(.number.precision(.fractionLength(1))))s" }
         return "1/\(Int(round(1.0 / secs)))"
     }
     

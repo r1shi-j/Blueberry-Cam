@@ -3,6 +3,13 @@ import CoreMedia
 internal import Photos
 import SwiftUI
 
+extension Float {
+    var signedSingleDecimalString: String {
+        let magnitude = abs(Double(self)).formatted(.number.precision(.fractionLength(1)))
+        return self >= 0 ? "+\(magnitude)" : "-\(magnitude)"
+    }
+}
+
 // MARK: Constants
 enum Colors {
     static let buttonBackground: Color = .white.opacity(0.15)

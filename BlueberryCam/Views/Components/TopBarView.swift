@@ -21,7 +21,7 @@ extension CameraModel {
     
     // MARK: Macro properties
     fileprivate var macroButtonSymbol: String {
-        isMacroEnabled ? "camera.macro" : "camera.macro.slash"
+        "camera.macro"
     }
     
     fileprivate var macroButtonForeground: Color {
@@ -124,7 +124,7 @@ extension TopBarView {
     
     private func readoutTitle(for control: ManualControl) -> String {
         switch control {
-            case .ev: String(format: "EV %+.1f", cameraModel.exposureBias)
+            case .ev: "EV \(cameraModel.exposureBias.signedSingleDecimalString)"
             case .iso: "ISO \(Int(cameraModel.liveISO))"
             case .ss: cameraModel.liveShutter
             case .f: cameraModel.liveFocus

@@ -11,7 +11,7 @@ extension LockedCameraModel: AVCaptureVideoDataOutputSampleBufferDelegate {
                 self.liveShutter = Self.formatShutter(d.exposureDuration)
                 let tnt = d.temperatureAndTintValues(for: d.deviceWhiteBalanceGains)
                 self.liveWB = "\(Int(tnt.temperature))K"
-                self.liveFocus = String(format: "%.2f", d.lensPosition)
+                self.liveFocus = Double(d.lensPosition).formatted(.number.precision(.fractionLength(2)))
             }
         }
     }
