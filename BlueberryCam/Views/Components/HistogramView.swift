@@ -218,7 +218,7 @@ struct HistogramView: View {
                     
                     Text(mode.rawValue.uppercased())
                         .font(.system(size: 8, weight: .bold, design: .monospaced))
-                        .foregroundColor(.white.opacity(0.45))
+                        .foregroundStyle(.white.opacity(0.45))
                         .padding(.horizontal, 6)
                         .padding(.bottom, 3)
                 }

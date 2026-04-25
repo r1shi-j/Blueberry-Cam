@@ -46,7 +46,7 @@ struct LockedManualControlsView: View {
                     HStack {
                         Text(exposureString.uppercased())
                             .font(Fonts.manualLabel)
-                            .foregroundColor(Colors.manualLabel)
+                            .foregroundStyle(Colors.manualLabel)
                             .tracking(2)
                         Spacer()
                         Toggle("", isOn: $cameraModel.isAutoExposure)
@@ -62,7 +62,7 @@ struct LockedManualControlsView: View {
                             }
                         Text(conditionalTextLabel(for: cameraModel.isAutoExposure))
                             .font(Fonts.manualLabel)
-                            .foregroundColor(conditionalTextColor(for: cameraModel.isAutoExposure))
+                            .foregroundStyle(conditionalTextColor(for: cameraModel.isAutoExposure))
                     }
                     .padding(.horizontal, 20)
                     
@@ -70,7 +70,7 @@ struct LockedManualControlsView: View {
                         HStack {
                             Text(evString.uppercased())
                                 .font(Fonts.manualLabel)
-                                .foregroundColor(Colors.manualLabel)
+                                .foregroundStyle(Colors.manualLabel)
                                 .tracking(2)
                                 .frame(width: 60, alignment: .leading)
                             Slider(value: $cameraModel.exposureBias, in: -4.0...4.0, step: 0.1)
@@ -80,7 +80,7 @@ struct LockedManualControlsView: View {
                                 .tint(.yellow)
                             Text(customEVValue)
                                 .font(Fonts.manualValue)
-                                .foregroundColor(.yellow)
+                                .foregroundStyle(.yellow)
                                 .frame(width: 50, alignment: .trailing)
                         }
                         .padding(.horizontal, 20)
@@ -90,7 +90,7 @@ struct LockedManualControlsView: View {
                     HStack {
                         Text(exposureString.uppercased())
                             .font(Fonts.manualLabel)
-                            .foregroundColor(Colors.manualLabel)
+                            .foregroundStyle(Colors.manualLabel)
                             .tracking(2)
                         Spacer()
                         Toggle("", isOn: $cameraModel.isAutoExposure)
@@ -106,7 +106,7 @@ struct LockedManualControlsView: View {
                             }
                         Text(conditionalTextLabel(for: cameraModel.isAutoExposure))
                             .font(Fonts.manualLabel)
-                            .foregroundColor(conditionalTextColor(for: cameraModel.isAutoExposure))
+                            .foregroundStyle(conditionalTextColor(for: cameraModel.isAutoExposure))
                     }
                     .padding(.horizontal, 20)
                     
@@ -115,7 +115,7 @@ struct LockedManualControlsView: View {
                             HStack {
                                 Text(isoString.uppercased())
                                     .font(Fonts.manualLabel)
-                                    .foregroundColor(Colors.manualLabel)
+                                    .foregroundStyle(Colors.manualLabel)
                                     .tracking(2)
                                     .frame(width: 60, alignment: .leading)
                                 Slider(value: $cameraModel.iso, in: cameraModel.minISO...cameraModel.maxISO, step: 1)
@@ -125,7 +125,7 @@ struct LockedManualControlsView: View {
                                     .tint(.yellow)
                                 Text(customISOValue)
                                     .font(Fonts.manualValue)
-                                    .foregroundColor(.yellow)
+                                    .foregroundStyle(.yellow)
                                     .frame(width: 50, alignment: .trailing)
                             }
                         }
@@ -136,7 +136,7 @@ struct LockedManualControlsView: View {
                     HStack {
                         Text(exposureString.uppercased())
                             .font(Fonts.manualLabel)
-                            .foregroundColor(Colors.manualLabel)
+                            .foregroundStyle(Colors.manualLabel)
                             .tracking(2)
                         Spacer()
                         Toggle("", isOn: $cameraModel.isAutoExposure)
@@ -152,7 +152,7 @@ struct LockedManualControlsView: View {
                             }
                         Text(conditionalTextLabel(for: cameraModel.isAutoExposure))
                             .font(Fonts.manualLabel)
-                            .foregroundColor(conditionalTextColor(for: cameraModel.isAutoExposure))
+                            .foregroundStyle(conditionalTextColor(for: cameraModel.isAutoExposure))
                     }
                     .padding(.horizontal, 20)
                     
@@ -161,7 +161,7 @@ struct LockedManualControlsView: View {
                             HStack {
                                 Text(ssString.uppercased())
                                     .font(Fonts.manualLabel)
-                                    .foregroundColor(Colors.manualLabel)
+                                    .foregroundStyle(Colors.manualLabel)
                                     .tracking(2)
                                     .frame(width: 60, alignment: .leading)
                                 Slider(
@@ -177,7 +177,7 @@ struct LockedManualControlsView: View {
                                 .tint(.yellow)
                                 Text(customSSValue)
                                     .font(Fonts.manualValue)
-                                    .foregroundColor(.yellow)
+                                    .foregroundStyle(.yellow)
                                     .frame(width: 65, alignment: .trailing)
                             }
                         }
@@ -188,7 +188,7 @@ struct LockedManualControlsView: View {
                     HStack {
                         Text(focusString.uppercased())
                             .font(Fonts.manualLabel)
-                            .foregroundColor(Colors.manualLabel)
+                            .foregroundStyle(Colors.manualLabel)
                             .tracking(2)
                         Spacer()
                         Toggle("", isOn: $cameraModel.isAutoFocus)
@@ -201,7 +201,7 @@ struct LockedManualControlsView: View {
                             }
                         Text(conditionalTextLabel(for: cameraModel.isAutoFocus))
                             .font(Fonts.manualLabel)
-                            .foregroundColor(conditionalTextColor(for: cameraModel.isAutoFocus))
+                            .foregroundStyle(conditionalTextColor(for: cameraModel.isAutoFocus))
                     }
                     .padding(.horizontal, 20)
                     
@@ -218,7 +218,7 @@ struct LockedManualControlsView: View {
                                 .tint(.yellow)
                             Text(customFocusValue)
                                 .font(Fonts.manualValue)
-                                .foregroundColor(.yellow)
+                                .foregroundStyle(.yellow)
                                 .frame(width: 50, alignment: .trailing)
                         }
                         .padding(.horizontal, 20)
@@ -228,7 +228,7 @@ struct LockedManualControlsView: View {
                     HStack {
                         Text(wbString.uppercased())
                             .font(Fonts.manualLabel)
-                            .foregroundColor(Colors.manualLabel)
+                            .foregroundStyle(Colors.manualLabel)
                             .tracking(2)
                         Spacer()
                         Toggle("", isOn: $cameraModel.isAutoWhiteBalance)
@@ -236,7 +236,7 @@ struct LockedManualControlsView: View {
                             .tint(.yellow)
                         Text(conditionalTextLabel(for: cameraModel.isAutoWhiteBalance))
                             .font(Fonts.manualLabel)
-                            .foregroundColor(conditionalTextColor(for: cameraModel.isAutoWhiteBalance))
+                            .foregroundStyle(conditionalTextColor(for: cameraModel.isAutoWhiteBalance))
                     }
                     .padding(.horizontal, 20)
                     
@@ -250,7 +250,7 @@ struct LockedManualControlsView: View {
                                 .tint(.yellow)
                             Text(customWBValue)
                                 .font(Fonts.manualValue)
-                                .foregroundColor(.yellow)
+                                .foregroundStyle(.yellow)
                                 .frame(width: 65, alignment: .trailing)
                         }
                         .padding(.horizontal, 20)

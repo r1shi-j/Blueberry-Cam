@@ -77,7 +77,7 @@ struct StatusBarAreaView: View {
                             } label: {
                                 Image(systemName: chartSymbolName)
                                     .font(.system(size: 12, weight: .bold))
-                                    .foregroundColor(.black)
+                                    .foregroundStyle(.black)
                                     .padding(.horizontal, 8)
                                     .padding(.vertical, 5)
                                     .background(.yellow)
@@ -92,7 +92,7 @@ struct StatusBarAreaView: View {
                             } label: {
                                 Image(systemName: chartSymbolName)
                                     .font(.system(size: 12, weight: .bold))
-                                    .foregroundColor(Colors.buttonText)
+                                    .foregroundStyle(Colors.buttonText)
                                     .padding(.horizontal, 8)
                                     .padding(.vertical, 5)
                                     .background(Colors.buttonBackground)
@@ -114,7 +114,7 @@ struct StatusBarAreaView: View {
                     } label: {
                         Text(zebrasTitle)
                             .font(.system(size: 12, weight: .bold, design: .monospaced))
-                            .foregroundColor(zebrasForegroundColor)
+                            .foregroundStyle(zebrasForegroundColor)
                             .padding(.horizontal, 8)
                             .padding(.vertical, 5)
                             .background(zebrasBackgroundColor)
@@ -128,7 +128,7 @@ struct StatusBarAreaView: View {
                     } label: {
                         Text(highlightClippingTitle)
                             .font(.system(size: 12, weight: .bold, design: .monospaced))
-                            .foregroundColor(clippingForegroundColor)
+                            .foregroundStyle(clippingForegroundColor)
                             .padding(.horizontal, 8)
                             .padding(.vertical, 5)
                             .background(clippingBackgroundColor)

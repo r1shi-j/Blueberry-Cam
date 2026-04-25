@@ -218,7 +218,8 @@ struct CaptureView: View {
                     CameraPreviewView(session: cameraModel.session, onCapture: {
                         cameraModel.capturePhoto {
                             withAnimation { cameraModel.changeCapturingState(to: true) }
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                            Task { @MainActor in
+                                try? await Task.sleep(for: .milliseconds(150))
                                 withAnimation { cameraModel.changeCapturingState(to: false) }
                             }
                         }
@@ -586,7 +587,8 @@ struct CaptureView: View {
                     visualBlur = 18
                     cameraModel.flipRotation = newLens.isFront ? 80 : -80
                 }
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
+                Task { @MainActor in
+                    try? await Task.sleep(for: .milliseconds(120))
                     cameraModel.flipRotation = pendingFacingFlipRotation
                     withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
                         cameraModel.flipRotation = 0

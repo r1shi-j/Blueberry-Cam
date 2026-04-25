@@ -31,7 +31,7 @@ struct LockedLensSelectorView: View {
                 } label: {
                     Text(lens.label)
                         .font(lensIconFont(isActive: isActive))
-                        .foregroundColor(lensIconForeground(isActive: isActive))
+                        .foregroundStyle(lensIconForeground(isActive: isActive))
                         .frame(minWidth: 36, minHeight: 36)
                         .background(lensIconBackground(isActive: isActive))
                         .clipShape(.circle)

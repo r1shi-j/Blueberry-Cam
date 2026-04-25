@@ -44,7 +44,7 @@ struct LockedBottomBarView: View {
                     Text(openString.uppercased())
                         .font(.caption)
                         .fontWidth(.expanded)
-                        .foregroundColor(.white.opacity(0.6))
+                        .foregroundStyle(.white.opacity(0.6))
                         .offset(y: 41)
                 }
                 
@@ -56,7 +56,8 @@ struct LockedBottomBarView: View {
                     Button {
                         cameraModel.capturePhoto {
                             withAnimation { cameraModel.changeCapturingState(to: true) }
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                            Task { @MainActor in
+                                try? await Task.sleep(for: .milliseconds(150))
                                 withAnimation { cameraModel.changeCapturingState(to: false) }
                             }
                         }
@@ -77,7 +78,7 @@ struct LockedBottomBarView: View {
                 } label: {
                     Image(systemName: "applelogo")
                         .font(.system(size: 20))
-                        .foregroundColor(.white.opacity(0.8))
+                        .foregroundStyle(.white.opacity(0.8))
                 }
                 .frame(height: 82)
                 .frame(maxWidth: .infinity)

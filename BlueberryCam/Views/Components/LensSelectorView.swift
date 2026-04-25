@@ -26,7 +26,7 @@ extension LensSelectorView {
             } label: {
                 Text(lens.label)
                     .font(lensIconFont(isActive: isActive))
-                    .foregroundColor(lensIconForeground(isActive: isActive))
+                    .foregroundStyle(lensIconForeground(isActive: isActive))
                     .frame(minWidth: 36, minHeight: 36)
                     .background(lensIconBackground(isActive: isActive))
                     .clipShape(.circle)
@@ -53,7 +53,7 @@ struct LensSelectorView: View {
             } label: {
                 Image(systemName: flipLensSymbolName)
                     .font(.system(size: 16))
-                    .foregroundColor(.white.opacity(0.8))
+                    .foregroundStyle(.white.opacity(0.8))
                     .frame(width: 36, height: 36)
             }
             

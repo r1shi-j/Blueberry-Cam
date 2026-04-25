@@ -165,7 +165,7 @@ struct TopBarView: View {
                         .padding(.horizontal, 4)
                         .font(.system(size: 14, weight: selectedControl == control ? .black : .regular, design: .monospaced))
                         .underline(isReadoutUnderlined(for: control))
-                        .foregroundColor(readoutColor(for: control))
+                        .foregroundStyle(readoutColor(for: control))
                         .onTapGesture(count: 2) {
                             hapticTriggerR += 1
                             withAnimation(.bouncy) {
@@ -278,7 +278,7 @@ struct TopBarView: View {
                     } label: {
                         Image(systemName: cameraModel.macroButtonSymbol)
                             .font(.system(size: 12, weight: .bold))
-                            .foregroundColor(cameraModel.macroButtonForeground)
+                            .foregroundStyle(cameraModel.macroButtonForeground)
                             .padding(.horizontal, 8)
                             .padding(.vertical, 5)
                             .background(cameraModel.macroButtonBackground)
@@ -294,7 +294,7 @@ struct TopBarView: View {
                 } label: {
                     Image(systemName: cameraModel.dualcamButtonSymbol)
                         .font(.system(size: 12, weight: .bold))
-                        .foregroundColor(cameraModel.dualcamButtonForeground)
+                        .foregroundStyle(cameraModel.dualcamButtonForeground)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 5)
                         .background(cameraModel.dualcamButtonBackground)
@@ -309,7 +309,7 @@ struct TopBarView: View {
                 } label: {
                     Image(systemName: cameraModel.burstButtonSymbol)
                         .font(.system(size: 12, weight: .bold))
-                        .foregroundColor(cameraModel.burstButtonForeground)
+                        .foregroundStyle(cameraModel.burstButtonForeground)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 5)
                         .background(cameraModel.burstButtonBackground)
