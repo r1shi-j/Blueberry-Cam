@@ -289,10 +289,11 @@ class LockedCameraModel: NSObject {
         
         let zoomBlocksRAW = (device?.videoZoomFactor ?? 1.0) > 1.0
         
-        var visibleModes: [CaptureMode] = [.jpeg]
+        var visibleModes: [CaptureMode] = []
         if photoOutput.availablePhotoCodecTypes.contains(.hevc) {
             visibleModes.append(.heif)
         }
+        visibleModes.append(.jpeg)
         if !photoOutput.availableRawPhotoPixelFormatTypes.isEmpty {
             visibleModes.append(.raw)
         }
