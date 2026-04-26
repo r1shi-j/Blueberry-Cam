@@ -608,6 +608,14 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
         }
     }
     
+    func waitForSessionQueueIdle() async {
+        await withCheckedContinuation { continuation in
+            sessionQueue.async {
+                continuation.resume()
+            }
+        }
+    }
+    
     deinit {
         burstCaptureTask?.cancel()
         burstFeedbackTask?.cancel()
@@ -1109,6 +1117,10 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
                 self.burstCaptureTask = nil
                 self.finishBurstSession(burstSessionID)
             }
+            
+            await self.waitForSessionQueueIdle()
+            await self.settleManualWhiteBalanceBeforeBurst()
+            guard !Task.isCancelled, self.isBurstModeEnabled else { return }
             
             while !Task.isCancelled, self.isBurstModeEnabled {
                 guard self.canContinueBurstCapture else { break }

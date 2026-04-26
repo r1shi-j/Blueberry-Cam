@@ -4,13 +4,34 @@ import Foundation
 extension CameraModel {
     func applyManualWhiteBalance() {
         guard let d = device else { return }
-        try? d.lockForConfiguration()
+        
+        do {
+            try d.lockForConfiguration()
+        } catch {
+            return
+        }
+        
         applyManualWhiteBalanceLocked()
         d.unlockForConfiguration()
     }
     
+    func settleManualWhiteBalanceBeforeBurst() async {
+        guard !isAutoWhiteBalance else { return }
+        applyManualWhiteBalance()
+        
+        do {
+            try await Task.sleep(for: .milliseconds(120))
+        } catch {
+            return
+        }
+    }
+    
     private func applyManualWhiteBalanceLocked() {
-        guard let d = device else { return }
+        guard let d = device,
+              d.isWhiteBalanceModeSupported(.locked) else {
+            return
+        }
+        
         // Expanded bounding from 2000K (very cool/blue) to 10000K (very warm/orange)
         let kelvin = max(2000, min(10000, whiteBalanceTargetKelvin))
         let tempAndTint = AVCaptureDevice.WhiteBalanceTemperatureAndTintValues(temperature: kelvin, tint: 0)
