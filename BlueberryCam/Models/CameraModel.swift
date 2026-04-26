@@ -129,6 +129,9 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
     var shouldShowBurstFeedback = false {
         didSet { UserDefaults.standard.set(shouldShowBurstFeedback, forKey: "shouldShowBurstFeedback") }
     }
+    var shouldShowConfettiCannons = true {
+        didSet { UserDefaults.standard.set(shouldShowConfettiCannons, forKey: "shouldShowConfettiCannons") }
+    }
     
     // MARK: - Capture format
     var captureMode: CaptureMode = .raw {
@@ -182,6 +185,7 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
     var burstFrameLimit: Int?
     var burstIntervalRemainingSeconds: Double?
     var burstFeedbackMessage: String?
+    var confettiCannonTrigger = 0
     var burstSessionCounter = 0
     var activeBurstSessionID: Int?
     var burstSaveStatsBySession: [Int: BurstSaveStats] = [:]
@@ -667,6 +671,7 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
         self.shouldHideUIWhileCountingDown = defaults.object(forKey: "shouldHideUIWhileCountingDown") as? Bool ?? true
         self.shouldPrioritizeBurstSpeed = defaults.object(forKey: "shouldPrioritizeBurstSpeed") as? Bool ?? true
         self.shouldShowBurstFeedback = defaults.object(forKey: "shouldShowBurstFeedback") as? Bool ?? false
+        self.shouldShowConfettiCannons = defaults.object(forKey: "shouldShowConfettiCannons") as? Bool ?? true
         
         if let res = defaults.string(forKey: "defaultResolution"), let rPref = ResolutionPreference(rawValue: res) {
             self.defaultResolution = rPref
@@ -996,7 +1001,7 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
         burstSessionCounter += 1
         let burstSessionID = burstSessionCounter
         activeBurstSessionID = burstSessionID
-        burstSaveStatsBySession[burstSessionID] = BurstSaveStats(captureMode: captureMode)
+        burstSaveStatsBySession[burstSessionID] = BurstSaveStats(captureMode: captureMode, frameLimit: burstFrameLimit)
         isBurstCapturing = true
         onCapture()
         
@@ -1041,6 +1046,7 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
                 }
                 
                 if let burstFrameLimit = self.burstFrameLimit, self.burstCapturedCount >= burstFrameLimit {
+                    self.markBurstSessionFrameLimitReached(burstSessionID)
                     self.stopBurstCapture()
                     break
                 }
@@ -1197,6 +1203,11 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
         }
     }
     
+    private func requestConfettiCannons() {
+        guard shouldShowConfettiCannons else { return }
+        confettiCannonTrigger += 1
+    }
+    
     private func registerCaptureContext(for settings: AVCapturePhotoSettings, isBurst: Bool, burstSessionID: Int? = nil) {
         _captureContextStore.set(
             PhotoCaptureContext(
@@ -1284,6 +1295,12 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
         burstSaveStatsBySession[sessionID] = stats
     }
     
+    private func markBurstSessionFrameLimitReached(_ sessionID: Int) {
+        guard var stats = burstSaveStatsBySession[sessionID] else { return }
+        stats.didReachFrameLimit = true
+        burstSaveStatsBySession[sessionID] = stats
+    }
+    
     private func printBurstDrainSummaryIfReady(for sessionID: Int) {
         guard var stats = burstSaveStatsBySession[sessionID],
               !stats.isCapturing,
@@ -1297,6 +1314,15 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
         stats.didPrintDrainSummary = true
         stats.drainSummaryDate = Date()
         burstSaveStatsBySession[sessionID] = stats
+        
+        if let frameLimit = stats.frameLimit,
+           stats.didReachFrameLimit,
+           stats.sensorCaptureCount >= frameLimit,
+           stats.savedCount >= stats.sensorCaptureCount,
+           stats.captureFailureCount == 0,
+           stats.saveFailureCount == 0 {
+            requestConfettiCannons()
+        }
         
     }
     
@@ -1331,7 +1357,7 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
                     }
                 }
                 
-                self.performPhotoCapture(onCapture: onCapture)
+                self.performPhotoCapture(onCapture: onCapture, requestsConfettiAfterCapture: true)
             }
             return
         }
@@ -1339,7 +1365,8 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
         performPhotoCapture(onCapture: onCapture)
     }
     
-    private func performPhotoCapture(onCapture: @escaping @MainActor @Sendable () -> Void) {
+    private func performPhotoCapture(onCapture: @escaping @MainActor @Sendable () -> Void,
+                                     requestsConfettiAfterCapture: Bool = false) {
         onCapture()
         
         exposureDebounceTask?.cancel()
@@ -1370,6 +1397,9 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
                     let settings = self.buildPhotoSettings()
                     self.registerCaptureContext(for: settings, isBurst: false)
                     self.photoOutput.capturePhoto(with: settings, delegate: self)
+                    if requestsConfettiAfterCapture {
+                        self.requestConfettiCannons()
+                    }
                 }
             }
             d.unlockForConfiguration()
@@ -1377,6 +1407,9 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
             let settings = buildPhotoSettings()
             registerCaptureContext(for: settings, isBurst: false)
             photoOutput.capturePhoto(with: settings, delegate: self)
+            if requestsConfettiAfterCapture {
+                requestConfettiCannons()
+            }
         }
     }
     

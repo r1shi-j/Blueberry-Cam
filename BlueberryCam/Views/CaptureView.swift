@@ -1,3 +1,4 @@
+import ConfettiSwiftUI
 import SwiftUI
 
 extension CameraModel {
@@ -557,6 +558,89 @@ struct CaptureView: View {
                         .position(x: previewRect.midX, y: previewRect.midY)
                         .animation(.easeOut(duration: 0.15), value: cameraModel.isCapturing)
                 }
+                
+                // MARK: - Confetti cannons
+                ConfettiCannon(
+                    trigger: $cameraModel.confettiCannonTrigger,
+                    num: 50,
+                    confettis: [
+                        .sfSymbol(symbolName: "bolt.fill"),
+//                        .sfSymbol(symbolName: "camera.macro"),
+                        .sfSymbol(symbolName: "camera.aperture"),
+//                        .sfSymbol(symbolName: "camera.filters"),
+                        .sfSymbol(symbolName: "camera.shutter.button.fill"),
+//                        .sfSymbol(symbolName: "photo.stack.fill"),
+                        .sfSymbol(symbolName: "cloud.sun.fill"),
+//                        .sfSymbol(symbolName: "cloud.bolt.rain"),
+                        .sfSymbol(symbolName: "rainbow"),
+//                        .sfSymbol(symbolName: "person.fill"),
+                        .sfSymbol(symbolName: "bird"),
+//                        .sfSymbol(symbolName: "mountain.2"),
+                        .image("camera.blueberry"),
+//                        .text("📸"),
+                        .text("🫐"),
+//                        .text("🌤️"),
+                        .text("🌉"),
+//                        .text("🌄"),
+                        .text("🌅"),
+//                        .text("🌃"),
+                        .text("🍛"),
+//                        .text("🐶"),
+                        .text("🏎️"),
+//                        .text("🚙"),
+                        .text("🏀"),
+//                        .text("⚽️"),
+                        .text("🏈"),
+                    ],
+                    confettiSize: 12,
+                    rainHeight: 800,
+                    openingAngle: .degrees(45),
+                    closingAngle: .degrees(75),
+                    radius: 350
+                )
+                .position(x: previewRect.minX, y: previewRect.maxY - 60)
+                .allowsHitTesting(false)
+                
+                ConfettiCannon(
+                    trigger: $cameraModel.confettiCannonTrigger,
+                    num: 50,
+                    confettis: [
+//                        .sfSymbol(symbolName: "bolt.fill"),
+                        .sfSymbol(symbolName: "camera.macro"),
+//                        .sfSymbol(symbolName: "camera.aperture"),
+                        .sfSymbol(symbolName: "camera.filters"),
+//                        .sfSymbol(symbolName: "camera.shutter.button.fill"),
+                        .sfSymbol(symbolName: "photo.stack.fill"),
+//                        .sfSymbol(symbolName: "cloud.sun.fill"),
+                        .sfSymbol(symbolName: "cloud.bolt.rain"),
+//                        .sfSymbol(symbolName: "rainbow"),
+                        .sfSymbol(symbolName: "person.fill"),
+//                        .sfSymbol(symbolName: "bird"),
+                        .sfSymbol(symbolName: "mountain.2"),
+//                        .image("camera.blueberry"),
+                        .text("📸"),
+//                        .text("🫐")
+                        .text("🌤️"),
+//                        .text("🌉"),
+                        .text("🌄"),
+//                        .text("🌅"),
+                        .text("🌃"),
+//                        .text("🍛"),
+                        .text("🐶"),
+//                        .text("🏎️"),
+                        .text("🚙"),
+//                        .text("🏀"),
+                        .text("⚽️"),
+//                        .text("🏈"),
+                    ],
+                    confettiSize: 12,
+                    rainHeight: 800,
+                    openingAngle: .degrees(105),
+                    closingAngle: .degrees(135),
+                    radius: 350
+                )
+                .position(x: previewRect.maxX, y: previewRect.maxY - 60)
+                .allowsHitTesting(false)
             }
             .ignoresSafeArea(.keyboard)
         }

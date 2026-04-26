@@ -3,7 +3,7 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 77;
+	objectVersion = 100;
 	objects = {
 
 /* Begin PBXBuildFile section */
@@ -13,6 +13,7 @@
 		5B5FC8532F64B32E00532B15 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 5B5FC8522F64B32E00532B15 /* WidgetKit.framework */; };
 		5B5FC8552F64B32E00532B15 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 5B5FC8542F64B32E00532B15 /* SwiftUI.framework */; };
 		5B5FC8642F64B32F00532B15 /* BlueberryCamWidgetExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 5B5FC8512F64B32E00532B15 /* BlueberryCamWidgetExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		5BBD8C422F9E1B0E00403034 /* ConfettiSwiftUI in Frameworks */ = {isa = PBXBuildFile; productRef = 5BBD8C412F9E1B0E00403034 /* ConfettiSwiftUI */; };
 		5BD3EC122F5F6C9400B83A36 /* AGENTS.md in Resources */ = {isa = PBXBuildFile; fileRef = 5BD3EC112F5F6C9400B83A36 /* AGENTS.md */; };
 		5BD3EC142F5F6C9500B83A36 /* Journal.md in Resources */ = {isa = PBXBuildFile; fileRef = 5BD3EC132F5F6C9500B83A36 /* Journal.md */; };
 /* End PBXBuildFile section */
@@ -37,25 +38,21 @@
 /* Begin PBXCopyFilesBuildPhase section */
 		5B5FC83A2F648F8E00532B15 /* Embed ExtensionKit Extensions */ = {
 			isa = PBXCopyFilesBuildPhase;
-			buildActionMask = 2147483647;
 			dstPath = "$(EXTENSIONS_FOLDER_PATH)";
-			dstSubfolderSpec = 16;
+			dstSubfolder = Product;
 			files = (
 				5B5FC8352F648F8E00532B15 /* BlueberryCamCapture.appex in Embed ExtensionKit Extensions */,
 			);
 			name = "Embed ExtensionKit Extensions";
-			runOnlyForDeploymentPostprocessing = 0;
 		};
 		5B5FC8692F64B32F00532B15 /* Embed Foundation Extensions */ = {
 			isa = PBXCopyFilesBuildPhase;
-			buildActionMask = 2147483647;
 			dstPath = "";
-			dstSubfolderSpec = 13;
+			dstSubfolder = PlugIns;
 			files = (
 				5B5FC8642F64B32F00532B15 /* BlueberryCamWidgetExtension.appex in Embed Foundation Extensions */,
 			);
 			name = "Embed Foundation Extensions";
-			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXCopyFilesBuildPhase section */
 
@@ -152,27 +149,22 @@
 /* Begin PBXFrameworksBuildPhase section */
 		5B3325062F5C7A3200874430 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
-			buildActionMask = 2147483647;
 			files = (
+				5BBD8C422F9E1B0E00403034 /* ConfettiSwiftUI in Frameworks */,
 			);
-			runOnlyForDeploymentPostprocessing = 0;
 		};
 		5B5FC8292F648F8E00532B15 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
-			buildActionMask = 2147483647;
 			files = (
 				5B5FC84C2F64AC3800532B15 /* LockedCameraCapture.framework in Frameworks */,
 			);
-			runOnlyForDeploymentPostprocessing = 0;
 		};
 		5B5FC84E2F64B32E00532B15 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
-			buildActionMask = 2147483647;
 			files = (
 				5B5FC8552F64B32E00532B15 /* SwiftUI.framework in Frameworks */,
 				5B5FC8532F64B32E00532B15 /* WidgetKit.framework in Frameworks */,
 			);
-			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXFrameworksBuildPhase section */
 
@@ -235,6 +227,7 @@
 			);
 			name = BlueberryCam;
 			packageProductDependencies = (
+				5BBD8C412F9E1B0E00403034 /* ConfettiSwiftUI */,
 			);
 			productName = "Blueberry Cam";
 			productReference = 5B3325092F5C7A3200874430 /* BlueberryCam.app */;
@@ -250,14 +243,10 @@
 			);
 			buildRules = (
 			);
-			dependencies = (
-			);
 			fileSystemSynchronizedGroups = (
 				5B5FC82D2F648F8E00532B15 /* BlueberryCamCapture */,
 			);
 			name = BlueberryCamCapture;
-			packageProductDependencies = (
-			);
 			productName = BlueberryCamCapture;
 			productReference = 5B5FC82C2F648F8E00532B15 /* BlueberryCamCapture.appex */;
 			productType = "com.apple.product-type.extensionkit-extension";
@@ -272,14 +261,10 @@
 			);
 			buildRules = (
 			);
-			dependencies = (
-			);
 			fileSystemSynchronizedGroups = (
 				5B5FC8562F64B32E00532B15 /* BlueberryCamWidget */,
 			);
 			name = BlueberryCamWidgetExtension;
-			packageProductDependencies = (
-			);
 			productName = BlueberryCamWidgetExtension;
 			productReference = 5B5FC8512F64B32E00532B15 /* BlueberryCamWidgetExtension.appex */;
 			productType = "com.apple.product-type.app-extension";
@@ -314,7 +299,10 @@
 			);
 			mainGroup = 5B3325002F5C7A3200874430;
 			minimizedProjectReferenceProxies = 1;
-			preferredProjectObjectVersion = 77;
+			packageReferences = (
+				5BBD8C402F9E1AD100403034 /* XCRemoteSwiftPackageReference "ConfettiSwiftUI" */,
+			);
+			preferredProjectObjectVersion = 100;
 			productRefGroup = 5B33250A2F5C7A3200874430 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
@@ -329,51 +317,39 @@
 /* Begin PBXResourcesBuildPhase section */
 		5B3325072F5C7A3200874430 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
-			buildActionMask = 2147483647;
 			files = (
 				5BD3EC122F5F6C9400B83A36 /* AGENTS.md in Resources */,
 				5B43BB8C2F937B1600EB6E7E /* blueberrycam-development.txt in Resources */,
 				5BD3EC142F5F6C9500B83A36 /* Journal.md in Resources */,
 			);
-			runOnlyForDeploymentPostprocessing = 0;
 		};
 		5B5FC82A2F648F8E00532B15 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
-			buildActionMask = 2147483647;
 			files = (
 			);
-			runOnlyForDeploymentPostprocessing = 0;
 		};
 		5B5FC84F2F64B32E00532B15 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
-			buildActionMask = 2147483647;
 			files = (
 			);
-			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		5B3325052F5C7A3200874430 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
-			buildActionMask = 2147483647;
 			files = (
 			);
-			runOnlyForDeploymentPostprocessing = 0;
 		};
 		5B5FC8282F648F8E00532B15 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
-			buildActionMask = 2147483647;
 			files = (
 			);
-			runOnlyForDeploymentPostprocessing = 0;
 		};
 		5B5FC84D2F64B32E00532B15 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
-			buildActionMask = 2147483647;
 			files = (
 			);
-			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
 
@@ -391,7 +367,7 @@
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
-		5B3325122F5C7A3200874430 /* Debug */ = {
+		5B3325122F5C7A3200874430 /* Debug configuration for PBXProject "BlueberryCam" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
@@ -456,7 +432,7 @@
 			};
 			name = Debug;
 		};
-		5B3325132F5C7A3200874430 /* Release */ = {
+		5B3325132F5C7A3200874430 /* Release configuration for PBXProject "BlueberryCam" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
@@ -514,7 +490,7 @@
 			};
 			name = Release;
 		};
-		5B3325152F5C7A3200874430 /* Debug */ = {
+		5B3325152F5C7A3200874430 /* Debug configuration for PBXNativeTarget "BlueberryCam" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = BlueberryCamIcon;
@@ -556,7 +532,7 @@
 			};
 			name = Debug;
 		};
-		5B3325162F5C7A3200874430 /* Release */ = {
+		5B3325162F5C7A3200874430 /* Release configuration for PBXNativeTarget "BlueberryCam" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = BlueberryCamIcon;
@@ -598,7 +574,7 @@
 			};
 			name = Release;
 		};
-		5B5FC8382F648F8E00532B15 /* Debug */ = {
+		5B5FC8382F648F8E00532B15 /* Debug configuration for PBXNativeTarget "BlueberryCamCapture" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_IDENTITY = "Apple Development";
@@ -631,7 +607,7 @@
 			};
 			name = Debug;
 		};
-		5B5FC8392F648F8E00532B15 /* Release */ = {
+		5B5FC8392F648F8E00532B15 /* Release configuration for PBXNativeTarget "BlueberryCamCapture" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_IDENTITY = "Apple Development";
@@ -664,7 +640,7 @@
 			};
 			name = Release;
 		};
-		5B5FC8672F64B32F00532B15 /* Debug */ = {
+		5B5FC8672F64B32F00532B15 /* Debug configuration for PBXNativeTarget "BlueberryCamWidgetExtension" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
@@ -697,7 +673,7 @@
 			};
 			name = Debug;
 		};
-		5B5FC8682F64B32F00532B15 /* Release */ = {
+		5B5FC8682F64B32F00532B15 /* Release configuration for PBXNativeTarget "BlueberryCamWidgetExtension" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
@@ -736,40 +712,55 @@
 		5B3325042F5C7A3200874430 /* Build configuration list for PBXProject "BlueberryCam" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				5B3325122F5C7A3200874430 /* Debug */,
-				5B3325132F5C7A3200874430 /* Release */,
+				5B3325122F5C7A3200874430 /* Debug configuration for PBXProject "BlueberryCam" */,
+				5B3325132F5C7A3200874430 /* Release configuration for PBXProject "BlueberryCam" */,
 			);
-			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
 		5B3325142F5C7A3200874430 /* Build configuration list for PBXNativeTarget "BlueberryCam" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				5B3325152F5C7A3200874430 /* Debug */,
-				5B3325162F5C7A3200874430 /* Release */,
+				5B3325152F5C7A3200874430 /* Debug configuration for PBXNativeTarget "BlueberryCam" */,
+				5B3325162F5C7A3200874430 /* Release configuration for PBXNativeTarget "BlueberryCam" */,
 			);
-			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
 		5B5FC8372F648F8E00532B15 /* Build configuration list for PBXNativeTarget "BlueberryCamCapture" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				5B5FC8382F648F8E00532B15 /* Debug */,
-				5B5FC8392F648F8E00532B15 /* Release */,
+				5B5FC8382F648F8E00532B15 /* Debug configuration for PBXNativeTarget "BlueberryCamCapture" */,
+				5B5FC8392F648F8E00532B15 /* Release configuration for PBXNativeTarget "BlueberryCamCapture" */,
 			);
-			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
 		5B5FC8662F64B32F00532B15 /* Build configuration list for PBXNativeTarget "BlueberryCamWidgetExtension" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				5B5FC8672F64B32F00532B15 /* Debug */,
-				5B5FC8682F64B32F00532B15 /* Release */,
+				5B5FC8672F64B32F00532B15 /* Debug configuration for PBXNativeTarget "BlueberryCamWidgetExtension" */,
+				5B5FC8682F64B32F00532B15 /* Release configuration for PBXNativeTarget "BlueberryCamWidgetExtension" */,
 			);
-			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		5BBD8C402F9E1AD100403034 /* XCRemoteSwiftPackageReference "ConfettiSwiftUI" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/simibac/ConfettiSwiftUI";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 3.0.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		5BBD8C412F9E1B0E00403034 /* ConfettiSwiftUI */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 5BBD8C402F9E1AD100403034 /* XCRemoteSwiftPackageReference "ConfettiSwiftUI" */;
+			productName = ConfettiSwiftUI;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 5B3325012F5C7A3200874430 /* Project object */;
 }

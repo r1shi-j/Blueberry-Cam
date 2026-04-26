@@ -41,8 +41,10 @@ struct PhotoCaptureContext: Sendable {
 
 struct BurstSaveStats {
     let captureMode: CaptureMode
+    let frameLimit: Int?
     var isCapturing = true
     var isStopping = false
+    var didReachFrameLimit = false
     var sensorCaptureCount = 0
     var expectedSaveCount = 0
     var savedCount = 0

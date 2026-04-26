@@ -83,6 +83,7 @@ struct SettingsView: View {
                     Toggle("Pro Timer", isOn: $cameraModel.detailedCountdownTimer)
                     Toggle("Hide UI When Counting Down", isOn: $cameraModel.shouldHideUIWhileCountingDown)
                     Toggle("Burst Feedback", isOn: $cameraModel.shouldShowBurstFeedback)
+                    Toggle("Confetti Cannons", isOn: $cameraModel.shouldShowConfettiCannons)
                     Toggle("Recognize Barcodes", isOn: $cameraModel.recognizeBarcodes)
                 } header: {
                     Text("Customization")
