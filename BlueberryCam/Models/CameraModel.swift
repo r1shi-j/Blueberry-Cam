@@ -16,6 +16,7 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
     nonisolated let frameCounter = FrameCounter()
     let _pendingCaptureModeBox = CaptureModeBox()
     let _pendingPhotoFilterBox = PhotoFilterBox()
+    let _captureContextStore = PhotoCaptureContextStore()
     let _burstCaptureTracker = BurstCaptureTracker()
     
     // MARK: - Barcode Detection
@@ -122,7 +123,7 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
     var shouldPrioritizeBurstSpeed = true {
         didSet {
             UserDefaults.standard.set(shouldPrioritizeBurstSpeed, forKey: "shouldPrioritizeBurstSpeed")
-            updateFastCapturePrioritization()
+            refreshFastCapturePrioritizationForBurstMode()
         }
     }
     
@@ -131,6 +132,7 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
         didSet {
             if oldValue != captureMode {
                 buildAvailableFormats()
+                refreshFastCapturePrioritizationForBurstMode()
                 updateCameraControlsMode()
             }
         }
@@ -151,6 +153,7 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
     var flashMode: AVCaptureDevice.FlashMode = .off
     var isBurstModeEnabled: Bool = false {
         didSet {
+            refreshFastCapturePrioritizationForBurstMode()
             if isBurstModeEnabled {
                 flashMode = .off
             }
@@ -169,6 +172,11 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
         }
     }
     private(set) var burstCapturedCount: Int = 0
+    var burstCaptureFailureCount: Int = 0
+    var burstSaveFailureCount: Int = 0
+    var burstSessionCounter = 0
+    var activeBurstSessionID: Int?
+    var burstSaveStatsBySession: [Int: BurstSaveStats] = [:]
     @ObservationIgnored
     var burstCaptureTask: Task<Void, Never>?
     @ObservationIgnored
@@ -535,6 +543,7 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
     deinit {
         burstCaptureTask?.cancel()
         _burstCaptureTracker.cancelAll()
+        _captureContextStore.removeAll()
         if let subjectAreaChangeObserver {
             NotificationCenter.default.removeObserver(subjectAreaChangeObserver)
         }
@@ -628,7 +637,6 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
         self.updateDeviceRanges()
         self.normalizeFlashModeForCurrentDevice()
         self.enforceExposureModeConstraints()
-        self.updateFastCapturePrioritization()
     }
     
     private func loadSettings() {
@@ -666,10 +674,10 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
             self.defaultHistogramLarge = hMode
         }
     }
-
-    private func updateFastCapturePrioritization() {
+    
+    private func refreshFastCapturePrioritizationForBurstMode() {
         guard photoOutput.isFastCapturePrioritizationSupported else { return }
-        photoOutput.isFastCapturePrioritizationEnabled = shouldPrioritizeBurstSpeed
+        photoOutput.isFastCapturePrioritizationEnabled = isBurstModeEnabled && shouldPrioritizeBurstSpeed && captureMode != .raw
     }
     
     // MARK: - Formats & ranges
@@ -970,6 +978,12 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
         isTimerCountingDown = false
         timerCountdownValue = nil
         burstCapturedCount = 0
+        burstCaptureFailureCount = 0
+        burstSaveFailureCount = 0
+        burstSessionCounter += 1
+        let burstSessionID = burstSessionCounter
+        activeBurstSessionID = burstSessionID
+        burstSaveStatsBySession[burstSessionID] = BurstSaveStats(captureMode: captureMode)
         isBurstCapturing = true
         onCapture()
         
@@ -980,10 +994,15 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
             defer {
                 let elapsed = Date().timeIntervalSince(startDate)
                 let fps = elapsed > 0 ? Double(self.burstCapturedCount) / elapsed : 0
-                print("Burst finished: \(self.burstCapturedCount) photos in \(elapsed.formatted(.number.precision(.fractionLength(2))))s (\(fps.formatted(.number.precision(.fractionLength(2)))) fps)")
+                let pendingProcessingCount = self._burstCaptureTracker.inFlightProcessingCount
+                let failureText = self.burstCaptureFailureCount == 0 && self.burstSaveFailureCount == 0
+                ? ""
+                : ", \(self.burstCaptureFailureCount) capture failures, \(self.burstSaveFailureCount) save failures"
+                let pendingText = pendingProcessingCount == 0 ? "" : ", \(pendingProcessingCount) still processing"
+                print("Burst finished: \(self.burstCapturedCount) photos in \(elapsed.formatted(.number.precision(.fractionLength(2))))s (\(fps.formatted(.number.precision(.fractionLength(2)))) fps)\(failureText)\(pendingText)")
                 self.isBurstCapturing = false
                 self.burstCaptureTask = nil
-                self._burstCaptureTracker.cancelAll()
+                self.finishBurstSession(burstSessionID)
             }
             
             while !Task.isCancelled, self.isBurstModeEnabled {
@@ -992,15 +1011,22 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
                 self._pendingCaptureModeBox.value = self.captureMode
                 self._pendingPhotoFilterBox.value = self.selectedPhotoFilter
                 self.updateCaptureOrientation()
-
+                let completionGate = self.burstCaptureCompletionGate
+                let processingLimit = self.burstProcessingLimit
+                
+                await self._burstCaptureTracker.waitForProcessingCapacity(limit: processingLimit)
+                guard !Task.isCancelled, self.canContinueBurstCapture else { break }
                 guard let settings = await self.buildNextBurstPhotoSettings() else { break }
-                let success = await self._burstCaptureTracker.waitForCapture(uniqueID: settings.uniqueID) { [photoOutput = self.photoOutput, weak self] in
+                self.registerCaptureContext(for: settings, isBurst: true, burstSessionID: burstSessionID)
+                let success = await self._burstCaptureTracker.waitForCapture(uniqueID: settings.uniqueID, gate: completionGate) { [photoOutput = self.photoOutput, weak self] in
                     guard let self else { return }
                     photoOutput.capturePhoto(with: settings, delegate: self)
                 }
-
+                
                 if success {
+                    self._captureContextStore.markCaptureCounted(for: settings.uniqueID)
                     self.burstCapturedCount += 1
+                    self.recordBurstSensorCapture(sessionID: burstSessionID)
                     onBurstPhotoCaptured()
                 }
                 
@@ -1010,8 +1036,11 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
     }
     
     func stopBurstCapture() {
+        if let activeBurstSessionID {
+            markBurstSessionStopping(activeBurstSessionID)
+        }
+        isBurstCapturing = false
         burstCaptureTask?.cancel()
-        _burstCaptureTracker.cancelAll()
     }
     
     private var canStartBurstCapture: Bool {
@@ -1038,6 +1067,123 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
         } else {
             return nil
         }
+    }
+    
+    private var burstCaptureCompletionGate: BurstCaptureCompletionGate {
+        guard shouldPrioritizeBurstSpeed, captureMode != .raw else { return .processing }
+        return .sensorCapture
+    }
+    
+    private var burstProcessingLimit: Int {
+        guard shouldPrioritizeBurstSpeed, captureMode != .raw else { return 1 }
+        return 4
+    }
+    
+    private func registerCaptureContext(for settings: AVCapturePhotoSettings, isBurst: Bool, burstSessionID: Int? = nil) {
+        _captureContextStore.set(
+            PhotoCaptureContext(
+                captureMode: captureMode,
+                photoFilter: selectedPhotoFilter,
+                isBurst: isBurst,
+                burstSessionID: burstSessionID
+            ),
+            for: settings.uniqueID
+        )
+    }
+    
+    func recordBurstSensorCapture(sessionID: Int) {
+        guard var stats = burstSaveStatsBySession[sessionID] else { return }
+        stats.sensorCaptureCount += 1
+        burstSaveStatsBySession[sessionID] = stats
+    }
+    
+    func recordBurstPhotoDataProduced(context: PhotoCaptureContext) {
+        guard let sessionID = context.burstSessionID,
+              var stats = burstSaveStatsBySession[sessionID] else { return }
+        stats.expectedSaveCount += 1
+        burstSaveStatsBySession[sessionID] = stats
+        printBurstDrainSummaryIfReady(for: sessionID)
+    }
+    
+    func recordBurstCaptureFailure(context: PhotoCaptureContext) {
+        guard let sessionID = context.burstSessionID,
+              var stats = burstSaveStatsBySession[sessionID] else { return }
+        stats.captureFailureCount += 1
+        burstSaveStatsBySession[sessionID] = stats
+        printBurstDrainSummaryIfReady(for: sessionID)
+    }
+    
+    func shouldIgnoreBurstCaptureFailure(context: PhotoCaptureContext, uniqueID: Int64) -> Bool {
+        guard let sessionID = context.burstSessionID,
+              let stats = burstSaveStatsBySession[sessionID],
+              !_captureContextStore.hasCountedCapture(for: uniqueID) else {
+            return false
+        }
+        
+        return stats.isStopping || stats.sensorCaptureCount > 0
+    }
+    
+    func shouldSuppressGenericCaptureErrorAsBurstTail() -> Bool {
+        let now = Date()
+        return burstSaveStatsBySession.values.contains { stats in
+            if !stats.didPrintDrainSummary {
+                return stats.isStopping
+            }
+            guard let drainSummaryDate = stats.drainSummaryDate else { return false }
+            return now.timeIntervalSince(drainSummaryDate) < 5
+        }
+    }
+    
+    func recordBurstSaveSuccess(context: PhotoCaptureContext) {
+        guard let sessionID = context.burstSessionID,
+              var stats = burstSaveStatsBySession[sessionID] else { return }
+        stats.savedCount += 1
+        burstSaveStatsBySession[sessionID] = stats
+        printBurstDrainSummaryIfReady(for: sessionID)
+    }
+    
+    func recordBurstSaveFailure(context: PhotoCaptureContext) {
+        guard let sessionID = context.burstSessionID,
+              var stats = burstSaveStatsBySession[sessionID] else { return }
+        stats.saveFailureCount += 1
+        burstSaveStatsBySession[sessionID] = stats
+        printBurstDrainSummaryIfReady(for: sessionID)
+    }
+    
+    private func finishBurstSession(_ sessionID: Int) {
+        if activeBurstSessionID == sessionID {
+            activeBurstSessionID = nil
+        }
+        guard var stats = burstSaveStatsBySession[sessionID] else { return }
+        stats.isCapturing = false
+        burstSaveStatsBySession[sessionID] = stats
+        printBurstDrainSummaryIfReady(for: sessionID)
+    }
+    
+    private func markBurstSessionStopping(_ sessionID: Int) {
+        guard var stats = burstSaveStatsBySession[sessionID] else { return }
+        stats.isStopping = true
+        burstSaveStatsBySession[sessionID] = stats
+    }
+    
+    private func printBurstDrainSummaryIfReady(for sessionID: Int) {
+        guard var stats = burstSaveStatsBySession[sessionID],
+              !stats.isCapturing,
+              !stats.didPrintDrainSummary else { return }
+        
+        let resolvedCaptureCount = stats.expectedSaveCount + stats.captureFailureCount
+        let completedSaveCount = stats.savedCount + stats.saveFailureCount
+        guard resolvedCaptureCount >= stats.sensorCaptureCount,
+              completedSaveCount >= stats.expectedSaveCount else { return }
+        
+        stats.didPrintDrainSummary = true
+        stats.drainSummaryDate = Date()
+        burstSaveStatsBySession[sessionID] = stats
+        
+        let failureText = stats.captureFailureCount == 0 && stats.saveFailureCount == 0
+        ? ""
+        : ", \(stats.captureFailureCount) capture failures, \(stats.saveFailureCount) save failures"
+        print("Burst saved: \(stats.savedCount)/\(stats.sensorCaptureCount) captured photos reached Photos [\(stats.captureMode.rawValue)]\(failureText)")
     }
     
     func capturePhoto(onCapture: @escaping @MainActor @Sendable () -> Void) {
@@ -1107,12 +1253,16 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
             d.setExposureModeCustom(duration: duration, iso: isoValue) { [weak self] _ in
                 guard let self else { return }
                 Task { @MainActor in
-                    self.photoOutput.capturePhoto(with: self.buildPhotoSettings(), delegate: self)
+                    let settings = self.buildPhotoSettings()
+                    self.registerCaptureContext(for: settings, isBurst: false)
+                    self.photoOutput.capturePhoto(with: settings, delegate: self)
                 }
             }
             d.unlockForConfiguration()
         } else {
-            photoOutput.capturePhoto(with: buildPhotoSettings(), delegate: self)
+            let settings = buildPhotoSettings()
+            registerCaptureContext(for: settings, isBurst: false)
+            photoOutput.capturePhoto(with: settings, delegate: self)
         }
     }
     
@@ -1165,7 +1315,7 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
         
         let settings = buildPhotoSettings()
         settings.flashMode = .off
-        if shouldPrioritizeBurstSpeed {
+        if shouldPrioritizeBurstSpeed, captureMode != .raw {
             settings.photoQualityPrioritization = .speed
         }
         return settings

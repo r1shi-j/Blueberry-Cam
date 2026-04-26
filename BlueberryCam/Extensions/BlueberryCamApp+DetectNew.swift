@@ -42,7 +42,7 @@ extension BlueberryCamApp {
     @discardableResult
     func addSessionPhotosToAlbum(at sessionURL: URL) async -> Bool {
         let content = await waitForSessionContent(at: sessionURL)
-        guard !content.assetIdentifiers.isEmpty || !content.filenames.isEmpty else {
+        guard content.hasContent else {
             return false
         }
         
@@ -52,6 +52,10 @@ extension BlueberryCamApp {
         let canRead = readStatus == .authorized || readStatus == .limited
         
         if !content.assetIdentifiers.isEmpty {
+            guard content.isReadyToProcess else {
+                return false
+            }
+            
             let photoCount = content.assetIdentifiers.count
             
             // Use the retry helper — Photos may not have indexed the assets yet
@@ -61,21 +65,19 @@ extension BlueberryCamApp {
                     // Not ready yet. Keep the session content and allow a future scan/update to retry.
                     return false
                 }
-
+                
                 await addAssetsToBlueberryAlbum(assets)
             }
-
+            
             // Increment and invalidate — we confirmed the photos exist (or we have add-only access
             // and trust the manifest).
             await MainActor.run { self.shutterCount += photoCount }
             try? await LockedCameraCaptureManager.shared.invalidateSessionContent(at: sessionURL)
             return true
         }
-
+        
         if !canRead {
-            await MainActor.run { self.shutterCount += content.filenames.count }
-            try? await LockedCameraCaptureManager.shared.invalidateSessionContent(at: sessionURL)
-            return true
+            return false
         }
         
         let assets = await fetchAssets(withOriginalFilenames: Set(content.filenames))
@@ -95,12 +97,29 @@ extension BlueberryCamApp {
                                        maxAttempts: Int = 10,
                                        delay: Duration = .milliseconds(500)) async -> LockedCaptureSessionContent {
         var latest = readSessionContent(at: sessionURL)
+        var previous: LockedCaptureSessionContent?
+        var stableReadyPollCount = 0
+        
         for attempt in 1...maxAttempts {
-            if !latest.assetIdentifiers.isEmpty {
+            if latest.isReadyToProcess {
+                if latest == previous {
+                    stableReadyPollCount += 1
+                } else {
+                    stableReadyPollCount = 0
+                }
+                
+                if stableReadyPollCount >= 1 {
+                    return latest
+                }
+            } else {
+                stableReadyPollCount = 0
+            }
+            
+            guard attempt < maxAttempts else {
                 return latest
             }
             
-            guard attempt < maxAttempts else { break }
+            previous = latest
             try? await Task.sleep(for: delay)
             latest = readSessionContent(at: sessionURL)
         }
@@ -220,8 +239,7 @@ extension BlueberryCamApp {
             delay = min(delay * 2, 4.0)
         }
         
-        let partial = PHAsset.fetchAssets(withLocalIdentifiers: ids, options: nil)
-        return partial.count > 0 ? partial : nil
+        return nil
     }
 }
 
@@ -244,7 +262,16 @@ final class ProcessedURLSet: @unchecked Sendable {
     }
 }
 
-private struct LockedCaptureSessionContent {
+private struct LockedCaptureSessionContent: Equatable {
     let assetIdentifiers: [String]
     let filenames: [String]
+    
+    var hasContent: Bool {
+        !assetIdentifiers.isEmpty || !filenames.isEmpty
+    }
+    
+    var isReadyToProcess: Bool {
+        guard !assetIdentifiers.isEmpty else { return false }
+        return filenames.isEmpty || assetIdentifiers.count >= filenames.count
+    }
 }

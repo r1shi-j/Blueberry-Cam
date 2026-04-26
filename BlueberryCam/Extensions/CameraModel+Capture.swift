@@ -7,48 +7,94 @@ import UniformTypeIdentifiers
 
 extension CameraModel: AVCapturePhotoCaptureDelegate {
     nonisolated func photoOutput(_ output: AVCapturePhotoOutput,
+                                 didCapturePhotoFor resolvedSettings: AVCaptureResolvedPhotoSettings) {
+        self._burstCaptureTracker.completeSensorCapture(uniqueID: resolvedSettings.uniqueID, success: true)
+    }
+    
+    nonisolated func photoOutput(_ output: AVCapturePhotoOutput,
                                  didFinishProcessingPhoto photo: AVCapturePhoto,
                                  error: Error?) {
+        let uniqueID = photo.resolvedSettings.uniqueID
+        let context = self._captureContextStore.context(for: uniqueID) ?? PhotoCaptureContext(
+            captureMode: self._pendingCaptureModeBox.value,
+            photoFilter: self._pendingPhotoFilterBox.value,
+            isBurst: false,
+            burstSessionID: nil
+        )
         if let error {
-            self._burstCaptureTracker.completeCapture(uniqueID: photo.resolvedSettings.uniqueID, success: false)
-            Task { @MainActor in self.errorMessage = error.localizedDescription; self.showError = true }
+            self._burstCaptureTracker.completeProcessing(uniqueID: uniqueID, success: false)
+            reportCaptureFailure(error, context: context, uniqueID: uniqueID, phase: "processing")
             return
         }
         guard let data = photo.fileDataRepresentation() else {
-            self._burstCaptureTracker.completeCapture(uniqueID: photo.resolvedSettings.uniqueID, success: false)
-            Task { @MainActor in self.errorMessage = "Failed to get photo data."; self.showError = true }
+            self._burstCaptureTracker.completeProcessing(uniqueID: uniqueID, success: false)
+            reportCaptureFailure("Failed to get photo data.", context: context, uniqueID: uniqueID, phase: "file data")
             return
         }
-        let isHeif = !photo.isRawPhoto && self._pendingCaptureModeBox.value == .heif
-        let photoFilter = self._pendingPhotoFilterBox.value
+        self._captureContextStore.markPhotoDataProduced(for: uniqueID)
+        let isHeif = !photo.isRawPhoto && context.captureMode == .heif
+        let photoFilter = context.photoFilter
         Task {
-            let loc = await MainActor.run { self.currentLocation }
+            let loc = await MainActor.run {
+                self.recordBurstPhotoDataProduced(context: context)
+                return self.currentLocation
+            }
             let filteredData = self.filteredPhotoDataIfNeeded(
                 from: data,
                 filter: photoFilter,
                 isRaw: photo.isRawPhoto,
                 isHEIF: isHeif
             ) ?? data
-            self.saveToPhotos(data: filteredData, location: loc, isDNG: photo.isRawPhoto, isHEIF: isHeif)
-            self._burstCaptureTracker.completeCapture(uniqueID: photo.resolvedSettings.uniqueID, success: true)
+            self.saveToPhotos(data: filteredData, location: loc, isDNG: photo.isRawPhoto, isHEIF: isHeif, context: context)
+            self._burstCaptureTracker.completeProcessing(uniqueID: uniqueID, success: true)
         }
     }
     
-    private nonisolated func saveToPhotos(data: Data, location: CLLocation?, isDNG: Bool, isHEIF: Bool = false) {
+    nonisolated func photoOutput(_ output: AVCapturePhotoOutput,
+                                 didFinishCaptureFor resolvedSettings: AVCaptureResolvedPhotoSettings,
+                                 error: Error?) {
+        let uniqueID = resolvedSettings.uniqueID
+        let context = self._captureContextStore.context(for: uniqueID) ?? PhotoCaptureContext(
+            captureMode: self._pendingCaptureModeBox.value,
+            photoFilter: self._pendingPhotoFilterBox.value,
+            isBurst: false,
+            burstSessionID: nil
+        )
+        guard let error else {
+            _ = self._captureContextStore.removeContext(for: uniqueID)
+            return
+        }
+        if self._captureContextStore.hasProducedPhotoData(for: uniqueID) {
+            printFinalCaptureErrorAfterPhotoData(error, context: context, uniqueID: uniqueID)
+            _ = self._captureContextStore.removeContext(for: uniqueID)
+            return
+        }
+        self._burstCaptureTracker.completeSensorCapture(uniqueID: uniqueID, success: false)
+        self._burstCaptureTracker.completeProcessing(uniqueID: uniqueID, success: false)
+        reportCaptureFailure(error, context: context, uniqueID: uniqueID, phase: "capture")
+        _ = self._captureContextStore.removeContext(for: uniqueID)
+    }
+    
+    private nonisolated func saveToPhotos(data: Data,
+                                          location: CLLocation?,
+                                          isDNG: Bool,
+                                          isHEIF: Bool = false,
+                                          context: PhotoCaptureContext) {
         let currentStatus = PHPhotoLibrary.authorizationStatus(for: .addOnly)
         
         guard currentStatus == .authorized || currentStatus == .limited else {
-            Task { @MainActor in
-                self.errorMessage = "Photos access denied. Please enable in Settings."
-                self.showError = true
-            }
+            reportSaveFailure("Photos access denied. Please enable in Settings.", context: context)
             return
         }
         
-        performSave(data: data, location: location, isDNG: isDNG, isHEIF: isHEIF)
+        performSave(data: data, location: location, isDNG: isDNG, isHEIF: isHEIF, context: context)
     }
     
-    private nonisolated func performSave(data: Data, location: CLLocation? = nil, isDNG: Bool, isHEIF: Bool) {
+    private nonisolated func performSave(data: Data,
+                                         location: CLLocation? = nil,
+                                         isDNG: Bool,
+                                         isHEIF: Bool,
+                                         context: PhotoCaptureContext) {
         // Only resolve the album if the user has read/write access.
         // With add-only access, resolveAlbumID() would silently fail.
         let readWriteStatus = PHPhotoLibrary.authorizationStatus(for: .readWrite)
@@ -76,12 +122,90 @@ extension CameraModel: AVCapturePhotoCaptureDelegate {
                 albumReq?.addAssets([placeholder] as NSArray)
             }
         }) { success, error in
-            Task { @MainActor in
-                if !success {
-                    self.errorMessage = error?.localizedDescription ?? "Unknown save error."
-                    self.showError = true
+            if success {
+                self.reportSaveSuccess(context: context)
+            } else {
+                if let error {
+                    self.reportSaveFailure(error, context: context)
+                } else {
+                    self.reportSaveFailure("Unknown save error.", context: context)
                 }
             }
+        }
+    }
+    
+    private nonisolated func reportCaptureFailure(_ error: Error,
+                                                  context: PhotoCaptureContext,
+                                                  uniqueID: Int64,
+                                                  phase: String) {
+        let nsError = error as NSError
+        let diagnostics = "\(error.localizedDescription) (\(nsError.domain) \(nsError.code))"
+        reportCaptureFailure(
+            diagnostics,
+            context: context,
+            uniqueID: uniqueID,
+            phase: phase,
+            isGenericAVFoundationFailure: nsError.domain == AVFoundationErrorDomain && nsError.code == -11800
+        )
+    }
+    
+    private nonisolated func reportCaptureFailure(_ message: String,
+                                                  context: PhotoCaptureContext,
+                                                  uniqueID: Int64,
+                                                  phase: String,
+                                                  isGenericAVFoundationFailure: Bool = false) {
+        let shouldReportBurstFailure = context.isBurst && self._captureContextStore.markCaptureFailureIfNeeded(for: uniqueID)
+        Task { @MainActor in
+            if context.isBurst {
+                guard shouldReportBurstFailure else { return }
+                guard !self.shouldIgnoreBurstCaptureFailure(context: context, uniqueID: uniqueID) else { return }
+                self.burstCaptureFailureCount += 1
+                self.recordBurstCaptureFailure(context: context)
+                print("Burst \(phase) failed [\(context.captureMode.rawValue), id \(uniqueID)]: \(message)")
+            } else if isGenericAVFoundationFailure, self.shouldSuppressGenericCaptureErrorAsBurstTail() {
+                print("Suppressed generic AVFoundation burst tail error [id \(uniqueID)]: \(message)")
+            } else {
+                self.errorMessage = message
+                self.showError = true
+            }
+        }
+    }
+    
+    private nonisolated func reportSaveSuccess(context: PhotoCaptureContext) {
+        guard context.isBurst else { return }
+        Task { @MainActor in
+            self.recordBurstSaveSuccess(context: context)
+        }
+    }
+    
+    private nonisolated func reportSaveFailure(_ error: Error, context: PhotoCaptureContext) {
+        let nsError = error as NSError
+        let diagnostics = "\(error.localizedDescription) (\(nsError.domain) \(nsError.code))"
+        reportSaveFailure(diagnostics, context: context)
+    }
+    
+    private nonisolated func reportSaveFailure(_ message: String, context: PhotoCaptureContext) {
+        Task { @MainActor in
+            if context.isBurst {
+                self.burstSaveFailureCount += 1
+                self.recordBurstSaveFailure(context: context)
+                print("Burst save failed [\(context.captureMode.rawValue)]: \(message)")
+            } else {
+                self.errorMessage = message
+                self.showError = true
+            }
+        }
+    }
+    
+    private nonisolated func printFinalCaptureErrorAfterPhotoData(_ error: Error,
+                                                                  context: PhotoCaptureContext,
+                                                                  uniqueID: Int64) {
+        let nsError = error as NSError
+        let diagnostics = "\(error.localizedDescription) (\(nsError.domain) \(nsError.code))"
+        if context.isBurst {
+            print("Burst final capture callback reported an error after photo data was produced [\(context.captureMode.rawValue), id \(uniqueID)]: \(diagnostics)")
+        } else {
+            print("Final capture callback reported an error after photo data was produced [\(context.captureMode.rawValue), id \(uniqueID)]: \(diagnostics)")
         }
     }
     
