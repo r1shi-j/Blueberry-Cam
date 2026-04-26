@@ -56,7 +56,7 @@ extension LockedCameraModel: AVCapturePhotoCaptureDelegate {
         
         performDirectSave(data: data, isDNG: isDNG, isHEIF: isHEIF, sessionURL: sessionURL, originalFilename: originalFilename)
     }
-
+    
     private nonisolated func performDirectSave(data: Data, isDNG: Bool, isHEIF: Bool, sessionURL: URL?, originalFilename: String?) {
         // Use a local to capture the placeholder ID safely within the performChanges closure.
         // Declared as a class wrapper so it can be mutated inside the closure without a data race.

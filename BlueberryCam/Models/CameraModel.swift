@@ -929,16 +929,16 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
     func changeCapturingState(to new: Bool) {
         isCapturing = new
     }
-
+    
     func toggleBurstMode() {
         guard !isBurstCapturing else {
             stopBurstCapture()
             return
         }
-
+        
         isBurstModeEnabled.toggle()
     }
-
+    
     func handleShutterButton(onCapture: @escaping @MainActor @Sendable () -> Void,
                              onBurstPhotoCaptured: @escaping @MainActor @Sendable () -> Void = {}) {
         if isBurstModeEnabled {
@@ -949,10 +949,10 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
             }
             return
         }
-
+        
         capturePhoto(onCapture: onCapture)
     }
-
+    
     private func startBurstCapture(onCapture: @escaping @MainActor @Sendable () -> Void,
                                    onBurstPhotoCaptured: @escaping @MainActor @Sendable () -> Void) {
         guard burstCaptureTask == nil else { return }
@@ -963,7 +963,7 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
             }
             return
         }
-
+        
         flashMode = .off
         timerCountdownTask?.cancel()
         timerCountdownTask = nil
@@ -972,11 +972,11 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
         burstCapturedCount = 0
         isBurstCapturing = true
         onCapture()
-
+        
         let startDate = Date()
         burstCaptureTask = Task { @MainActor [weak self] in
             guard let self else { return }
-
+            
             defer {
                 let elapsed = Date().timeIntervalSince(startDate)
                 let fps = elapsed > 0 ? Double(self.burstCapturedCount) / elapsed : 0
@@ -985,7 +985,7 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
                 self.burstCaptureTask = nil
                 self._burstCaptureTracker.cancelAll()
             }
-
+            
             while !Task.isCancelled, self.isBurstModeEnabled {
                 guard self.canContinueBurstCapture else { break }
                 self.exposureDebounceTask?.cancel()
@@ -1003,33 +1003,33 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
                     self.burstCapturedCount += 1
                     onBurstPhotoCaptured()
                 }
-
+                
                 await Task.yield()
             }
         }
     }
-
+    
     func stopBurstCapture() {
         burstCaptureTask?.cancel()
         _burstCaptureTracker.cancelAll()
     }
-
+    
     private var canStartBurstCapture: Bool {
         guard session.isRunning, !isTimerCountingDown else { return false }
         guard isAutoExposure || manualExposureIsFastEnoughForBurst else { return false }
         return true
     }
-
+    
     private var canContinueBurstCapture: Bool {
         canStartBurstCapture && isBurstCapturing
     }
-
+    
     private var manualExposureIsFastEnoughForBurst: Bool {
         guard !isAutoExposure else { return true }
         guard let duration = currentManualExposureDuration else { return false }
         return CMTimeGetSeconds(duration) <= 0.01
     }
-
+    
     private var currentManualExposureDuration: CMTime? {
         if manualShutterDenominator > 0 {
             return CMTimeMake(value: 1, timescale: CMTimeScale(manualShutterDenominator))
@@ -1042,27 +1042,27 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
     
     func capturePhoto(onCapture: @escaping @MainActor @Sendable () -> Void) {
         guard timerCountdownTask == nil else { return }
-
+        
         if let totalSeconds = timerMode.seconds {
             isTimerCountingDown = true
             timerCountdownValue = Double(totalSeconds)
             timerCountdownTask = Task { @MainActor [weak self] in
                 guard let self else { return }
                 let usesDetailedCountdown = self.detailedCountdownTimer
-
+                
                 defer {
                     self.isTimerCountingDown = false
                     self.timerCountdownValue = nil
                     self.timerCountdownTask = nil
                 }
-
+                
                 let endDate = Date().addingTimeInterval(TimeInterval(totalSeconds))
                 let updateInterval: Duration = usesDetailedCountdown ? .milliseconds(16) : .milliseconds(100)
-
+                
                 while true {
                     let remaining = endDate.timeIntervalSinceNow
                     guard remaining > 0 else { break }
-
+                    
                     self.timerCountdownValue = remaining
                     do {
                         try await Task.sleep(for: updateInterval)
@@ -1070,15 +1070,15 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
                         return
                     }
                 }
-
+                
                 self.performPhotoCapture(onCapture: onCapture)
             }
             return
         }
-
+        
         performPhotoCapture(onCapture: onCapture)
     }
-
+    
     private func performPhotoCapture(onCapture: @escaping @MainActor @Sendable () -> Void) {
         onCapture()
         
@@ -1147,13 +1147,13 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
                 return s
         }
     }
-
+    
     private func buildNextBurstPhotoSettings() async -> AVCapturePhotoSettings? {
         if !isAutoExposure {
             guard let duration = currentManualExposureDuration,
                   let d = device else { return nil }
             let isoValue = max(d.activeFormat.minISO, min(d.activeFormat.maxISO, iso))
-
+            
             await withCheckedContinuation { continuation in
                 try? d.lockForConfiguration()
                 d.setExposureModeCustom(duration: duration, iso: isoValue) { _ in
@@ -1162,7 +1162,7 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
                 d.unlockForConfiguration()
             }
         }
-
+        
         let settings = buildPhotoSettings()
         settings.flashMode = .off
         if shouldPrioritizeBurstSpeed {
@@ -1195,7 +1195,7 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
                 degrees = isFront ? 180 : 270
             }
         } else {
-            // Landscape orientation  
+            // Landscape orientation
             if gx > 0 {
                 // Landscape right (home button on right)
                 degrees = isFront ? 270 : 180

@@ -322,7 +322,7 @@ struct TopBarView: View {
                     HStack(spacing: 4) {
                         Image(systemName: cameraModel.timerButtonSymbol)
                             .font(.system(size: 12, weight: .bold))
-
+                        
                         if cameraModel.timerMode != .off {
                             Text(cameraModel.timerMode.label)
                                 .font(.system(size: 12, weight: .medium, design: .monospaced))

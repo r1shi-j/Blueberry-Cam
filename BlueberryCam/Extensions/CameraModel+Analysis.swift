@@ -29,7 +29,7 @@ extension CameraModel: AVCaptureDataOutputSynchronizerDelegate, AVCaptureVideoDa
     
     nonisolated func processFrame(pixelBuffer: CVPixelBuffer, depthData: AVDepthData?) {
         guard !shouldPauseAnalysis else { return }
-
+        
         Task { @MainActor in
             if let d = self.device {
                 self.liveISO = d.iso

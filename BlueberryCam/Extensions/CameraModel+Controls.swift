@@ -48,24 +48,24 @@ extension CameraModel {
         session.addControl(filterPicker)
         
         // Lens Picker
-//        let availableLenses = Lens.allCases.filter { len in
-//            AVCaptureDevice.default(len.deviceType, for: .video, position: len.position) != nil
-//        }
-//        if !availableLenses.isEmpty {
-//            let titles = availableLenses.map { "\($0.label)x" }
-//            let picker = AVCaptureIndexPicker("Cameras", symbolName: "camera.aperture", localizedIndexTitles: titles)
-//            picker.setActionQueue(.main) { [weak self] index in
-//                guard let self else { return }
-//                guard index >= 0 && index < availableLenses.count else { return }
-//                self.switchLens(to: availableLenses[index])
-//            }
-//            if let activeIndex = availableLenses.firstIndex(of: activeLens) {
-//                picker.selectedIndex = activeIndex
-//            }
-//            self.lensControl = picker
-//            session.addControl(picker)
-//        }
-
+        //        let availableLenses = Lens.allCases.filter { len in
+        //            AVCaptureDevice.default(len.deviceType, for: .video, position: len.position) != nil
+        //        }
+        //        if !availableLenses.isEmpty {
+        //            let titles = availableLenses.map { "\($0.label)x" }
+        //            let picker = AVCaptureIndexPicker("Cameras", symbolName: "camera.aperture", localizedIndexTitles: titles)
+        //            picker.setActionQueue(.main) { [weak self] index in
+        //                guard let self else { return }
+        //                guard index >= 0 && index < availableLenses.count else { return }
+        //                self.switchLens(to: availableLenses[index])
+        //            }
+        //            if let activeIndex = availableLenses.firstIndex(of: activeLens) {
+        //                picker.selectedIndex = activeIndex
+        //            }
+        //            self.lensControl = picker
+        //            session.addControl(picker)
+        //        }
+        
         // EV Slider
         let ev = AVCaptureSlider("Exposure", symbolName: "plusminus", in: -4.0...4.0, step: 0.1)
         ev.prominentValues = [-4.0, -3.5, -3.0, -2.5, -2.0, -1.5, -1.0, -0.5, 0.0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0]

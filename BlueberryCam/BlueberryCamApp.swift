@@ -21,23 +21,23 @@ struct BlueberryCamApp: App {
                 shutterCountBurst: $shutterCountBurst,
                 permissionModel: permissionModel
             )
-                .task {
-                    await permissionModel.checkAndRequest()
-                    await scanExistingSessions()
-                    await detectLockedCaptureSessions()
-                }
-                .onChange(of: scenePhase) { _, newPhase in
-                    if newPhase == .active {
-                        Task { await permissionModel.checkAndRequest() }
-                        Task { await scanExistingSessions() }
-                    }
-                }
-                .onContinueUserActivity("\(BundleIDs.fullBundleID).opencamera") { _ in
-                    // App was opened via the locked-app shortcut button.
-                    // scenePhase will also fire .active, but that races with the
-                    // session being written — scan again explicitly here to be safe.
+            .task {
+                await permissionModel.checkAndRequest()
+                await scanExistingSessions()
+                await detectLockedCaptureSessions()
+            }
+            .onChange(of: scenePhase) { _, newPhase in
+                if newPhase == .active {
+                    Task { await permissionModel.checkAndRequest() }
                     Task { await scanExistingSessions() }
                 }
+            }
+            .onContinueUserActivity("\(BundleIDs.fullBundleID).opencamera") { _ in
+                // App was opened via the locked-app shortcut button.
+                // scenePhase will also fire .active, but that races with the
+                // session being written — scan again explicitly here to be safe.
+                Task { await scanExistingSessions() }
+            }
         }
         .handlesExternalEvents(matching: ["*"])
     }

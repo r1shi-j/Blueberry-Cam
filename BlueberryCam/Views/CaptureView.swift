@@ -62,14 +62,14 @@ extension CaptureView {
         let dy = abs(sliderCenterY - point.y)
         return dx <= focusReticleSliderXTolerance && dy <= focusReticleSliderYTolerance
     }
-
+    
     private func countdownText(for value: Double) -> String {
         let clampedValue = max(value, 0)
-
+        
         if cameraModel.detailedCountdownTimer {
             return clampedValue.formatted(.number.precision(.fractionLength(3)))
         }
-
+        
         return Int(ceil(clampedValue)).formatted()
     }
     
@@ -152,7 +152,7 @@ extension CaptureView {
             cameraModel.handleTapPointHold(devicePoint: devicePoint, previewPoint: location)
         }
     }
-
+    
     @ViewBuilder
     private func timerCountdownOverlay(in previewRect: CGRect) -> some View {
         if cameraModel.isTimerCountingDown {
@@ -475,11 +475,11 @@ struct CaptureView: View {
                         shutterCount: $shutterCount,
                         shutterCountBurst: $shutterCountBurst
                     )
-                        .padding(.bottom, 30)
+                    .padding(.bottom, 30)
                 }
                 .allowsHitTesting(!cameraModel.isTimerCountingDown)
                 .animation(.easeInOut(duration: 0.2), value: cameraModel.showSimpleView)
-                    
+                
                 // MARK: - Timer countdown
                 timerCountdownOverlay(in: previewRect)
                 

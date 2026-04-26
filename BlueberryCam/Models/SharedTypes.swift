@@ -130,9 +130,9 @@ enum TimerMode: String, CaseIterable, Identifiable {
     case off
     case threeSeconds
     case tenSeconds
-
+    
     var id: String { rawValue }
-
+    
     var label: String {
         switch self {
             case .off: ""
@@ -140,7 +140,7 @@ enum TimerMode: String, CaseIterable, Identifiable {
             case .tenSeconds: "10s"
         }
     }
-
+    
     var duration: Duration? {
         switch self {
             case .off: nil
@@ -148,7 +148,7 @@ enum TimerMode: String, CaseIterable, Identifiable {
             case .tenSeconds: .seconds(10)
         }
     }
-
+    
     var seconds: Int? {
         switch self {
             case .off: nil

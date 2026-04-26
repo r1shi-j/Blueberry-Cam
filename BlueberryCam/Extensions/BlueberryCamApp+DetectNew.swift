@@ -61,17 +61,17 @@ extension BlueberryCamApp {
                     // Not ready yet. Keep the session content and allow a future scan/update to retry.
                     return false
                 }
-                
+
                 await addAssetsToBlueberryAlbum(assets)
             }
-            
+
             // Increment and invalidate — we confirmed the photos exist (or we have add-only access
             // and trust the manifest).
             await MainActor.run { self.shutterCount += photoCount }
             try? await LockedCameraCaptureManager.shared.invalidateSessionContent(at: sessionURL)
             return true
         }
-        
+
         if !canRead {
             await MainActor.run { self.shutterCount += content.filenames.count }
             try? await LockedCameraCaptureManager.shared.invalidateSessionContent(at: sessionURL)

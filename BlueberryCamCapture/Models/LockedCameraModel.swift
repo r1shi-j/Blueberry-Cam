@@ -15,7 +15,7 @@ class LockedCameraModel: NSObject {
         let addOnly = PHPhotoLibrary.authorizationStatus(for: .addOnly)
         let readWrite = PHPhotoLibrary.authorizationStatus(for: .readWrite)
         return addOnly == .authorized || addOnly == .limited
-            || readWrite == .authorized || readWrite == .limited
+        || readWrite == .authorized || readWrite == .limited
     }
     
     var device: AVCaptureDevice?

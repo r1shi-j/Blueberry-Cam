@@ -246,7 +246,7 @@ extension CameraModel {
                 timerMode = .off
         }
     }
-
+    
     func changePhotoFilter(to filter: PhotoFilter) {
         selectedPhotoFilter = filter
     }
