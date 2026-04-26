@@ -65,7 +65,6 @@ extension CameraModel: AVCapturePhotoCaptureDelegate {
             return
         }
         if self._captureContextStore.hasProducedPhotoData(for: uniqueID) {
-            printFinalCaptureErrorAfterPhotoData(error, context: context, uniqueID: uniqueID)
             _ = self._captureContextStore.removeContext(for: uniqueID)
             return
         }
@@ -161,9 +160,8 @@ extension CameraModel: AVCapturePhotoCaptureDelegate {
                 guard !self.shouldIgnoreBurstCaptureFailure(context: context, uniqueID: uniqueID) else { return }
                 self.burstCaptureFailureCount += 1
                 self.recordBurstCaptureFailure(context: context)
-                print("Burst \(phase) failed [\(context.captureMode.rawValue), id \(uniqueID)]: \(message)")
             } else if isGenericAVFoundationFailure, self.shouldSuppressGenericCaptureErrorAsBurstTail() {
-                print("Suppressed generic AVFoundation burst tail error [id \(uniqueID)]: \(message)")
+                return
             } else {
                 self.errorMessage = message
                 self.showError = true
@@ -189,23 +187,10 @@ extension CameraModel: AVCapturePhotoCaptureDelegate {
             if context.isBurst {
                 self.burstSaveFailureCount += 1
                 self.recordBurstSaveFailure(context: context)
-                print("Burst save failed [\(context.captureMode.rawValue)]: \(message)")
             } else {
                 self.errorMessage = message
                 self.showError = true
             }
-        }
-    }
-    
-    private nonisolated func printFinalCaptureErrorAfterPhotoData(_ error: Error,
-                                                                  context: PhotoCaptureContext,
-                                                                  uniqueID: Int64) {
-        let nsError = error as NSError
-        let diagnostics = "\(error.localizedDescription) (\(nsError.domain) \(nsError.code))"
-        if context.isBurst {
-            print("Burst final capture callback reported an error after photo data was produced [\(context.captureMode.rawValue), id \(uniqueID)]: \(diagnostics)")
-        } else {
-            print("Final capture callback reported an error after photo data was produced [\(context.captureMode.rawValue), id \(uniqueID)]: \(diagnostics)")
         }
     }
     

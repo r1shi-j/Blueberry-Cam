@@ -66,6 +66,14 @@ extension CameraModel {
         isBurstModeEnabled ? .yellow : Colors.buttonBackground
     }
     
+    fileprivate var burstButtonOpacity: Double {
+        timerMode == .off && !isTimerCountingDown ? 1.0 : 0.3
+    }
+    
+    fileprivate var isBurstButtonDisabled: Bool {
+        timerMode != .off || isTimerCountingDown
+    }
+    
     // MARK: Timer properties
     fileprivate var timerButtonSymbol: String {
         "timer"
@@ -77,6 +85,14 @@ extension CameraModel {
     
     fileprivate var timerButtonBackground: Color {
         timerMode == .off ? Colors.buttonBackground : .yellow
+    }
+    
+    fileprivate var timerButtonOpacity: Double {
+        isBurstModeEnabled ? 0.3 : 1.0
+    }
+    
+    fileprivate var isTimerButtonDisabled: Bool {
+        isBurstModeEnabled
     }
     
     // MARK: Format/resolution properties
@@ -144,6 +160,28 @@ struct TopBarView: View {
     @Binding var selectedControl: ManualControl?
     @State private var hapticTrigger = 0
     @State private var hapticTriggerR = 0
+    @State private var isShowingBurstIntervalAlert = false
+    @State private var isShowingBurstFrameLimitAlert = false
+    @State private var burstIntervalInput = ""
+    @State private var burstFrameLimitInput = ""
+    
+    private var parsedBurstInterval: Double? {
+        Double(burstIntervalInput)
+    }
+    
+    private var parsedBurstFrameLimit: Int? {
+        Int(burstFrameLimitInput)
+    }
+    
+    private var isBurstIntervalInputValid: Bool {
+        guard let parsedBurstInterval else { return false }
+        return parsedBurstInterval >= 0.2 && parsedBurstInterval <= 5.0
+    }
+    
+    private var isBurstFrameLimitInputValid: Bool {
+        guard let parsedBurstFrameLimit else { return false }
+        return parsedBurstFrameLimit >= 1 && parsedBurstFrameLimit <= 100
+    }
     
     var body: some View {
         VStack(spacing: 14) {
@@ -296,21 +334,59 @@ struct TopBarView: View {
                 .opacity(cameraModel.dualcamButtonOpacity)
                 
                 // MARK: - Burst
-                Button {
-                    hapticTrigger += 1
-                    withAnimation(.bouncy) {
-                        cameraModel.toggleBurstMode()
+                HStack(spacing: 10) {
+                    Button {
+                        hapticTrigger += 1
+                        withAnimation(.bouncy) {
+                            cameraModel.toggleBurstMode()
+                        }
+                    } label: {
+                        Image(systemName: cameraModel.burstButtonSymbol)
                     }
-                } label: {
-                    Image(systemName: cameraModel.burstButtonSymbol)
-                        .font(.system(size: 12, weight: .bold))
-                        .frame(height: 18)
-                        .foregroundStyle(cameraModel.burstButtonForeground)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 5)
-                        .background(cameraModel.burstButtonBackground)
-                        .clipShape(.capsule)
+                    
+                    if cameraModel.isBurstModeEnabled {
+                        Button {
+                            hapticTrigger += 1
+                            burstIntervalInput = cameraModel.burstIntervalSeconds.map {
+                                $0.formatted(.number.precision(.fractionLength(1)))
+                            } ?? ""
+                            isShowingBurstIntervalAlert = true
+                        } label: {
+                            Text(cameraModel.burstIntervalLabel)
+                        }
+                        .onTapGesture(count: 2) {
+                            hapticTriggerR += 1
+                            withAnimation(.bouncy) {
+                                cameraModel.setBurstInterval(seconds: nil)
+                            }
+                        }
+                        .transition(.opacity.combined(with: .scale(scale: 0.7)))
+                        
+                        Button {
+                            hapticTrigger += 1
+                            burstFrameLimitInput = cameraModel.burstFrameLimit.map(String.init) ?? ""
+                            isShowingBurstFrameLimitAlert = true
+                        } label: {
+                            Text(cameraModel.burstFrameLimitLabel)
+                        }
+                        .onTapGesture(count: 2) {
+                            hapticTriggerR += 1
+                            withAnimation(.bouncy) {
+                                cameraModel.setBurstFrameLimit(nil)
+                            }
+                        }
+                        .transition(.opacity.combined(with: .scale(scale: 0.7)))
+                    }
                 }
+                .font(.system(size: 12, weight: .bold))
+                .frame(height: 18)
+                .foregroundStyle(cameraModel.burstButtonForeground)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 5)
+                .background(cameraModel.burstButtonBackground)
+                .clipShape(.capsule)
+                .disabled(cameraModel.isBurstButtonDisabled)
+                .opacity(cameraModel.burstButtonOpacity)
                 
                 // MARK: - Timer
                 Button {
@@ -336,10 +412,44 @@ struct TopBarView: View {
                     .clipShape(.capsule)
                 }
                 .animation(.bouncy, value: cameraModel.timerMode)
+                .disabled(cameraModel.isTimerButtonDisabled)
+                .opacity(cameraModel.timerButtonOpacity)
             }
             .padding(.horizontal, 8)
         }
         .sensoryFeedback(.impact, trigger: hapticTrigger)
         .sensoryFeedback(.impact(flexibility: .soft), trigger: hapticTriggerR)
+        .alert("Burst Interval", isPresented: $isShowingBurstIntervalAlert) {
+            TextField("Auto", text: $burstIntervalInput)
+                .keyboardType(.decimalPad)
+            Button("OK") {
+                if let parsedBurstInterval {
+                    cameraModel.setBurstInterval(seconds: parsedBurstInterval)
+                }
+            }
+            .disabled(!isBurstIntervalInputValid)
+            Button("Auto") {
+                cameraModel.setBurstInterval(seconds: nil)
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Time (seconds) between frames.\nRange: 0.2 to 5.0.\nMay not be guaranteed for smaller intervals. Auto shoots as fast as safely possible.")
+        }
+        .alert("Burst Frames", isPresented: $isShowingBurstFrameLimitAlert) {
+            TextField("Infinity", text: $burstFrameLimitInput)
+                .keyboardType(.numberPad)
+            Button("OK") {
+                if let parsedBurstFrameLimit {
+                    cameraModel.setBurstFrameLimit(parsedBurstFrameLimit)
+                }
+            }
+            .disabled(!isBurstFrameLimitInputValid)
+            Button("Auto") {
+                cameraModel.setBurstFrameLimit(nil)
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Number of frames to capture.\nRange: 1 to 100.\nAuto keeps shooting until you tap the shutter button again.")
+        }
     }
 }

@@ -73,6 +73,31 @@ extension CaptureView {
         return Int(ceil(clampedValue)).formatted()
     }
     
+    private func updateBurstFeedbackOverlay(_ message: String?) {
+        burstFeedbackFadeTask?.cancel()
+        
+        if let message {
+            displayedBurstFeedbackMessage = message
+            withAnimation(.easeInOut(duration: 0.2)) {
+                isBurstFeedbackVisible = true
+            }
+            return
+        }
+        
+        withAnimation(.easeInOut(duration: 0.35)) {
+            isBurstFeedbackVisible = false
+        }
+        burstFeedbackFadeTask = Task { @MainActor in
+            do {
+                try await Task.sleep(for: .milliseconds(350))
+                displayedBurstFeedbackMessage = nil
+                burstFeedbackFadeTask = nil
+            } catch {
+                return
+            }
+        }
+    }
+    
     private func beginPreviewInteraction(at location: CGPoint) {
         cameraModel.isTapFocusInteractionActive = true
         previewInteractionStartPoint = location
@@ -205,6 +230,9 @@ struct CaptureView: View {
     @State private var isAwaitingFacingFlipCompletion = false
     @State private var isAwaitingSameFacingLensCompletion = false
     @State private var pendingFacingFlipRotation: Double = 0
+    @State private var displayedBurstFeedbackMessage: String?
+    @State private var isBurstFeedbackVisible = false
+    @State private var burstFeedbackFadeTask: Task<Void, Never>?
     
     private var cameraContent: some View {
         GeometryReader { geo in
@@ -415,6 +443,20 @@ struct CaptureView: View {
                         }
                     }
                     .animation(.bouncy, value: cameraModel.shouldShowLensCleaningHint)
+                    
+                    // MARK: - Burst Feedback
+                    if let displayedBurstFeedbackMessage {
+                        Text(displayedBurstFeedbackMessage)
+                            .font(.system(size: 16, weight: .bold))
+                            .fontWidth(.expanded)
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 10)
+                            .background(.black.opacity(0.6), in: .capsule)
+                            .position(x: previewRect.midX, y: previewRect.midY)
+                            .allowsHitTesting(false)
+                            .opacity(isBurstFeedbackVisible ? 1 : 0)
+                    }
                 }
                 .blur(radius: scenePhase != .active ? 20 : 0)
                 
@@ -467,6 +509,31 @@ struct CaptureView: View {
                         }
                         .transition(.opacity)
                     } else {
+                        if cameraModel.isBurstCapturing {
+                            VStack(spacing: 6) {
+                                Text(cameraModel.burstCaptureStatusLabel)
+                                    .font(.system(size: 16, weight: .bold))
+                                    .fontWidth(.expanded)
+                                    .monospacedDigit()
+                                    .contentTransition(.numericText())
+                                
+                                if cameraModel.shouldShowBurstIntervalCountdown {
+                                    Text(cameraModel.burstIntervalCountdownLabel)
+                                        .font(.system(size: 16, weight: .bold))
+                                        .fontWidth(.expanded)
+                                        .monospacedDigit()
+                                        .contentTransition(.numericText(countsDown: true))
+                                }
+                            }
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 10)
+                            .background(.black.opacity(0.6), in: .rect(cornerRadius: 8))
+                            .allowsHitTesting(false)
+                            .padding(.top, 16)
+                            .transition(.opacity)
+                        }
+                        
                         Spacer()
                     }
                     
@@ -491,6 +558,7 @@ struct CaptureView: View {
                         .animation(.easeOut(duration: 0.15), value: cameraModel.isCapturing)
                 }
             }
+            .ignoresSafeArea(.keyboard)
         }
         .safeAreaInset(edge: .top) {
             // MARK: - Status bar
@@ -547,6 +615,8 @@ struct CaptureView: View {
             }
         }
         .onDisappear {
+            cameraModel.stopBurstCapture()
+            burstFeedbackFadeTask?.cancel()
             levelModel.stopUpdates()
             cameraModel.clearTapPointInteraction(resetDeviceState: false)
         }
@@ -559,6 +629,7 @@ struct CaptureView: View {
                 levelModel.startUpdates() // Always start
                 levelModel.setLevelDisplayEnabled(cameraModel.shouldShowLevel && !cameraModel.showSimpleView)
             } else {
+                cameraModel.stopBurstCapture()
                 cameraModel.stopSession()
                 levelModel.stopUpdates() // Only stop when backgrounded
                 if newPhase == .background {
@@ -568,6 +639,9 @@ struct CaptureView: View {
         }
         .onChange(of: cameraModel.showSimpleView) { _, new in
             levelModel.setLevelDisplayEnabled(!new && cameraModel.shouldShowLevel)
+        }
+        .onChange(of: cameraModel.burstFeedbackMessage) { _, new in
+            updateBurstFeedbackOverlay(new)
         }
         .onChange(of: cameraModel.activeLens) { oldLens, newLens in
             cameraModel.clearTapPointInteraction(resetDeviceState: false)

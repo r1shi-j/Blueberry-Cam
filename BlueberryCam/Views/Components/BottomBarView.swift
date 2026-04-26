@@ -2,8 +2,8 @@ import SwiftUI
 
 extension CameraModel {
     fileprivate var shutterTint: Color {
-        if isBurstCapturing { return .yellow.mix(with: .orange, by: 0.4).opacity(0.7) }
-        if isBurstModeEnabled { return .yellow.opacity(0.7) }
+        if isBurstCapturing { return .yellow.mix(with: .orange, by: 0.3).opacity(0.6) }
+        if isBurstModeEnabled { return .yellow.opacity(0.8) }
         return captureMode == .raw ? .blue.mix(with: .mint, by: 0.5).opacity(0.4) : .white.opacity(0.2)
     }
 }

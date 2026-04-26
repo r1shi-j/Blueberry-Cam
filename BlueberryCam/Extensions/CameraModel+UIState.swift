@@ -237,6 +237,10 @@ extension CameraModel {
     }
     
     func cycleTimerMode() {
+        if isBurstModeEnabled {
+            isBurstModeEnabled = false
+        }
+        
         switch timerMode {
             case .off:
                 timerMode = .threeSeconds

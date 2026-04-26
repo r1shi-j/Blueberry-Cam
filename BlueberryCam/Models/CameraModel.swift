@@ -126,6 +126,9 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
             refreshFastCapturePrioritizationForBurstMode()
         }
     }
+    var shouldShowBurstFeedback = false {
+        didSet { UserDefaults.standard.set(shouldShowBurstFeedback, forKey: "shouldShowBurstFeedback") }
+    }
     
     // MARK: - Capture format
     var captureMode: CaptureMode = .raw {
@@ -156,6 +159,7 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
             refreshFastCapturePrioritizationForBurstMode()
             if isBurstModeEnabled {
                 flashMode = .off
+                timerMode = .off
             }
         }
     }
@@ -174,11 +178,17 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
     private(set) var burstCapturedCount: Int = 0
     var burstCaptureFailureCount: Int = 0
     var burstSaveFailureCount: Int = 0
+    var burstIntervalSeconds: Double?
+    var burstFrameLimit: Int?
+    var burstIntervalRemainingSeconds: Double?
+    var burstFeedbackMessage: String?
     var burstSessionCounter = 0
     var activeBurstSessionID: Int?
     var burstSaveStatsBySession: [Int: BurstSaveStats] = [:]
     @ObservationIgnored
     var burstCaptureTask: Task<Void, Never>?
+    @ObservationIgnored
+    var burstFeedbackTask: Task<Void, Never>?
     @ObservationIgnored
     nonisolated(unsafe) private(set) var shouldPauseAnalysis = false
     var isMacroEnabled: Bool = false {
@@ -542,6 +552,7 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
     
     deinit {
         burstCaptureTask?.cancel()
+        burstFeedbackTask?.cancel()
         _burstCaptureTracker.cancelAll()
         _captureContextStore.removeAll()
         if let subjectAreaChangeObserver {
@@ -655,6 +666,7 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
         self.detailedCountdownTimer = defaults.object(forKey: "detailedCountdownTimer") as? Bool ?? false
         self.shouldHideUIWhileCountingDown = defaults.object(forKey: "shouldHideUIWhileCountingDown") as? Bool ?? true
         self.shouldPrioritizeBurstSpeed = defaults.object(forKey: "shouldPrioritizeBurstSpeed") as? Bool ?? true
+        self.shouldShowBurstFeedback = defaults.object(forKey: "shouldShowBurstFeedback") as? Bool ?? false
         
         if let res = defaults.string(forKey: "defaultResolution"), let rPref = ResolutionPreference(rawValue: res) {
             self.defaultResolution = rPref
@@ -980,6 +992,7 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
         burstCapturedCount = 0
         burstCaptureFailureCount = 0
         burstSaveFailureCount = 0
+        burstIntervalRemainingSeconds = nil
         burstSessionCounter += 1
         let burstSessionID = burstSessionCounter
         activeBurstSessionID = burstSessionID
@@ -994,13 +1007,10 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
             defer {
                 let elapsed = Date().timeIntervalSince(startDate)
                 let fps = elapsed > 0 ? Double(self.burstCapturedCount) / elapsed : 0
-                let pendingProcessingCount = self._burstCaptureTracker.inFlightProcessingCount
-                let failureText = self.burstCaptureFailureCount == 0 && self.burstSaveFailureCount == 0
-                ? ""
-                : ", \(self.burstCaptureFailureCount) capture failures, \(self.burstSaveFailureCount) save failures"
-                let pendingText = pendingProcessingCount == 0 ? "" : ", \(pendingProcessingCount) still processing"
-                print("Burst finished: \(self.burstCapturedCount) photos in \(elapsed.formatted(.number.precision(.fractionLength(2))))s (\(fps.formatted(.number.precision(.fractionLength(2)))) fps)\(failureText)\(pendingText)")
+                let summary = "\(self.burstCapturedCount) photos in \(elapsed.formatted(.number.precision(.fractionLength(2))))s (\(fps.formatted(.number.precision(.fractionLength(2)))) fps)"
+                self.showBurstFeedback(summary)
                 self.isBurstCapturing = false
+                self.burstIntervalRemainingSeconds = nil
                 self.burstCaptureTask = nil
                 self.finishBurstSession(burstSessionID)
             }
@@ -1030,6 +1040,17 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
                     onBurstPhotoCaptured()
                 }
                 
+                if let burstFrameLimit = self.burstFrameLimit, self.burstCapturedCount >= burstFrameLimit {
+                    self.stopBurstCapture()
+                    break
+                }
+                
+                if let burstIntervalSeconds = self.burstIntervalSeconds {
+                    if !(await self.waitForBurstInterval(seconds: burstIntervalSeconds)) {
+                        break
+                    }
+                }
+                
                 await Task.yield()
             }
         }
@@ -1040,6 +1061,7 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
             markBurstSessionStopping(activeBurstSessionID)
         }
         isBurstCapturing = false
+        burstIntervalRemainingSeconds = nil
         burstCaptureTask?.cancel()
     }
     
@@ -1077,6 +1099,102 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
     private var burstProcessingLimit: Int {
         guard shouldPrioritizeBurstSpeed, captureMode != .raw else { return 1 }
         return 4
+    }
+    
+    var burstIntervalLabel: String {
+        if let burstIntervalSeconds {
+            "\(burstIntervalSeconds.formatted(.number.precision(.fractionLength(1))))s"
+        } else {
+            "A"
+        }
+    }
+    
+    var burstFrameLimitLabel: String {
+        if let burstFrameLimit {
+            "#\(burstFrameLimit)"
+        } else {
+            "#∞"
+        }
+    }
+    
+    var burstCaptureStatusLabel: String {
+        if let burstFrameLimit {
+            "\(burstCapturedCount)/\(burstFrameLimit) photos captured"
+        } else {
+            "\(burstCapturedCount) photos captured"
+        }
+    }
+    
+    var shouldShowBurstIntervalCountdown: Bool {
+        guard isBurstCapturing, let burstIntervalSeconds else { return false }
+        return burstIntervalSeconds >= 1.0
+    }
+    
+    var burstIntervalCountdownLabel: String {
+        let remaining = max(0, burstIntervalRemainingSeconds ?? 0)
+        return "Next photo in \(remaining.formatted(.number.precision(.fractionLength(1))))s"
+    }
+    
+    func setBurstInterval(seconds: Double?) {
+        if let seconds {
+            burstIntervalSeconds = min(5.0, max(0.2, seconds))
+        } else {
+            burstIntervalSeconds = nil
+        }
+    }
+    
+    func setBurstFrameLimit(_ limit: Int?) {
+        if let limit {
+            burstFrameLimit = min(100, max(1, limit))
+        } else {
+            burstFrameLimit = nil
+        }
+    }
+    
+    private func waitForBurstInterval(seconds: Double) async -> Bool {
+        guard seconds >= 1.0 else {
+            do {
+                try await Task.sleep(for: .milliseconds(Int((seconds * 1000).rounded())))
+                return !Task.isCancelled && canContinueBurstCapture
+            } catch {
+                return false
+            }
+        }
+        
+        let endDate = Date().addingTimeInterval(seconds)
+        burstIntervalRemainingSeconds = seconds
+        
+        while true {
+            let remaining = endDate.timeIntervalSinceNow
+            guard remaining > 0 else { break }
+            burstIntervalRemainingSeconds = remaining
+            
+            do {
+                let sleepMilliseconds = max(1, min(100, Int((remaining * 1000).rounded())))
+                try await Task.sleep(for: .milliseconds(sleepMilliseconds))
+            } catch {
+                burstIntervalRemainingSeconds = nil
+                return false
+            }
+        }
+        
+        burstIntervalRemainingSeconds = nil
+        return !Task.isCancelled && canContinueBurstCapture
+    }
+    
+    private func showBurstFeedback(_ message: String) {
+        guard shouldShowBurstFeedback else { return }
+        burstFeedbackTask?.cancel()
+        burstFeedbackMessage = message
+        burstFeedbackTask = Task { @MainActor [weak self] in
+            do {
+                try await Task.sleep(for: .seconds(4))
+                self?.burstFeedbackMessage = nil
+                self?.burstFeedbackTask = nil
+            } catch {
+                return
+            }
+        }
     }
     
     private func registerCaptureContext(for settings: AVCapturePhotoSettings, isBurst: Bool, burstSessionID: Int? = nil) {
@@ -1180,10 +1298,6 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
         stats.drainSummaryDate = Date()
         burstSaveStatsBySession[sessionID] = stats
         
-        let failureText = stats.captureFailureCount == 0 && stats.saveFailureCount == 0
-        ? ""
-        : ", \(stats.captureFailureCount) capture failures, \(stats.saveFailureCount) save failures"
-        print("Burst saved: \(stats.savedCount)/\(stats.sensorCaptureCount) captured photos reached Photos [\(stats.captureMode.rawValue)]\(failureText)")
     }
     
     func capturePhoto(onCapture: @escaping @MainActor @Sendable () -> Void) {

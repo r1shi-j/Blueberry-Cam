@@ -74,7 +74,7 @@ struct SettingsView: View {
                 } header: {
                     Text("Photo Settings")
                 } footer: {
-                    Text("When on, burst captures prefer speed over maximum processed quality.")
+                    Text("Burst speed prioritization allows quicker frames, but less quality.")
                 }
                 
                 Section {
@@ -82,11 +82,12 @@ struct SettingsView: View {
                     Toggle("Level/Crosshair", isOn: $cameraModel.shouldShowLevel)
                     Toggle("Pro Timer", isOn: $cameraModel.detailedCountdownTimer)
                     Toggle("Hide UI When Counting Down", isOn: $cameraModel.shouldHideUIWhileCountingDown)
+                    Toggle("Burst Feedback", isOn: $cameraModel.shouldShowBurstFeedback)
                     Toggle("Recognize Barcodes", isOn: $cameraModel.recognizeBarcodes)
                 } header: {
                     Text("Customization")
                 } footer : {
-                    Text("This app supports lens smudge detection and is always enabled.")
+                    Text("Pro Timer shows milliseconds instead of just seconds. Burst feedback shows a quick summary when a burst finishes. This app supports lens smudge detection and is always enabled.")
                 }
                 
                 Section("About") {
