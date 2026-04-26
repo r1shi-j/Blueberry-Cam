@@ -266,8 +266,8 @@ struct ResolutionOption: Identifiable, Equatable {
 
 // MARK: - CaptureMode
 enum CaptureMode: String, CaseIterable, Identifiable {
-    case jpeg = "JPEG"
     case heif = "HEIF"
+    case jpeg = "JPEG"
     case raw = "RAW"
     var id: String { rawValue }
 }
