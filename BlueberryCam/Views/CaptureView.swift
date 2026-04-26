@@ -792,8 +792,8 @@ struct CaptureView: View {
             SettingsView(
                 cameraModel: cameraModel,
                 shutterCount: $shutterCount,
-                shutterCountBurst: $shutterCountBurst
-            )
+                shutterCountBurst: $shutterCountBurst,
+                resetToDefaults: cameraModel.resetToDefaults)
         }
     }
 }

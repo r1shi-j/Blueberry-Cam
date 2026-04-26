@@ -717,16 +717,6 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
             self.captureMode = mode
         }
         
-        self.shouldGeotagLocation = defaults.bool(forKey: "shouldGeotagLocation")
-        self.recognizeBarcodes = defaults.object(forKey: "recognizeBarcodes") as? Bool ?? true
-        self.shouldShowGrid = defaults.object(forKey: "shouldShowGrid") as? Bool ?? true
-        self.shouldShowLevel = defaults.object(forKey: "shouldShowLevel") as? Bool ?? true
-        self.detailedCountdownTimer = defaults.object(forKey: "detailedCountdownTimer") as? Bool ?? false
-        self.shouldHideUIWhileCountingDown = defaults.object(forKey: "shouldHideUIWhileCountingDown") as? Bool ?? true
-        self.shouldPrioritizeBurstSpeed = defaults.object(forKey: "shouldPrioritizeBurstSpeed") as? Bool ?? true
-        self.shouldShowBurstFeedback = defaults.object(forKey: "shouldShowBurstFeedback") as? Bool ?? false
-        self.shouldShowConfettiCannons = defaults.object(forKey: "shouldShowConfettiCannons") as? Bool ?? true
-        
         if let res = defaults.string(forKey: "defaultResolution"), let rPref = ResolutionPreference(rawValue: res) {
             self.defaultResolution = rPref
         }
@@ -744,6 +734,51 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
         if let histLarge = defaults.string(forKey: "defaultHistogramLarge"), let hMode = HistogramMode(rawValue: histLarge) {
             self.defaultHistogramLarge = hMode
         }
+        
+        self.shouldGeotagLocation = defaults.object(forKey: "shouldGeotagLocation") as? Bool ?? false
+        self.recognizeBarcodes = defaults.object(forKey: "recognizeBarcodes") as? Bool ?? false
+        self.shouldShowGrid = defaults.object(forKey: "shouldShowGrid") as? Bool ?? false
+        self.shouldShowLevel = defaults.object(forKey: "shouldShowLevel") as? Bool ?? false
+        self.detailedCountdownTimer = defaults.object(forKey: "detailedCountdownTimer") as? Bool ?? false
+        self.shouldHideUIWhileCountingDown = defaults.object(forKey: "shouldHideUIWhileCountingDown") as? Bool ?? true
+        self.shouldPrioritizeBurstSpeed = defaults.object(forKey: "shouldPrioritizeBurstSpeed") as? Bool ?? true
+        self.shouldShowBurstFeedback = defaults.object(forKey: "shouldShowBurstFeedback") as? Bool ?? false
+        self.shouldShowConfettiCannons = defaults.object(forKey: "shouldShowConfettiCannons") as? Bool ?? true
+    }
+    
+    func resetToDefaults() {
+        let defaults = UserDefaults.standard
+        [
+            "defaultFileFormat",
+            "defaultResolution",
+            "defaultPhotoFilter",
+            "defaultHistogramSmall",
+            "defaultHistogramLarge",
+            "shouldGeotagLocation",
+            "recognizeBarcodes",
+            "shouldShowGrid",
+            "shouldShowLevel",
+            "detailedCountdownTimer",
+            "shouldHideUIWhileCountingDown",
+            "shouldPrioritizeBurstSpeed",
+            "shouldShowBurstFeedback",
+            "shouldShowConfettiCannons"
+        ].forEach(defaults.removeObject)
+        
+        defaultFileFormat = .raw
+        defaultResolution = .max
+        defaultPhotoFilter = .off
+        defaultHistogramSmall = .none
+        defaultHistogramLarge = .none
+        shouldGeotagLocation = false
+        recognizeBarcodes = false
+        shouldShowGrid = false
+        shouldShowLevel = false
+        detailedCountdownTimer = false
+        shouldHideUIWhileCountingDown = true
+        shouldPrioritizeBurstSpeed = true
+        shouldShowBurstFeedback = false
+        shouldShowConfettiCannons = true
     }
     
     private func refreshFastCapturePrioritizationForBurstMode() {

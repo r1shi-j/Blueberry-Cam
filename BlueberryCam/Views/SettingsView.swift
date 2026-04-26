@@ -5,6 +5,8 @@ struct SettingsView: View {
     @Bindable var cameraModel: CameraModel
     @Binding var shutterCount: Int
     @Binding var shutterCountBurst: Int
+    let resetToDefaults: () -> ()
+    @State private var isShowingDefaultsResetAlert = false
     @State private var countResetTarget: ShutterCountResetTarget?
     
     var body: some View {
@@ -63,38 +65,76 @@ struct SettingsView: View {
                         .pickerStyle(.menu)
                     }
                 } header: {
-                    Text("Defaults")
+                    HStack {
+                        Text("Capture Defaults")
+                        Spacer()
+                        Image(systemName: "pencil.and.list.clipboard")
+                    }
                 } footer: {
-                    Text("These are all used as startup defaults. To cycle through histograms, simply tap each histogram.")
+                    Text("Used when the app starts.")
                 }
                 
                 Section {
                     Toggle("Geotag Location", isOn: $cameraModel.shouldGeotagLocation)
-                    Toggle("Prioritize Burst Speed Over Quality", isOn: $cameraModel.shouldPrioritizeBurstSpeed)
+                    Toggle("Faster Burst Capture", isOn: $cameraModel.shouldPrioritizeBurstSpeed)
+                    Toggle("Burst Feedback", isOn: $cameraModel.shouldShowBurstFeedback)
+                    Toggle("Precise Timer", isOn: $cameraModel.detailedCountdownTimer)
+                    Toggle("Hide UI When Counting Down", isOn: $cameraModel.shouldHideUIWhileCountingDown)
+                    Toggle("Capture Celebration", isOn: $cameraModel.shouldShowConfettiCannons)
                 } header: {
-                    Text("Photo Settings")
+                    HStack {
+                        Text("Capture Behaviour")
+                        Spacer()
+                        Image(systemName: "paintbrush.fill")
+                    }
                 } footer: {
-                    Text("Burst speed prioritization allows quicker frames, but less quality.")
+                    Text("Faster burst capture prioritises speed over quality. Burst feedback shows a quick summary when a burst finishes. Precise Timer shows milliseconds instead of just seconds. Lens smudge detection is supported and always enabled.")
                 }
                 
                 Section {
                     Toggle("Grid", isOn: $cameraModel.shouldShowGrid)
                     Toggle("Level/Crosshair", isOn: $cameraModel.shouldShowLevel)
-                    Toggle("Pro Timer", isOn: $cameraModel.detailedCountdownTimer)
-                    Toggle("Hide UI When Counting Down", isOn: $cameraModel.shouldHideUIWhileCountingDown)
-                    Toggle("Burst Feedback", isOn: $cameraModel.shouldShowBurstFeedback)
-                    Toggle("Confetti Cannons", isOn: $cameraModel.shouldShowConfettiCannons)
                     Toggle("Recognize Barcodes", isOn: $cameraModel.recognizeBarcodes)
                 } header: {
-                    Text("Customization")
-                } footer : {
-                    Text("Pro Timer shows milliseconds instead of just seconds. Burst feedback shows a quick summary when a burst finishes. This app supports lens smudge detection and is always enabled.")
+                    HStack {
+                        Text("Viewfinder")
+                        Spacer()
+                        Image(systemName: "scope")
+                    }
+                }
+                                
+                NavigationLink {
+                    Form {
+                        Text("Locked Capture opens BLueberry Cam from system surfaces like Control Centre and the Lock Screen. Some full-app features are unavailable there, including bursts, capture celebrations, overlays such as historgrams, zebras, highlight clipping, focus peaking, focus loupe, level and grid, as well as selfie cameras, geotagging location, recognising barcodes. Settings, clean UI and filters will also not be available. Any settings above which you have changed will not be read and so the defaults the app shipped with will be used.")
+                        Text("You can open the full app from the locked session by clicking the icon in the bottom left.")
+                        Text("Photos library usage is only required to search for the album to save photos taken with this app, you can set it to limited access and select no photos, the app still work.")
+                        
+                        Section("Features") {
+                            Text("With auto focus and auto exposure, tap sets focus and exposure at the selected point, and hold locks both focus and exposure. With auto focus and manual exposure, tap sets focus and hold locks focus. With manual focus and auto exposure, tap sets exposure at the selected point.")
+                            Text("With manual controls holding or double tapping will reset it to auto, with manual burst config, double tapping resets to auto.")
+                            Text("Tap on a histogram to cycle through, long press to hide it. When both are hidden they can be reshown by tapping the histogram icon in the top left status bar.")
+                            Text("Double tapping the camera preview will switch to selfie mode as an alternative to tapping the camera flip icon above the camera preview.")
+                        }
+                    }
+                    .navigationTitle("About")
+                } label: {
+                    HStack {
+                        Text("About")
+                        Spacer()
+                        Image(systemName: "info.circle")
+                    }
                 }
                 
-                Section("About") {
-                    Text("This app supports LockedCameraCapture which enables the app to be opened from camera control, control centre and from the lock screen action buttons. However when the app is opened from the lock screen some features arent available, these include: Histograms, Zebras, Highlight Clipping, Focus Peaking, Focus Loupe, Level, Grid, Selfie Cameras, Embedding Location and Recognising Barcodes. Settings, Clean UI view and filters will also not be available as camera control isn't available. Additionally the default image format and resolution will not be applied, this required a paid Apple Developer account. The defaults used will be Efficient High Efficiency (HEIF 12MP). To open the full app click the app icon in the bottom left (left of the shutter).")
-                    Text("Photos library usage is only required to search for the album to save photos taken with this app, you can set it to limited access and select no photos, the app still work.")
-                    Text("With auto focus and auto exposure, tap sets focus and exposure at the selected point, and hold locks both focus and exposure. With auto focus and manual exposure, tap sets focus and hold locks focus. With manual focus and auto exposure, tap sets exposure at the selected point.")
+                Section {
+                    Button {
+                        isShowingDefaultsResetAlert = true
+                    } label: {
+                        LabeledContent("Reset to Defaults") { Image(systemName: "exclamationmark.arrow.trianglehead.counterclockwise.rotate.90") }
+                            .tint(.red)
+                    }
+                    
+                    // TODO: Reset tips
+                    
                     LabeledContent {
                         Text(shutterCount.formatted())
                     } label: {
@@ -112,6 +152,12 @@ struct SettingsView: View {
                         }
                         .tint(.red)
                     }
+                } header: {
+                    HStack {
+                        Text("Danger Zone")
+                        Spacer()
+                        Image(systemName: "exclamationmark.triangle.fill")
+                    }
                 }
                 
                 Section {
@@ -128,7 +174,11 @@ struct SettingsView: View {
                             .tint(.blue)
                     }
                 } header: {
-                    Text("Contact")
+                    HStack {
+                        Text("Contact")
+                        Spacer()
+                        Image(systemName: "signpost.right.and.left.fill")
+                    }
                 } footer: {
                     Text("© 2026 Rishi Jansari . All Rights Reserved.")
                 }
@@ -140,6 +190,10 @@ struct SettingsView: View {
                         dismiss()
                     }
                 }
+            }
+            .alert("Are you sure you want to reset all custom settings?", isPresented: $isShowingDefaultsResetAlert) {
+                Button("Cancel", role: .cancel) { }
+                Button("Reset", role: .destructive, action: resetToDefaults)
             }
             .alert(countResetTarget?.confirmationTitle ?? "", isPresented: Binding(get: {
                 countResetTarget != nil
@@ -210,6 +264,5 @@ private enum ShutterCountResetTarget {
     SettingsView(
         cameraModel: cameraModel,
         shutterCount: $shutterCount,
-        shutterCountBurst: $shutterCountBurst
-    )
+        shutterCountBurst: $shutterCountBurst) { }    
 }
