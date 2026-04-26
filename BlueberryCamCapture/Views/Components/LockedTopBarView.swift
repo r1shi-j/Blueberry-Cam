@@ -2,6 +2,27 @@ internal import AVFoundation
 import SwiftUI
 
 extension LockedCameraModel {
+    // MARK: Format/resolution properties
+    fileprivate func resolutionForeground(for isSelected: Bool, isEnabled: Bool) -> Color {
+        guard isEnabled else { return Colors.buttonText.opacity(0.3) }
+        return isSelected ? .black : .white
+    }
+    
+    fileprivate func resolutionBackground(for isSelected: Bool, isEnabled: Bool) -> Color {
+        guard isEnabled else { return Colors.buttonBackground.opacity(0.3) }
+        return isSelected ? .yellow : Colors.buttonBackground
+    }
+    
+    fileprivate func formatForeground(for mode: CaptureMode, isEnabled: Bool) -> Color {
+        guard isEnabled else { return Colors.buttonText.opacity(0.3) }
+        return captureMode == mode ? .black : .white
+    }
+    
+    fileprivate func formatBackground(for mode: CaptureMode, isEnabled: Bool) -> Color {
+        guard isEnabled else { return Colors.buttonBackground.opacity(0.3) }
+        return captureMode == mode ? .yellow : Colors.buttonBackground
+    }
+    
     // MARK: Flash properties
     fileprivate var flashButtonForeground: Color {
         flashMode == .off || !supportsFlash ? Colors.buttonText : .black
@@ -43,27 +64,6 @@ extension LockedCameraModel {
     
     fileprivate var timerButtonBackground: Color {
         timerMode == .off ? Colors.buttonBackground : .yellow
-    }
-    
-    // MARK: Format/resolution properties
-    fileprivate func resolutionForeground(for isSelected: Bool, isEnabled: Bool) -> Color {
-        guard isEnabled else { return Colors.buttonText.opacity(0.3) }
-        return isSelected ? .black : .white
-    }
-    
-    fileprivate func resolutionBackground(for isSelected: Bool, isEnabled: Bool) -> Color {
-        guard isEnabled else { return Colors.buttonBackground.opacity(0.3) }
-        return isSelected ? .yellow : Colors.buttonBackground
-    }
-    
-    fileprivate func formatForeground(for mode: CaptureMode, isEnabled: Bool) -> Color {
-        guard isEnabled else { return Colors.buttonText.opacity(0.3) }
-        return captureMode == mode ? .black : .white
-    }
-    
-    fileprivate func formatBackground(for mode: CaptureMode, isEnabled: Bool) -> Color {
-        guard isEnabled else { return Colors.buttonBackground.opacity(0.3) }
-        return captureMode == mode ? .yellow : Colors.buttonBackground
     }
 }
 

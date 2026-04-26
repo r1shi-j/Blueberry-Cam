@@ -9,6 +9,7 @@ extension CameraModel {
     }
     
     func switchLens(to lens: Lens) {
+        let lens = switchableLens(for: lens)
         guard lens != activeLens else { return }
         guard let previewCamera = AVCaptureDevice.default(lens.deviceType, for: .video, position: lens.position) else { return }
         
@@ -93,6 +94,7 @@ extension CameraModel {
                 if !cam.isLockingFocusWithCustomLensPositionSupported {
                     self.isAutoFocus = true
                 }
+                self.applyPendingCaptureModeAfterLensSwitch()
                 self.lensSwitchCompletionCount += 1
             }
         }
@@ -127,7 +129,7 @@ extension CameraModel {
     }
     
     func toggleSelfie() {
-        let target: Lens = activeLens.isFront ? .wide : .front
+        let target: Lens = activeLens.isFront ? .wide : (captureMode == .raw ? .frontUltraWide : .front)
         switchLens(to: target)
     }
     
@@ -192,12 +194,51 @@ extension CameraModel {
     
     func selectResolution(_ opt: ResolutionOption) {
         guard isResolutionEnabled(opt) else { return }
+        if isHighResolutionOption(opt), !activeLens.preservesHighResolutionCapture {
+            switchLens(to: activeLens.highResolutionFallbackLens)
+        }
+        
         selectedResolution = opt
     }
     
     func changeCaptureFormat(to mode: CaptureMode) {
         guard isFormatEnabled(mode) else { return }
+        if mode == .raw {
+            switchToRawCaptureMode()
+            return
+        }
+        
         captureMode = mode
+    }
+    
+    func switchToRawCaptureMode() {
+        guard canSelectRawCaptureMode else { return }
+        
+        if !activeLens.preservesRawCaptureMode {
+            pendingCaptureModeAfterLensSwitch = .raw
+            switchLens(to: activeLens.rawFallbackLens)
+            return
+        }
+        captureMode = .raw
+    }
+    
+    private func applyPendingCaptureModeAfterLensSwitch() {
+        guard let pendingMode = pendingCaptureModeAfterLensSwitch else { return }
+        pendingCaptureModeAfterLensSwitch = nil
+        guard isFormatEnabled(pendingMode) else { return }
+        captureMode = pendingMode
+    }
+    
+    private func switchableLens(for lens: Lens) -> Lens {
+        if captureMode == .raw {
+            return lens.rawFallbackLens
+        }
+        
+        if isHighResolutionSelected {
+            return lens.highResolutionFallbackLens
+        }
+        
+        return lens
     }
     
     func cycleFlashMode() {

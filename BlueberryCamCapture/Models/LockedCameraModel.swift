@@ -38,6 +38,7 @@ class LockedCameraModel: NSObject {
     private(set) var availableResolutions: [ResolutionOption] = []
     private(set) var enabledResolutions: [ResolutionOption] = []
     var selectedResolution: ResolutionOption? = nil
+    var pendingCaptureModeAfterLensSwitch: CaptureMode?
     var activeLens: Lens = .wide
     var timerMode: TimerMode = .off
     var flashMode: AVCaptureDevice.FlashMode = .off
@@ -174,11 +175,63 @@ class LockedCameraModel: NSObject {
     var captureAspectRatio: CGFloat { 3.0 / 4.0 }
     
     func isFormatEnabled(_ mode: CaptureMode) -> Bool {
-        enabledFormats.contains(mode)
+        if mode == .raw {
+            return canSelectRawCaptureMode
+        }
+        
+        return enabledFormats.contains(mode)
+    }
+    
+    var canSelectRawCaptureMode: Bool {
+        guard availableFormats.contains(.raw) else { return false }
+        guard !isHighResolutionSelected else { return false }
+        guard isAutoExposure, !isMacroEnabled else { return enabledFormats.contains(.raw) }
+        return hasRawCapableLens
+    }
+    
+    private var hasRawCapableLens: Bool {
+        Lens.allCases.contains { lens in
+            !lens.isFront &&
+            lens.preservesRawCaptureMode &&
+            AVCaptureDevice.default(lens.deviceType, for: .video, position: .back) != nil
+        }
     }
     
     func isResolutionEnabled(_ option: ResolutionOption) -> Bool {
-        enabledResolutions.contains(where: { $0.id == option.id })
+        if isHighResolutionOption(option) {
+            return canSelectHighResolution
+        }
+        
+        return enabledResolutions.contains(where: { $0.id == option.id })
+    }
+    
+    var isHighResolutionSelected: Bool {
+        guard let selectedResolution else { return false }
+        return isHighResolutionOption(selectedResolution)
+    }
+    
+    var canSelectHighResolution: Bool {
+        guard captureMode != .raw,
+              !isMacroEnabled,
+              highResolutionOption != nil else { return false }
+        return hasHighResolutionCapableLens
+    }
+    
+    private var highResolutionOption: ResolutionOption? {
+        guard availableResolutions.count > 1 else { return nil }
+        return availableResolutions.last
+    }
+    
+    func isHighResolutionOption(_ option: ResolutionOption) -> Bool {
+        highResolutionOption?.id == option.id
+    }
+    
+    private var hasHighResolutionCapableLens: Bool {
+        Lens.allCases.contains { lens in
+            !lens.isFront &&
+            lens.preservesHighResolutionCapture &&
+            AVCaptureDevice.default(lens.deviceType, for: .video, position: .back) != nil
+        }
     }
     
     var supportsManualFocus: Bool {

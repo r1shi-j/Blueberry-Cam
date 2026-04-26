@@ -470,6 +470,11 @@ struct CaptureView: View {
                             
                             Spacer()
                             
+                            if let selectedControl {
+                                ManualControlsView(cameraModel: cameraModel, control: selectedControl)
+                                    .padding(.bottom, cameraModel.histogramModeLarge != .none ? 10 : 30)
+                            }
+                            
                             ZStack {
                                 if cameraModel.histogramModeLarge != .none {
                                     HistogramView(
@@ -483,7 +488,7 @@ struct CaptureView: View {
                                     )
                                     .frame(height: 60)
                                     .padding(.horizontal, 20)
-                                    .padding(.bottom, 8)
+                                    .padding(.bottom, 30)
                                     .onTapGesture {
                                         hapticTrigger += 1
                                         cameraModel.cycleHistogramMode(mode: &cameraModel.histogramModeLarge)
@@ -496,17 +501,6 @@ struct CaptureView: View {
                                 }
                             }
                             .animation(.bouncy, value: cameraModel.histogramModeLarge)
-                            
-                            if let selectedControl {
-                                ManualControlsView(cameraModel: cameraModel, control: selectedControl)
-                                    .padding(.bottom, 8)
-                            }
-                            
-                            ZStack {
-                                LensSelectorView(cameraModel: cameraModel)
-                                    .padding(.bottom, 30)
-                            }
-                            .animation(.bouncy, value: cameraModel.activeLens)
                         }
                         .transition(.opacity)
                     } else {

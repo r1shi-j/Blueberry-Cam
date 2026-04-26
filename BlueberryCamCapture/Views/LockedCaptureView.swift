@@ -250,14 +250,8 @@ struct LockedCaptureView: View {
                             
                             if let selectedControl {
                                 LockedManualControlsView(cameraModel: cameraModel, control: selectedControl)
-                                    .padding(.bottom, 8)
-                            }
-                            
-                            ZStack {
-                                LockedLensSelectorView(cameraModel: cameraModel)
                                     .padding(.bottom, 30)
                             }
-                            .animation(.bouncy, value: cameraModel.activeLens)
                             
                             LockedBottomBarView(cameraModel: cameraModel, lockedSession: lockedSession)
                                 .padding(.bottom, 30)

@@ -401,6 +401,48 @@ enum Lens: String, CaseIterable {
             default: 1.0
         }
     }
+    
+    var preservesRawCaptureMode: Bool {
+        switch self {
+            case .frontUltraWide, .ultraWide, .wide, .tele4x:
+                true
+            default:
+                false
+        }
+    }
+    
+    var preservesHighResolutionCapture: Bool {
+        switch self {
+            case .ultraWide, .wide, .tele4x:
+                true
+            default:
+                false
+        }
+    }
+    
+    var rawFallbackLens: Lens {
+        switch self {
+            case .front:
+                .frontUltraWide
+            case .tele2x:
+                .wide
+            case .tele8x:
+                .tele4x
+            default:
+                self
+        }
+    }
+    
+    var highResolutionFallbackLens: Lens {
+        switch self {
+            case .tele2x:
+                .wide
+            case .tele8x:
+                .tele4x
+            default:
+                self
+        }
+    }
 }
 
 // MARK: - AppView

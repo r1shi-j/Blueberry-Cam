@@ -2,6 +2,27 @@ internal import AVFoundation
 import SwiftUI
 
 extension CameraModel {
+    // MARK: Format/resolution properties
+    fileprivate func resolutionForeground(for isSelected: Bool, isEnabled: Bool) -> Color {
+        guard isEnabled else { return Colors.buttonText.opacity(0.3) }
+        return isSelected ? .black : .white
+    }
+    
+    fileprivate func resolutionBackground(for isSelected: Bool, isEnabled: Bool) -> Color {
+        guard isEnabled else { return Colors.buttonBackground.opacity(0.3) }
+        return isSelected ? .yellow : Colors.buttonBackground
+    }
+    
+    fileprivate func formatForeground(for mode: CaptureMode, isEnabled: Bool) -> Color {
+        guard isEnabled else { return Colors.buttonText.opacity(0.3) }
+        return captureMode == mode ? .black : .white
+    }
+    
+    fileprivate func formatBackground(for mode: CaptureMode, isEnabled: Bool) -> Color {
+        guard isEnabled else { return Colors.buttonBackground.opacity(0.3) }
+        return captureMode == mode ? .yellow : Colors.buttonBackground
+    }
+    
     // MARK: Flash properties
     fileprivate var flashButtonForeground: Color {
         flashMode == .off || !supportsFlash ? Colors.buttonText : .black
@@ -95,25 +116,17 @@ extension CameraModel {
         isBurstModeEnabled
     }
     
-    // MARK: Format/resolution properties
-    fileprivate func resolutionForeground(for isSelected: Bool, isEnabled: Bool) -> Color {
-        guard isEnabled else { return Colors.buttonText.opacity(0.3) }
-        return isSelected ? .black : .white
+    // MARK: Selfie Switch properties
+    fileprivate var selfieButtonSymbol: String {
+        "arrow.trianglehead.2.clockwise.rotate.90.camera.fill"
     }
     
-    fileprivate func resolutionBackground(for isSelected: Bool, isEnabled: Bool) -> Color {
-        guard isEnabled else { return Colors.buttonBackground.opacity(0.3) }
-        return isSelected ? .yellow : Colors.buttonBackground
+    fileprivate var selfieButtonForeground: Color {
+        Colors.buttonText
     }
     
-    fileprivate func formatForeground(for mode: CaptureMode, isEnabled: Bool) -> Color {
-        guard isEnabled else { return Colors.buttonText.opacity(0.3) }
-        return captureMode == mode ? .black : .white
-    }
-    
-    fileprivate func formatBackground(for mode: CaptureMode, isEnabled: Bool) -> Color {
-        guard isEnabled else { return Colors.buttonBackground.opacity(0.3) }
-        return captureMode == mode ? .yellow : Colors.buttonBackground
+    fileprivate var selfieButtonBackground: Color {
+        Colors.buttonBackground
     }
 }
 
@@ -414,6 +427,27 @@ struct TopBarView: View {
                 .animation(.bouncy, value: cameraModel.timerMode)
                 .disabled(cameraModel.isTimerButtonDisabled)
                 .opacity(cameraModel.timerButtonOpacity)
+                
+                // MARK: - Selfie switch
+                Button {
+                    hapticTrigger += 1
+                    withAnimation(.bouncy) {
+                        cameraModel.toggleSelfie()
+                    }
+                } label: {
+                    Image(systemName: cameraModel.selfieButtonSymbol)
+                        .font(.system(size: 12, weight: .bold))
+                        .frame(height: 18)
+                        .foregroundStyle(cameraModel.selfieButtonForeground)
+                        .rotation3DEffect(
+                            .degrees(cameraModel.activeLens.isFront ? 180 : 0),
+                            axis: (x: 0, y: 1, z: 0)
+                        )
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 5)
+                        .background(cameraModel.selfieButtonBackground)
+                        .clipShape(.capsule)
+                }
             }
             .padding(.horizontal, 8)
         }

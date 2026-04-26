@@ -72,17 +72,10 @@ struct LockedBottomBarView: View {
                 }
                 .frame(maxWidth: .infinity)
                 
-                // MARK: - Placeholder
-                Button {
-                    
-                } label: {
-                    Image(systemName: "applelogo")
-                        .font(.system(size: 20))
-                        .foregroundStyle(.white.opacity(0.8))
-                }
+                // MARK: - Lens picker
+                LockedLensSelectorView(cameraModel: cameraModel)
                 .frame(height: 82)
                 .frame(maxWidth: .infinity)
-                .disabled(true)
             }
         }
     }
