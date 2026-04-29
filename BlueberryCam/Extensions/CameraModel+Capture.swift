@@ -158,7 +158,6 @@ extension CameraModel: AVCapturePhotoCaptureDelegate {
             if context.isBurst {
                 guard shouldReportBurstFailure else { return }
                 guard !self.shouldIgnoreBurstCaptureFailure(context: context, uniqueID: uniqueID) else { return }
-                self.burstCaptureFailureCount += 1
                 self.recordBurstCaptureFailure(context: context)
             } else if isGenericAVFoundationFailure, self.shouldSuppressGenericCaptureErrorAsBurstTail() {
                 return
@@ -170,9 +169,12 @@ extension CameraModel: AVCapturePhotoCaptureDelegate {
     }
     
     private nonisolated func reportSaveSuccess(context: PhotoCaptureContext) {
-        guard context.isBurst else { return }
         Task { @MainActor in
-            self.recordBurstSaveSuccess(context: context)
+            if context.isBurst {
+                self.recordBurstSaveSuccess(context: context)
+            } else {
+                self.onStandardPhotoSaved?()
+            }
         }
     }
     
@@ -185,7 +187,6 @@ extension CameraModel: AVCapturePhotoCaptureDelegate {
     private nonisolated func reportSaveFailure(_ message: String, context: PhotoCaptureContext) {
         Task { @MainActor in
             if context.isBurst {
-                self.burstSaveFailureCount += 1
                 self.recordBurstSaveFailure(context: context)
             } else {
                 self.errorMessage = message

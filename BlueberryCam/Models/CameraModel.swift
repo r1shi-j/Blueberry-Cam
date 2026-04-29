@@ -19,37 +19,12 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
     let _captureContextStore = PhotoCaptureContextStore()
     let _burstCaptureTracker = BurstCaptureTracker()
     
-    // MARK: - Barcode Detection
-    nonisolated let metadataOutput = AVCaptureMetadataOutput()
-    var detectedCodeURL: URL? = nil
-    var detectedCodeString: String? = nil
-    var ignoredCodes: [String: Date] = [:]
-    var barcodeResetTask: Task<Void, Never>?
-    var supportedMetadataTypes: [AVMetadataObject.ObjectType] {
-        [
-            .qr, .microQR,
-            .ean13, .ean8, .upce,
-            .code128, .code39, .code39Mod43, .code93,
-            .itf14, .interleaved2of5,
-            .dataMatrix, .pdf417, .microPDF417, .aztec,
-            .codabar, .gs1DataBar, .gs1DataBarExpanded, .gs1DataBarLimited
-        ]
-    }
-    
-    // MARK: - Lens cleaning detection
-    var lensSmudgeDetectionStatus: AVCaptureCameraLensSmudgeDetectionStatus = .disabled
-    var shouldShowLensCleaningHint = false
-    @ObservationIgnored
-    private var didDismissLensCleaningHint = false
-    @ObservationIgnored
-    private var lensSmudgeStatusObservation: NSKeyValueObservation?
-    
-    // MARK: - Camera Control (iOS 18)
+    // MARK: - Camera Control
     var cleanUIControl: AVCaptureIndexPicker?
     var filterControl: AVCaptureIndexPicker?
     var lensControl: AVCaptureIndexPicker?
     var evControl: AVCaptureSlider?
-    var isoControl: AVCaptureSlider?
+    var isoControl: AVCaptureIndexPicker?
     var ssControl: AVCaptureIndexPicker?
     var focusControl: AVCaptureSlider?
     var wbControl: AVCaptureSlider?
@@ -145,85 +120,46 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
     }
     private(set) var availableFormats: [CaptureMode] = []
     private(set) var enabledFormats: [CaptureMode] = []
+    var selectedResolution: ResolutionOption? = nil
     private(set) var availableResolutions: [ResolutionOption] = []
     private(set) var enabledResolutions: [ResolutionOption] = []
-    var selectedResolution: ResolutionOption? = nil
     var pendingCaptureModeAfterLensSwitch: CaptureMode?
+    var activeLens: Lens = .wide
+    var isSwitchingLens = false
+    
+    // MARK: - UI State
+    private(set) var isCapturing: Bool = false
+    var showError: Bool = false
+    var errorMessage: String = ""
+    var appView: AppView = .standard {
+        didSet {
+            updateAnalysisPauseState()
+            if oldValue != appView && (appView == .settings || oldValue == .settings) {
+                setupCameraControls()
+            }
+        }
+    }
+    @ObservationIgnored
+    nonisolated(unsafe) private(set) var shouldPauseAnalysis = false
+    @ObservationIgnored
     var selectedPhotoFilter: PhotoFilter = .off {
         didSet {
             syncPhotoFilterToHardware()
         }
     }
-    var timerMode: TimerMode = .off
-    var activeLens: Lens = .wide
-    var flipRotation: Double = 0
-    var flashMode: AVCaptureDevice.FlashMode = .off
-    var isBurstModeEnabled: Bool = false {
-        didSet {
-            refreshFastCapturePrioritizationForBurstMode()
-            if isBurstModeEnabled {
-                flashMode = .off
-                timerMode = .off
-            }
-        }
-    }
-    private(set) var isBurstCapturing: Bool = false {
-        didSet {
-            updateAnalysisPauseState()
-            updateMetadataOutputStatus()
-            if isBurstCapturing {
-                detectedCodeURL = nil
-                detectedCodeString = nil
-                barcodeResetTask?.cancel()
-                barcodeResetTask = nil
-            }
-        }
-    }
-    private(set) var burstCapturedCount: Int = 0
-    var burstCaptureFailureCount: Int = 0
-    var burstSaveFailureCount: Int = 0
-    var burstIntervalSeconds: Double?
-    var burstFrameLimit: Int?
-    var burstIntervalRemainingSeconds: Double?
-    var burstFeedbackMessage: String?
     var confettiCannonTrigger = 0
-    var burstSessionCounter = 0
-    var activeBurstSessionID: Int?
-    var burstSaveStatsBySession: [Int: BurstSaveStats] = [:]
     @ObservationIgnored
-    var burstCaptureTask: Task<Void, Never>?
-    @ObservationIgnored
-    var burstFeedbackTask: Task<Void, Never>?
-    @ObservationIgnored
-    nonisolated(unsafe) private(set) var shouldPauseAnalysis = false
-    var isMacroEnabled: Bool = false {
-        didSet {
-            if oldValue != isMacroEnabled {
-                applyMacroMode()
-                buildAvailableFormats()
-            }
-        }
-    }
-    @ObservationIgnored
-    var timerCountdownTask: Task<Void, Never>?
-    var isTimerCountingDown = false {
-        didSet {
-            guard oldValue != isTimerCountingDown else { return }
-            updateAnalysisPauseState()
-            updateMetadataOutputStatus()
-            if isTimerCountingDown {
-                detectedCodeURL = nil
-                detectedCodeString = nil
-                barcodeResetTask?.cancel()
-                barcodeResetTask = nil
-            }
-        }
-    }
-    var timerCountdownValue: Double? = nil
+    var onStandardPhotoSaved: (() -> Void)?
     @ObservationIgnored
     nonisolated(unsafe) var lastGravity: (x: Double, y: Double, z: Double) = (0, -1, 0)
     @ObservationIgnored
-    var rotationCoordinator: AVCaptureDevice.RotationCoordinator?
+    var analysisGridSize: CGSize = .zero
+    
+    // MARK: - Live readouts
+    var liveISO: Float = 0
+    var liveShutter: String = ""
+    var liveWB: String = ""
+    var liveFocus: String = ""
     
     // MARK: - Manual controls
     var isAutoExposure: Bool = true {
@@ -232,8 +168,7 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
                 if !isAutoExposure, let d = device {
                     let currentISO = d.iso
                     let currentDur = d.exposureDuration
-                    let snappedISO = round(currentISO / 50.0) * 50.0
-                    self.iso = max(minISO, min(maxISO, snappedISO))
+                    self.iso = nearestISOStop(to: currentISO)
                     if let closestIdx = shutterSpeeds.indices.min(by: {
                         abs(CMTimeGetSeconds(shutterSpeeds[$0]) - CMTimeGetSeconds(currentDur)) <
                             abs(CMTimeGetSeconds(shutterSpeeds[$1]) - CMTimeGetSeconds(currentDur))
@@ -256,7 +191,23 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
     }
     private(set) var minISO: Float = 25
     private(set) var maxISO: Float = 6400
+    private let preferredISOStops: [Float] = [
+        25, 50, 64, 75, 100, 125, 150, 175, 200,
+        250, 300, 350, 400,
+        500, 600, 700, 800,
+        1000, 1200, 1400, 1600,
+        2000, 2400, 2800, 3200,
+        4000, 4800, 5600, 6400,
+        8000, 9600, 11200, 12000
+    ]
+    private(set) var isoStops: [Float] = []
     private(set) var shutterSpeeds: [CMTime] = []
+    private let preferredShutterDenominators: [Int] = [
+        1, 2, 3, 4, 5, 6, 8, 10, 13, 15, 20, 25, 30, 40, 50, 60, 80, 100, 125,
+        160, 200, 250, 320, 400, 500, 640, 800, 1000, 1250, 1600, 2000, 2500,
+        3200, 4000, 5000, 6000, 7000, 8000, 9000, 10000, 12500, 15000, 17500,
+        20000, 25000, 30000, 40000, 50000, 62500
+    ]
     var shutterIndex: Int = 0 {
         didSet {
             if oldValue != shutterIndex {
@@ -264,8 +215,6 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
             }
         }
     }
-    /// Denominator for in-app shutter slider (1 = 1s, 500 = 1/500s). 0 means use shutterIndex instead.
-    var manualShutterDenominator: Int = 0
     var exposureBias: Float = 0.0 {
         didSet {
             if oldValue != exposureBias {
@@ -276,7 +225,6 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
     private(set) var minExposureBias: Float = -8.0
     private(set) var maxExposureBias: Float = 8.0
     var exposureDebounceTask: Task<Void, Never>?
-    
     var isAdjustingManualFocus: Bool = false
     var showFocusPeaking: Bool = true {
         didSet {
@@ -296,6 +244,9 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
                 peakingEnabledForAnalysis = !isAutoFocus && showFocusPeaking
                 loupeEnabledForAnalysis = !isAutoFocus && showFocusLoupe
                 if !isAutoFocus, let d = device {
+                    if !showFocusPeaking && !showFocusLoupe {
+                        showFocusPeaking = true
+                    }
                     self.lensPosition = d.lensPosition
                 }
                 updateCameraControlsMode()
@@ -310,7 +261,6 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
             }
         }
     }
-    
     @ObservationIgnored
     nonisolated(unsafe) private(set) var lastLensPosition: Float = 1.0
     @ObservationIgnored
@@ -318,7 +268,6 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
     @ObservationIgnored
     nonisolated(unsafe) private(set) var minimumFocusDistanceForAnalysis: Float = 0
     var focusPeakingHoldTask: Task<Void, Never>?
-    
     var isAutoWhiteBalance: Bool = true {
         didSet {
             if oldValue != isAutoWhiteBalance {
@@ -345,49 +294,81 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
             }
         }
     }
-    var histogramModeSmall: HistogramMode = .none {
-        didSet { histogramModeForAnalysisSmall = histogramModeSmall }
-    }
-    var histogramModeLarge: HistogramMode = .none {
-        didSet { histogramModeForAnalysisLarge = histogramModeLarge }
-    }
-    var showClipping: Bool = false {
-        didSet { clippingEnabledForAnalysis = showClipping }
-    }
-    var showZebraStripes: Bool = false {
-        didSet { zebraEnabledForAnalysis = showZebraStripes }
-    }
     
-    // MARK: - UI State
-    private(set) var isCapturing: Bool = false
-    var showError: Bool = false
-    var errorMessage: String = ""
-    var liveISO: Float = 0
-    var liveShutter: String = ""
-    var liveWB: String = ""
-    var liveFocus: String = ""
-    var lensSwitchCompletionCount: Int = 0
-    var appView: AppView = .standard {
+    // MARK: - Flash
+    var flashMode: AVCaptureDevice.FlashMode = .off
+    
+    // MARK: - Macro
+    var isMacroEnabled: Bool = false {
         didSet {
-            updateAnalysisPauseState()
-            if oldValue != appView && (appView == .settings || oldValue == .settings) {
-                setupCameraControls()
+            if oldValue != isMacroEnabled {
+                applyMacroMode()
+                buildAvailableFormats()
             }
         }
     }
-    var loupeImage: CGImage?
-    nonisolated static let loupeCIContext = CIContext(options: [.useSoftwareRenderer: false])
+    
+    // MARK: - Timer
+    var timerMode: TimerMode = .off
+    var timerCountdownTask: Task<Void, Never>?
+    var isTimerCountingDown = false {
+        didSet {
+            guard oldValue != isTimerCountingDown else { return }
+            updateAnalysisPauseState()
+            updateMetadataOutputStatus()
+            if isTimerCountingDown {
+                detectedCodeURL = nil
+                detectedCodeString = nil
+                barcodeResetTask?.cancel()
+                barcodeResetTask = nil
+            }
+        }
+    }
+    var timerCountdownValue: Double? = nil
+    @ObservationIgnored
+    var onTimerCountdownSecond: (() -> Void)?
+    
+    // MARK: - Burst
+    var isBurstModeEnabled: Bool = false {
+        didSet {
+            refreshFastCapturePrioritizationForBurstMode()
+            if isBurstModeEnabled {
+                flashMode = .off
+                timerMode = .off
+            }
+        }
+    }
+    private(set) var isBurstCapturing: Bool = false {
+        didSet {
+            updateAnalysisPauseState()
+            updateMetadataOutputStatus()
+            if isBurstCapturing {
+                detectedCodeURL = nil
+                detectedCodeString = nil
+                barcodeResetTask?.cancel()
+                barcodeResetTask = nil
+            }
+        }
+    }
+    private(set) var burstCapturedCount: Int = 0
+    var burstIntervalSeconds: Double?
+    var burstFrameLimit: Int?
+    var burstIntervalRemainingSeconds: Double?
+    var burstFeedbackMessage: String?
+    var burstSessionCounter = 0
+    var activeBurstSessionID: Int?
+    var burstSaveStatsBySession: [Int: BurstSaveStats] = [:]
+    @ObservationIgnored
+    var burstCaptureTask: Task<Void, Never>?
+    @ObservationIgnored
+    var burstFeedbackTask: Task<Void, Never>?
+    
+    // MARK: - Selfie switch
+    var flipRotation: Double = 0
+    var lensSwitchCompletionCount: Int = 0
+    
+    // MARK: - Focus
     var focusPeakingMask: [UInt8] = []
-    var zebraMask: [UInt8] = []
-    var clippingMask: [UInt8] = []
-    var analysisGridSize: CGSize = .zero
-    var histogramData: [Float] = Array(repeating: 0, count: 256)
-    var redHistogram: [Float] = Array(repeating: 0, count: 256)
-    var greenHistogram: [Float] = Array(repeating: 0, count: 256)
-    var blueHistogram: [Float] = Array(repeating: 0, count: 256)
-    var waveformData: [Float] = []
-    nonisolated static var wfCols: Int { WaveformConstants.wfCols }
-    nonisolated static var wfRows: Int { WaveformConstants.wfRows }
     var tapFocusIndicatorPoint: CGPoint? = nil
     var isTapFocusIndicatorVisible = false
     var isTapFocusIndicatorDimmed = false
@@ -411,23 +392,81 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
     @ObservationIgnored
     var ignoredTapFocusAdjustmentDeadline: Date?
     @ObservationIgnored
+    var tapFocusRetakeProtectionUntil: Date?
+    @ObservationIgnored
     var tapFocusLensPositionBaseline: Float?
     @ObservationIgnored
     var tapFocusLensPositionMonitorTask: Task<Void, Never>?
+    var loupeImage: CGImage?
     @ObservationIgnored
     nonisolated(unsafe) private(set) var loupeEnabledForAnalysis: Bool = false
     @ObservationIgnored
     nonisolated(unsafe) private(set) var peakingEnabledForAnalysis: Bool = false
+    
+    // MARK: - Zebras
+    var showZebraStripes: Bool = false {
+        didSet { zebraEnabledForAnalysis = showZebraStripes }
+    }
+    var zebraMask: [UInt8] = []
     @ObservationIgnored
     nonisolated(unsafe) private(set) var zebraEnabledForAnalysis: Bool = false
+    
+    // MARK: - Highlight Clipping
+    var showClipping: Bool = false {
+        didSet { clippingEnabledForAnalysis = showClipping }
+    }
+    var clippingMask: [UInt8] = []
     @ObservationIgnored
     nonisolated(unsafe) private(set) var clippingEnabledForAnalysis: Bool = false
+    
+    // MARK: - Histograms
+    var histogramModeSmall: HistogramMode = .none {
+        didSet { histogramModeForAnalysisSmall = histogramModeSmall }
+    }
+    var histogramModeLarge: HistogramMode = .none {
+        didSet { histogramModeForAnalysisLarge = histogramModeLarge }
+    }
+    var histogramData: [Float] = Array(repeating: 0, count: 256)
+    var redHistogram: [Float] = Array(repeating: 0, count: 256)
+    var greenHistogram: [Float] = Array(repeating: 0, count: 256)
+    var blueHistogram: [Float] = Array(repeating: 0, count: 256)
+    var waveformData: [Float] = []
+    nonisolated static var wfCols: Int { WaveformConstants.wfCols }
+    nonisolated static var wfRows: Int { WaveformConstants.wfRows }
     @ObservationIgnored
     nonisolated(unsafe) private(set) var histogramModeForAnalysisSmall: HistogramMode = .luminance
     @ObservationIgnored
     nonisolated(unsafe) private(set) var histogramModeForAnalysisLarge: HistogramMode = .luminance
     
-    // MARK: - Lens cleaning
+    // MARK: - Location
+    let locationManager = CLLocationManager()
+    var currentLocation: CLLocation?
+    
+    // MARK: - Barcode Detection
+    nonisolated let metadataOutput = AVCaptureMetadataOutput()
+    var detectedCodeURL: URL? = nil
+    var detectedCodeString: String? = nil
+    var ignoredCodes: [String: Date] = [:]
+    var barcodeResetTask: Task<Void, Never>?
+    var supportedMetadataTypes: [AVMetadataObject.ObjectType] {
+        [
+            .qr, .microQR,
+            .ean13, .ean8, .upce,
+            .code128, .code39, .code39Mod43, .code93,
+            .itf14, .interleaved2of5,
+            .dataMatrix, .pdf417, .microPDF417, .aztec,
+            .codabar, .gs1DataBar, .gs1DataBarExpanded, .gs1DataBarLimited
+        ]
+    }
+    
+    // MARK: - Lens cleaning detection
+    var lensSmudgeDetectionStatus: AVCaptureCameraLensSmudgeDetectionStatus = .disabled
+    var shouldShowLensCleaningHint = false
+    @ObservationIgnored
+    private var didDismissLensCleaningHint = false
+    @ObservationIgnored
+    private var lensSmudgeStatusObservation: NSKeyValueObservation?
+    
     nonisolated func enableLensSmudgeDetectionIfSupported(on camera: AVCaptureDevice) {
         guard camera.activeFormat.isCameraLensSmudgeDetectionSupported else { return }
         try? camera.lockForConfiguration()
@@ -477,13 +516,211 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
         }
     }
     
-    // MARK: - Location
-    let locationManager = CLLocationManager()
-    var currentLocation: CLLocation?
-    
     // MARK: - Computed properties
+    var showSimpleView: Bool {
+        appView == .clean || appView == .settings || isBurstCapturing || (isTimerCountingDown && shouldHideUIWhileCountingDown)
+    }
     var captureAspectRatio: CGFloat { 3.0 / 4.0 }
+    var formattedISO: String { Self.formatISO(iso) }
+    var formattedFocus: String { Double(lensPosition).formatted(.number.precision(.fractionLength(2))) }
+    var formattedWhiteBalance: String { "\(Int(whiteBalanceTargetKelvin))K" }
+    var isoStopIndex: Float {
+        let stops = availableISOStops
+        guard let nearestIndex = stops.indices.min(by: {
+            abs(Float(stops[$0]) - iso) < abs(Float(stops[$1]) - iso)
+        }) else { return 0 }
+        return Float(nearestIndex)
+    }
+    var maxISOStopIndex: Float { Float(max(0, availableISOStops.count - 1)) }
+    var maxShutterIndex: Float { Float(max(0, shutterSpeeds.count - 1)) }
+    var formattedShutterSpeed: String {
+        guard shutterSpeeds.indices.contains(shutterIndex) else { return "--" }
+        return Self.formatShutter(shutterSpeeds[shutterIndex])
+    }
+    var availableISOStops: [Float] {
+        let filteredStops = preferredISOStops.filter { stop in
+            stop >= minISO && stop <= maxISO
+        }
+        let boundedStops = ([minISO] + filteredStops + [maxISO]).sorted()
+        
+        var dedupedStops: [Float] = []
+        for stop in boundedStops {
+            guard dedupedStops.last.map({ abs($0 - stop) < 0.5 }) != true else { continue }
+            dedupedStops.append(stop)
+        }
+        
+        return dedupedStops
+    }
     
+    // MARK: - Manual controls
+    var supportsManualFocus: Bool {
+        device?.isLockingFocusWithCustomLensPositionSupported ?? false
+    }
+    
+    var supportsMacro: Bool {
+        // Macro is typically supported on Pro models with AF on Ultra Wide.
+        // We look for a back camera that can focus closer than 15cm (150mm).
+        let discovery = AVCaptureDevice.DiscoverySession(
+            deviceTypes: [.builtInUltraWideCamera, .builtInWideAngleCamera],
+            mediaType: .video,
+            position: .back
+        )
+        return discovery.devices.contains { $0.minimumFocusDistance > 0 && $0.minimumFocusDistance <= 150 }
+    }
+    
+    var supportsFlash: Bool {
+        guard device?.hasFlash == true else { return false }
+        return !photoOutput.supportedFlashModes.isEmpty
+    }
+    
+    var flashLabel: String {
+        switch flashMode {
+            case .off, .on: "bolt.fill"
+            case .auto: "bolt.badge.automatic.fill"
+            @unknown default: "bolt.badge.xmark.fill"
+        }
+    }
+    
+    private func nearestISOStop(to value: Float) -> Float {
+        let stops = availableISOStops
+        guard let nearestIndex = nearestISOStopIndex(in: stops, to: value) else {
+            return max(minISO, min(maxISO, value))
+        }
+        return stops[nearestIndex]
+    }
+    
+    func nearestISOStopIndex(in stops: [Float], to value: Float) -> Int? {
+        stops.indices.min {
+            abs(stops[$0] - value) < abs(stops[$1] - value)
+        }
+    }
+    
+    private func nearestShutterIndex(to duration: CMTime) -> Int? {
+        let seconds = CMTimeGetSeconds(duration)
+        guard seconds.isFinite && seconds > 0 else { return nil }
+        
+        return shutterSpeeds.indices.min {
+            abs(CMTimeGetSeconds(shutterSpeeds[$0]) - seconds) < abs(CMTimeGetSeconds(shutterSpeeds[$1]) - seconds)
+        }
+    }
+    
+    private func snappedWhiteBalanceKelvin(_ kelvin: Float) -> Float {
+        let steppedKelvin = (kelvin / 100).rounded() * 100
+        return min(max(steppedKelvin, 2000), 10000)
+    }
+    
+    private func snappedFocusPosition(_ position: Float) -> Float {
+        let steppedPosition = (position / 0.01).rounded() * 0.01
+        return min(max(steppedPosition, 0), 1)
+    }
+    
+    func syncAutoRulerValues(
+        iso liveISO: Float,
+        exposureDuration: CMTime,
+        whiteBalanceTemperature: Float,
+        lensPosition liveLensPosition: Float
+    ) {
+        if isAutoExposure {
+            let nextISO = nearestISOStop(to: liveISO)
+            if abs(iso - nextISO) > 0.1 {
+                iso = nextISO
+            }
+            
+            if let nextShutterIndex = nearestShutterIndex(to: exposureDuration),
+               shutterIndex != nextShutterIndex {
+                shutterIndex = nextShutterIndex
+            }
+        }
+        
+        if isAutoWhiteBalance {
+            let nextWhiteBalance = snappedWhiteBalanceKelvin(whiteBalanceTemperature)
+            if abs(whiteBalanceTargetKelvin - nextWhiteBalance) >= 50 {
+                whiteBalanceTargetKelvin = nextWhiteBalance
+            }
+        }
+        
+        if isAutoFocus {
+            let nextLensPosition = snappedFocusPosition(liveLensPosition)
+            if abs(lensPosition - nextLensPosition) >= 0.005 {
+                lensPosition = nextLensPosition
+            }
+        }
+    }
+    
+    func setExposureBias(_ bias: Float) {
+        guard isAutoExposure else { return }
+        
+        let steppedBias = (bias / 0.1).rounded() * 0.1
+        let lowerBound = max(minExposureBias, -4.0)
+        let upperBound = min(maxExposureBias, 4.0)
+        let clampedBias = min(max(steppedBias, lowerBound), upperBound)
+        
+        guard clampedBias != exposureBias else { return }
+        
+        exposureBias = clampedBias
+        applyExposureBias()
+    }
+    
+    func setManualISOStopIndex(_ value: Float) {
+        let stops = availableISOStops
+        guard !stops.isEmpty else { return }
+        
+        let clampedIndex = min(max(Int(value.rounded()), 0), stops.count - 1)
+        let nextISO = stops[clampedIndex]
+        
+        guard nextISO != iso || isAutoExposure else { return }
+        
+        if isAutoExposure {
+            isAutoExposure = false
+        }
+        exposureBias = 0
+        iso = nextISO
+        liveISO = nextISO
+        applyManualExposure()
+    }
+    
+    func setManualShutterIndex(_ value: Float) {
+        let clampedIndex = min(max(Int(value.rounded()), 0), shutterSpeeds.count - 1)
+        
+        guard shutterSpeeds.indices.contains(clampedIndex),
+              clampedIndex != shutterIndex || isAutoExposure else { return }
+        
+        if isAutoExposure {
+            isAutoExposure = false
+        }
+        exposureBias = 0
+        setCustomShutter(to: clampedIndex)
+        liveShutter = formattedShutterSpeed
+        applyManualExposure()
+    }
+    
+    func setManualFocusPosition(_ position: Float) {
+        let clampedPosition = snappedFocusPosition(position)
+        
+        guard clampedPosition != lensPosition || isAutoFocus else { return }
+        
+        if isAutoFocus {
+            isAutoFocus = false
+        }
+        lensPosition = clampedPosition
+        liveFocus = formattedFocus
+        applyManualFocus()
+        endManualFocusAdjustment()
+    }
+    
+    func setWhiteBalanceTargetKelvin(_ kelvin: Float) {
+        let clampedKelvin = snappedWhiteBalanceKelvin(kelvin)
+        
+        guard clampedKelvin != whiteBalanceTargetKelvin || isAutoWhiteBalance else { return }
+        
+        if isAutoWhiteBalance {
+            isAutoWhiteBalance = false
+        }
+        whiteBalanceTargetKelvin = clampedKelvin
+        liveWB = formattedWhiteBalance
+    }
+    
+    // MARK: - Capture Settings
     func isFormatEnabled(_ mode: CaptureMode) -> Bool {
         if mode == .raw {
             return canSelectRawCaptureMode
@@ -543,38 +780,6 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
             lens.preservesHighResolutionCapture &&
             AVCaptureDevice.default(lens.deviceType, for: .video, position: .back) != nil
         }
-    }
-    
-    var supportsManualFocus: Bool {
-        device?.isLockingFocusWithCustomLensPositionSupported ?? false
-    }
-    
-    var supportsMacro: Bool {
-        // Macro is typically supported on Pro models with AF on Ultra Wide.
-        // We look for a back camera that can focus closer than 15cm (150mm).
-        let discovery = AVCaptureDevice.DiscoverySession(
-            deviceTypes: [.builtInUltraWideCamera, .builtInWideAngleCamera],
-            mediaType: .video,
-            position: .back
-        )
-        return discovery.devices.contains { $0.minimumFocusDistance > 0 && $0.minimumFocusDistance <= 150 }
-    }
-    
-    var supportsFlash: Bool {
-        guard device?.hasFlash == true else { return false }
-        return !photoOutput.supportedFlashModes.isEmpty
-    }
-    
-    var flashLabel: String {
-        switch flashMode {
-            case .off, .on: "bolt.fill"
-            case .auto: "bolt.badge.automatic.fill"
-            @unknown default: "bolt.badge.xmark.fill"
-        }
-    }
-    
-    var showSimpleView: Bool {
-        appView == .clean || appView == .settings || isBurstCapturing || (isTimerCountingDown && shouldHideUIWhileCountingDown)
     }
     
     private func updateAnalysisPauseState() {
@@ -689,8 +894,6 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
         // Match initial flip to lens
         self.flipRotation = activeLens.isFront ? 180 : 0
         
-        // Setup rotation coordinator
-        self.rotationCoordinator = AVCaptureDevice.RotationCoordinator(device: cam, previewLayer: nil)
         
         // Safely setup synchronizer or fallback
         let syncQueue = DispatchQueue(label: "\(BundleIDs.appID).analysisQueue")
@@ -787,11 +990,6 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
         shouldPrioritizeBurstSpeed = true
         shouldShowBurstFeedback = false
         shouldShowConfettiCannons = true
-    }
-    
-    private func refreshFastCapturePrioritizationForBurstMode() {
-        guard photoOutput.isFastCapturePrioritizationSupported else { return }
-        photoOutput.isFastCapturePrioritizationEnabled = isBurstModeEnabled && shouldPrioritizeBurstSpeed && captureMode != .raw
     }
     
     // MARK: - Formats & ranges
@@ -983,12 +1181,13 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
         guard let d = device else { return }
         minISO = d.activeFormat.minISO
         maxISO = d.activeFormat.maxISO
+        isoStops = availableISOStops
         
-        let stops = generateShutterStops(for: d)
-        shutterSpeeds = stops
-        shutterIndex = stops.indices.min(by: {
-            abs(CMTimeGetSeconds(stops[$0]) - 1.0/60.0) <
-                abs(CMTimeGetSeconds(stops[$1]) - 1.0/60.0)
+        let shutterOptions = generateShutterStops(for: d)
+        shutterSpeeds = shutterOptions.map(\.duration)
+        shutterIndex = shutterSpeeds.indices.min(by: {
+            abs(CMTimeGetSeconds(shutterSpeeds[$0]) - 1.0/60.0) <
+                abs(CMTimeGetSeconds(shutterSpeeds[$1]) - 1.0/60.0)
         }) ?? 0
         
         liveISO = d.iso
@@ -1002,10 +1201,7 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
         if newISO != iso { iso = newISO }
         
         // Update EV slider value (EV bounds are fixed -4...4 so this never crashes)
-        if let ev = evControl {
-            let clampedEV = max(-4.0, min(4.0, exposureBias))
-            ev.value = round(clampedEV * 10) / 10.0
-        }
+        syncEVToHardware()
         
         // For ISO and Shutter, we skip setting their .value here because their min/max
         // bounds depend on the active device. switchLens() calls setupCameraControls()
@@ -1018,37 +1214,37 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
         }
     }
     
-    private func generateShutterStops(for device: AVCaptureDevice) -> [CMTime] {
+    private func generateShutterStops(for device: AVCaptureDevice) -> [(denominator: Int, duration: CMTime)] {
         let fmt = device.activeFormat
         let minSecs = CMTimeGetSeconds(fmt.minExposureDuration)
         let maxSecs = CMTimeGetSeconds(fmt.maxExposureDuration)
-        let timescale = fmt.minExposureDuration.timescale
         
-        let allStops: [Double] = [
-            1/100000, 1/80000, 1/60000, 1/50000, 1/40000, 1/32000,
-            1/25000,  1/20000, 1/16000, 1/12500, 1/10000, 1/8000,
-            1/6400,   1/5000,  1/4000,  1/3200,  1/2500,  1/2000,
-            1/1600,   1/1250,  1/1000,  1/800,   1/640,   1/500,
-            1/400,    1/320,   1/250,   1/200,   1/160,   1/125,
-            1/100,    1/80,    1/60,    1/50,    1/40,    1/30,
-            1/25,     1/20,    1/15,    1/13,    1/10,    1/8,
-            1/6,      1/5,     1/4,     1/3,     1/2.5,   1/2,
-            1/1.6,    1/1.3
-        ]
-        
-        return allStops
-            .filter { $0 >= minSecs - 1e-9 && $0 <= maxSecs + 1e-9 }
-            .map { CMTimeMakeWithSeconds($0, preferredTimescale: timescale) }
+        return preferredShutterDenominators.compactMap { denominator in
+            let seconds = 1.0 / Double(denominator)
+            guard seconds >= minSecs - 1e-9 && seconds <= maxSecs + 1e-9 else { return nil }
+            return (denominator, CMTimeMake(value: 1, timescale: CMTimeScale(denominator)))
+        }
     }
     
     static func formatShutter(_ time: CMTime) -> String {
         let secs = CMTimeGetSeconds(time)
         guard secs.isFinite && secs > 0 else { return "—" }
         if secs >= 1.0 { return "\(secs.formatted(.number.precision(.fractionLength(1))))s" }
+        return "1/\(Int(round(1.0 / secs)))s"
+    }
+    
+    static func formatCameraControlShutter(_ time: CMTime) -> String {
+        let secs = CMTimeGetSeconds(time)
+        guard secs.isFinite && secs > 0 else { return "—" }
+        if secs >= 1.0 { return secs.formatted(.number.precision(.fractionLength(1))) }
         return "1/\(Int(round(1.0 / secs)))"
     }
     
-    // MARK: - Capture
+    static func formatISO(_ iso: Float) -> String {
+        Double(iso).formatted(.number.precision(.fractionLength(0)))
+    }
+    
+    // MARK: Bursts
     func changeCapturingState(to new: Bool) {
         isCapturing = new
     }
@@ -1093,8 +1289,6 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
         isTimerCountingDown = false
         timerCountdownValue = nil
         burstCapturedCount = 0
-        burstCaptureFailureCount = 0
-        burstSaveFailureCount = 0
         burstIntervalRemainingSeconds = nil
         burstSessionCounter += 1
         let burstSessionID = burstSessionCounter
@@ -1190,9 +1384,7 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
     }
     
     private var currentManualExposureDuration: CMTime? {
-        if manualShutterDenominator > 0 {
-            return CMTimeMake(value: 1, timescale: CMTimeScale(manualShutterDenominator))
-        } else if shutterSpeeds.indices.contains(shutterIndex) {
+        if shutterSpeeds.indices.contains(shutterIndex) {
             return shutterSpeeds[shutterIndex]
         } else {
             return nil
@@ -1428,7 +1620,13 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
         
     }
     
-    func capturePhoto(onCapture: @escaping @MainActor @Sendable () -> Void) {
+    private func refreshFastCapturePrioritizationForBurstMode() {
+        guard photoOutput.isFastCapturePrioritizationSupported else { return }
+        photoOutput.isFastCapturePrioritizationEnabled = isBurstModeEnabled && shouldPrioritizeBurstSpeed && captureMode != .raw
+    }
+    
+    // MARK: Capturing
+    private func capturePhoto(onCapture: @escaping @MainActor @Sendable () -> Void) {
         guard timerCountdownTask == nil else { return }
         
         if let totalSeconds = timerMode.seconds {
@@ -1446,10 +1644,17 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
                 
                 let endDate = Date().addingTimeInterval(TimeInterval(totalSeconds))
                 let updateInterval: Duration = usesDetailedCountdown ? .milliseconds(16) : .milliseconds(100)
+                var lastHapticSecond = totalSeconds
                 
                 while true {
                     let remaining = endDate.timeIntervalSinceNow
                     guard remaining > 0 else { break }
+                    
+                    let displaySecond = max(0, Int(ceil(remaining)))
+                    if displaySecond > 0, displaySecond < lastHapticSecond {
+                        lastHapticSecond = displaySecond
+                        self.onTimerCountdownSecond?()
+                    }
                     
                     self.timerCountdownValue = remaining
                     do {
@@ -1482,11 +1687,8 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
         // setExposureModeCustom is async — the completionHandler fires once the sensor has
         // actually settled on the requested ISO/shutter, then we fire the shutter.
         if !isAutoExposure, let d = device {
-            // Use manualShutterDenominator if set (in-app slider), else fall back to shutterIndex stop
             let duration: CMTime
-            if manualShutterDenominator > 0 {
-                duration = CMTimeMake(value: 1, timescale: CMTimeScale(manualShutterDenominator))
-            } else if shutterSpeeds.indices.contains(shutterIndex) {
+            if shutterSpeeds.indices.contains(shutterIndex) {
                 duration = shutterSpeeds[shutterIndex]
             } else {
                 return  // no valid shutter duration available, skip
@@ -1628,41 +1830,5 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
             .filter { $0.width <= outputMax.width && $0.height <= outputMax.height }
             .max { Int($0.width) * Int($0.height) < Int($1.width) * Int($1.height) }
         ?? outputMax
-    }
-    
-    func applyMacroMode() {
-        if isMacroEnabled {
-            // 1. Switch to Ultra Wide if it's not already active
-            if activeLens != .ultraWide {
-                // We use the internal switchLens but skip the recursive applyMacroMode
-                // This will be handled by the UI toggle
-            }
-            
-            guard let d = device else { return }
-            try? d.lockForConfiguration()
-            
-            // 2. Apply "Macro" zoom (typically 2.0x on UW to match 1x FOV)
-            if activeLens == .ultraWide {
-                d.videoZoomFactor = 2.0
-            }
-            
-            // 3. Optimize focus for near objects if supported
-            if d.isAutoFocusRangeRestrictionSupported {
-                d.autoFocusRangeRestriction = .near
-            }
-            
-            d.unlockForConfiguration()
-        } else {
-            guard let d = device else { return }
-            try? d.lockForConfiguration()
-            if d.isAutoFocusRangeRestrictionSupported {
-                d.autoFocusRangeRestriction = .none
-            }
-            // Reset zoom if we were in the macro-zoom state
-            if activeLens == .ultraWide && d.videoZoomFactor == 2.0 {
-                d.videoZoomFactor = 1.0
-            }
-            d.unlockForConfiguration()
-        }
     }
 }

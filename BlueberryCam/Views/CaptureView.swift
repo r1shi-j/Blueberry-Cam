@@ -19,6 +19,7 @@ extension CameraModel {
     }
 }
 
+// MARK: - Functions
 extension CaptureView {
     private var copiedString: String { "Copied to clipboard!" }
     private var closeLinkTitle: String { "Close" }
@@ -74,7 +75,7 @@ extension CaptureView {
         return Int(ceil(clampedValue)).formatted()
     }
     
-    private func updateBurstFeedbackOverlay(_ message: String?) {
+    private func updateBurstFeedbackOverlay(old: String?, message: String?) {
         burstFeedbackFadeTask?.cancel()
         
         if let message {
@@ -179,6 +180,496 @@ extension CaptureView {
         }
     }
     
+    private func manualControlColor(for control: ManualControl) -> Color {
+        switch control {
+            case .ev: .orange.opacity(0.85)
+            case .iso: .yellow.opacity(0.85)
+            case .ss: .white.opacity(0.85)
+            case .f: .green.opacity(0.85)
+            case .wb: .cyan.opacity(0.85)
+        }
+    }
+}
+
+// MARK: Subviews
+extension CaptureView {
+    // MARK: - Background Color
+    private func backgroundColor() -> some View {
+        Color.black.ignoresSafeArea()
+    }
+    
+    // MARK: - Viewfinder
+    private func viewFinder(_ previewRect: CGRect) -> some View {
+        CameraPreviewView(session: cameraModel.session, onCapture: {
+            triggerShutterFeedback()
+            cameraModel.handleShutterButton {
+                withAnimation { cameraModel.changeCapturingState(to: true) }
+                Task { @MainActor in
+                    try? await Task.sleep(for: .milliseconds(150))
+                    withAnimation { cameraModel.changeCapturingState(to: false) }
+                }
+            } onBurstPhotoCaptured: {
+                triggerShutterFeedback()
+                shutterCountBurst += 1
+            }
+        }, proxy: previewProxy)
+        .scaleEffect(visualZoomScale)
+        .rotation3DEffect(
+            .degrees(cameraModel.flipRotation),
+            axis: (x: 0, y: 1, z: 0),
+            perspective: 0.1
+        )
+        .blur(radius: visualBlur)
+        .opacity(visualOpacity)
+        .animation(.easeInOut, value: scenePhase)
+        .frame(width: previewRect.width, height: previewRect.height)
+        .position(x: previewRect.midX, y: previewRect.midY)
+        .allowsHitTesting(!cameraModel.isTimerCountingDown && !cameraModel.isBurstCapturing)
+        .gesture(
+            DragGesture(minimumDistance: 0)
+                .onChanged { value in
+                    if previewInteractionStartPoint == nil {
+                        beginPreviewInteraction(at: value.startLocation)
+                    }
+                    updatePreviewInteraction(at: value.location)
+                }
+                .onEnded { value in
+                    endPreviewInteraction(at: value.location)
+                }
+        )
+        .simultaneousGesture(
+            SpatialTapGesture(count: 2)
+                .onEnded { _ in
+                    hapticTrigger += 1
+                    withAnimation(.easeInOut(duration: 0.28)) {
+                        cameraModel.toggleSelfie()
+                    }
+                }
+        )
+    }
+    
+    // MARK: - Zebras
+    @ViewBuilder
+    private func zebras(_ previewRect: CGRect) -> some View {
+        if cameraModel.showZebraStripes {
+            AnalysisOverlayView(
+                mask: cameraModel.zebraMask,
+                gridSize: cameraModel.analysisGridSize,
+                style: .zebra
+            )
+            .frame(width: previewRect.width, height: previewRect.height)
+            .position(x: previewRect.midX, y: previewRect.midY)
+        }
+    }
+    
+    // MARK: - Highlight Clipping
+    @ViewBuilder
+    private func highlightClipping(_ previewRect: CGRect) -> some View {
+        if cameraModel.showClipping {
+            AnalysisOverlayView(
+                mask: cameraModel.clippingMask,
+                gridSize: cameraModel.analysisGridSize,
+                style: .clipping
+            )
+            .frame(width: previewRect.width, height: previewRect.height)
+            .position(x: previewRect.midX, y: previewRect.midY)
+        }
+    }
+    
+    // MARK: - Focus Peaking
+    @ViewBuilder
+    private func focusPeaking(_ previewRect: CGRect) -> some View {
+        if !cameraModel.isAutoFocus && cameraModel.showFocusPeaking {
+            AnalysisOverlayView(
+                mask: cameraModel.focusPeakingMask,
+                gridSize: cameraModel.analysisGridSize,
+                style: .focusPeaking
+            )
+            .frame(width: previewRect.width, height: previewRect.height)
+            .position(x: previewRect.midX, y: previewRect.midY)
+        }
+    }
+    
+    // MARK: - Focus Loupe
+    @ViewBuilder
+    private func focusLoupe(_ previewRect: CGRect) -> some View {
+        if !cameraModel.isAutoFocus && cameraModel.showFocusLoupe, cameraModel.loupeImage != nil {
+            let loupeSize: CGFloat = previewRect.width / 3
+            FocusLoupeView(loupeImage: cameraModel.loupeImage)
+                .frame(width: loupeSize, height: loupeSize)
+                .clipShape(Circle())
+                .overlay(
+                    Circle()
+                        .stroke(.white.opacity(0.5), lineWidth: 1.5)
+                )
+                .shadow(color: .black.opacity(0.5), radius: 8, x: 0, y: 2)
+                .position(x: previewRect.midX, y: previewRect.midY)
+                .allowsHitTesting(false)
+                .transition(.opacity)
+        }
+    }
+    
+    // MARK: - Crop frame overlay
+    @ViewBuilder
+    private func grid() -> some View {
+        if cameraModel.shouldShowGrid {
+            CropOverlayView(aspectRatio: cameraModel.captureAspectRatio)
+                .ignoresSafeArea()
+        }
+    }
+    
+    // MARK: - Level / Horizon overlay
+    @ViewBuilder
+    private func level() -> some View {
+        if cameraModel.shouldShowLevel {
+            LevelOverlayView(model: levelModel)
+                .ignoresSafeArea()
+        }
+    }
+    
+    // MARK: - Tap to focus overlay
+    @ViewBuilder
+    private func focusBox() -> some View {
+        if !cameraModel.isBurstCapturing, cameraModel.isTapFocusIndicatorVisible, let indicatorPoint = cameraModel.tapFocusIndicatorPoint {
+            FocusReticleView(
+                lockLabel: cameraModel.tapFocusLockLabel,
+                exposureOffset: cameraModel.tapFocusIndicatorOffset,
+                showsExposureHandle: cameraModel.canAdjustTapPointExposureBias,
+                isDimmed: cameraModel.isTapFocusIndicatorDimmed
+            )
+            .position(indicatorPoint)
+            .transition(.opacity)
+        }
+    }
+    
+    // MARK: - Focus lock overlay
+    @ViewBuilder
+    private func focusLock(_ previewRect: CGRect) -> some View {
+        ZStack {
+            if !cameraModel.isBurstCapturing, let lockLabel = cameraModel.tapFocusLockLabel {
+                Text(lockLabel)
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(.yellow)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(.black.opacity(0.55), in: .capsule)
+                    .position(x: previewRect.midX, y: previewRect.midY - previewRect.height / 2 + 20)
+                    .transition(.opacity)
+            }
+        }
+        .animation(.bouncy, value: cameraModel.tapFocusLockLabel)
+    }
+    
+    // MARK: - QR Code
+    @ViewBuilder
+    private func qrCode(_ previewRect: CGRect) -> some View {
+        ZStack {
+            if !cameraModel.isTimerCountingDown, !cameraModel.isBurstCapturing, let url = cameraModel.detectedCodeURL {
+                VStack(spacing: 4) {
+                    Text(copiedString)
+                        .font(.system(size: 10, weight: .bold))
+                        .fontWidth(.expanded)
+                        .foregroundStyle(.yellow.opacity(0.8))
+                        .padding(8)
+                        .glassEffect()
+                    Button {
+                        UIApplication.shared.open(url)
+                        cameraModel.ignoreCurrentCode()
+                    } label: {
+                        HStack(spacing: 8) {
+                            Image(systemName: linkSymbolName)
+                            Text(url.host ?? backupURLName)
+                                .lineLimit(1)
+                        }
+                        .font(.system(size: 14, weight: .bold))
+                        .fontWidth(.expanded)
+                    }
+                    .buttonStyle(.glass)
+                    .padding(.horizontal)
+                    
+                    Button(closeLinkTitle, systemImage: closeSymbolName) {
+                        cameraModel.ignoreCurrentCode()
+                    }
+                    .font(.system(size: 10, weight: .bold))
+                    .fontWidth(.expanded)
+                    .foregroundStyle(.yellow.opacity(0.8))
+                    .buttonStyle(.glass)
+                }
+                .position(x: previewRect.midX, y: previewRect.midY)
+                .transition(.opacity)
+            }
+        }
+        .animation(.bouncy, value: cameraModel.detectedCodeURL)
+    }
+    
+    // MARK: - Lens Cleaning Hint
+    @ViewBuilder
+    private func lensCleaning(_ previewRect: CGRect) -> some View {
+        ZStack {
+            if !cameraModel.isTimerCountingDown, !cameraModel.isBurstCapturing, cameraModel.shouldShowLensCleaningHint {
+                VStack(spacing: 4) {
+                    Button {
+                        hapticTriggerR += 1
+                        cameraModel.dismissLensCleaningHint()
+                    } label: {
+                        HStack(spacing: 8) {
+                            Image(systemName: lensCleaningSymbolName)
+                            Text(lensCleaningTitle)
+                        }
+                        .font(.system(size: 14, weight: .bold))
+                        .fontWidth(.expanded)
+                    }
+                    .buttonStyle(.glass)
+                    .padding(.horizontal)
+                    
+                    Button(closeCleaningTitle, systemImage: closeSymbolName) {
+                        cameraModel.dismissLensCleaningHint()
+                    }
+                    .font(.system(size: 10, weight: .bold))
+                    .fontWidth(.expanded)
+                    .foregroundStyle(.yellow.opacity(0.8))
+                    .buttonStyle(.glass)
+                }
+                .position(x: previewRect.midX, y: previewRect.midY)
+                .transition(.opacity)
+            }
+        }
+        .animation(.bouncy, value: cameraModel.shouldShowLensCleaningHint)
+    }
+    
+    // MARK: - Burst Feedback
+    @ViewBuilder
+    private func burstFeedback(_ previewRect: CGRect) -> some View {
+        if let displayedBurstFeedbackMessage {
+            Text(displayedBurstFeedbackMessage)
+                .font(.system(size: 16, weight: .bold))
+                .fontWidth(.expanded)
+                .foregroundStyle(.white)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+                .background(.black.opacity(0.6), in: .capsule)
+                .position(x: previewRect.midX, y: previewRect.midY)
+                .allowsHitTesting(false)
+                .opacity(isBurstFeedbackVisible ? 1 : 0)
+        }
+    }
+    
+    // MARK: - Manual control rulers
+    @ViewBuilder
+    private func manualControlOverlays(in previewRect: CGRect) -> some View {
+        ZStack {
+            if !cameraModel.showSimpleView, let selectedControl {
+                if selectedControl == .iso || selectedControl == .ss {
+                    manualISOOverlay(in: previewRect)
+                }
+                
+                switch selectedControl {
+                    case .ev:
+                        manualTrailingOverlay(
+                            title: "EV",
+                            color: manualControlColor(for: .ev),
+                            value: Binding(
+                                get: { cameraModel.exposureBias },
+                                set: { cameraModel.setExposureBias($0) }
+                            ),
+                            range: -4...4,
+                            step: 0.1,
+                            majorTickStride: 5,
+                            accessibilityLabel: "Exposure value",
+                            previewRect: previewRect
+                        )
+                    case .f:
+                        manualTrailingOverlay(
+                            title: "F",
+                            color: manualControlColor(for: .f),
+                            value: Binding(
+                                get: { cameraModel.lensPosition },
+                                set: { cameraModel.setManualFocusPosition($0) }
+                            ),
+                            range: 0...1,
+                            step: 0.01,
+                            majorTickStride: 10,
+                            accessibilityLabel: "Focus",
+                            previewRect: previewRect
+                        )
+                    case .wb:
+                        manualTrailingOverlay(
+                            title: "WB",
+                            color: manualControlColor(for: .wb),
+                            value: Binding(
+                                get: { cameraModel.whiteBalanceTargetKelvin },
+                                set: { cameraModel.setWhiteBalanceTargetKelvin($0) }
+                            ),
+                            range: 2000...10000,
+                            step: 100,
+                            majorTickStride: 5,
+                            accessibilityLabel: "White balance",
+                            previewRect: previewRect
+                        )
+                    case .iso, .ss:
+                        manualTrailingOverlay(
+                            title: "SS",
+                            color: manualControlColor(for: .ss),
+                            value: Binding(
+                                get: { Float(cameraModel.shutterIndex) },
+                                set: { cameraModel.setManualShutterIndex($0) }
+                            ),
+                            range: 0...cameraModel.maxShutterIndex,
+                            step: 1,
+                            majorTickStride: 4,
+                            accessibilityLabel: "Shutter speed",
+                            previewRect: previewRect
+                        )
+                }
+            }
+        }
+        .animation(.smooth(duration: 0.34), value: selectedControl)
+    }
+    
+    private func manualISOOverlay(in previewRect: CGRect) -> some View {
+        VStack(spacing: 4) {
+            Text("ISO")
+                .font(Fonts.manualLabel)
+                .foregroundStyle(manualControlColor(for: .iso))
+                .tracking(2)
+            
+            ManualRulerView(
+                value: Binding(
+                    get: { cameraModel.isoStopIndex },
+                    set: { cameraModel.setManualISOStopIndex($0) }
+                ),
+                range: 0...cameraModel.maxISOStopIndex,
+                step: 1,
+                axis: .horizontal,
+                majorTickStride: 4,
+                accessibilityLabel: "ISO"
+            )
+            .frame(width: previewRect.width * 0.78, height: 70)
+        }
+        .frame(width: previewRect.width, height: previewRect.height, alignment: .top)
+        .padding(.top, 20)
+        .position(x: previewRect.midX, y: previewRect.midY)
+        .transition(
+            .asymmetric(
+                insertion: .scale(scale: 0.72, anchor: .top)
+                    .combined(with: .opacity)
+                    .animation(.smooth(duration: 0.42)),
+                removal: .scale(scale: 0.72, anchor: .top)
+                    .combined(with: .opacity)
+                    .animation(.smooth(duration: 0.38))
+            )
+        )
+    }
+    
+    private func manualTrailingOverlay(
+        title: String,
+        color: Color,
+        value: Binding<Float>,
+        range: ClosedRange<Float>,
+        step: Float,
+        majorTickStride: Int,
+        accessibilityLabel: String,
+        previewRect: CGRect
+    ) -> some View {
+        HStack(spacing: 10) {
+            Text(title)
+                .font(Fonts.manualLabel)
+                .foregroundStyle(color)
+                .tracking(2)
+            
+            ManualRulerView(
+                value: value,
+                range: range,
+                step: step,
+                axis: .vertical,
+                majorTickStride: majorTickStride,
+                accessibilityLabel: accessibilityLabel
+            )
+            .frame(width: 78, height: previewRect.height * 0.72)
+        }
+        .frame(width: previewRect.width, height: previewRect.height, alignment: .trailing)
+        .padding(.trailing, 14)
+        .position(x: previewRect.midX, y: previewRect.midY)
+        .transition(.move(edge: .trailing).combined(with: .opacity))
+    }
+    
+    // MARK: - Top Bar View
+    private func topBarView() -> some View {
+        TopBarView(cameraModel: cameraModel, selectedControl: $selectedControl)
+            .offset(y:-10)
+    }
+    
+    // MARK: - Bottom Histogram
+    private func bottomHistogram() -> some View {
+        ZStack {
+            if cameraModel.histogramModeLarge != .none {
+                HistogramView(
+                    mode: cameraModel.histogramModeLarge,
+                    size: .large,
+                    lumaData: cameraModel.histogramData,
+                    redData: cameraModel.redHistogram,
+                    greenData: cameraModel.greenHistogram,
+                    blueData: cameraModel.blueHistogram,
+                    waveformData: cameraModel.waveformData
+                )
+                .frame(height: 60)
+                .padding(.horizontal, 20)
+                .padding(.bottom, 30)
+                .onTapGesture {
+                    hapticTrigger += 1
+                    cameraModel.cycleHistogramMode(mode: &cameraModel.histogramModeLarge)
+                }
+                .onLongPressGesture {
+                    hapticTriggerR += 1
+                    cameraModel.hideHistogram(for: .large)
+                }
+                .transition(.scale(scale: 0.5, anchor: .center).combined(with: .opacity))
+            }
+        }
+        .animation(.bouncy, value: cameraModel.histogramModeLarge)
+    }
+    
+    // MARK: - Burst Real time Feedback
+    @ViewBuilder
+    private func burstRealtimeFeedback() -> some View {
+        if cameraModel.isBurstCapturing {
+            VStack(spacing: 6) {
+                Text(cameraModel.burstCaptureStatusLabel)
+                    .font(.system(size: 16, weight: .bold))
+                    .fontWidth(.expanded)
+                    .monospacedDigit()
+                    .contentTransition(.numericText())
+                
+                if cameraModel.shouldShowBurstIntervalCountdown {
+                    Text(cameraModel.burstIntervalCountdownLabel)
+                        .font(.system(size: 16, weight: .bold))
+                        .fontWidth(.expanded)
+                        .monospacedDigit()
+                        .contentTransition(.numericText(countsDown: true))
+                }
+            }
+            .foregroundStyle(.white)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .background(.black.opacity(0.6), in: .rect(cornerRadius: 8))
+            .allowsHitTesting(false)
+            .padding(.top, 16)
+            .transition(.opacity)
+        }
+    }
+    
+    // MARK: - Bottom Bar View
+    private func bottomBarView() -> some View {
+        BottomBarView(
+            cameraModel: cameraModel,
+            shutterCount: $shutterCount,
+            shutterCountBurst: $shutterCountBurst,
+            onShutterFeedback: triggerShutterFeedback
+        )
+        .padding(.bottom, 30)
+    }
+    
+    // MARK: - Timer countdown
     @ViewBuilder
     private func timerCountdownOverlay(in previewRect: CGRect) -> some View {
         if cameraModel.isTimerCountingDown {
@@ -199,6 +690,198 @@ extension CaptureView {
             .animation(.easeInOut(duration: 0.12), value: cameraModel.timerCountdownValue)
         }
     }
+    
+    // MARK: - Capture flash
+    @ViewBuilder
+    private func captureFlash(_ previewRect: CGRect) -> some View {
+        if cameraModel.isCapturing {
+            Color.white.opacity(0.3)
+                .frame(width: previewRect.width, height: previewRect.height)
+                .position(x: previewRect.midX, y: previewRect.midY)
+                .animation(.easeOut(duration: 0.15), value: cameraModel.isCapturing)
+        }
+    }
+    
+    // MARK: - Confetti cannons
+    @ViewBuilder
+    private func confettiCannons(_ previewRect: CGRect) -> some View {
+        ConfettiCannon(
+            trigger: $cameraModel.confettiCannonTrigger,
+            num: 50,
+            confettis: [
+                .sfSymbol(symbolName: "bolt.fill"),
+                //                        .sfSymbol(symbolName: "camera.macro"),
+                .sfSymbol(symbolName: "camera.aperture"),
+                //                        .sfSymbol(symbolName: "camera.filters"),
+                .sfSymbol(symbolName: "camera.shutter.button.fill"),
+                //                        .sfSymbol(symbolName: "photo.stack.fill"),
+                .sfSymbol(symbolName: "cloud.sun.fill"),
+                //                        .sfSymbol(symbolName: "cloud.bolt.rain"),
+                .sfSymbol(symbolName: "rainbow"),
+                //                        .sfSymbol(symbolName: "person.fill"),
+                .sfSymbol(symbolName: "bird"),
+                //                        .sfSymbol(symbolName: "mountain.2"),
+                .image("camera.blueberry"),
+                //                        .text("📸"),
+                .text("🫐"),
+                //                        .text("🌤️"),
+                .text("🌉"),
+                //                        .text("🌄"),
+                .text("🌅"),
+                //                        .text("🌃"),
+                .text("🍛"),
+                //                        .text("🐶"),
+                .text("🏎️"),
+                //                        .text("🚙"),
+                .text("🏀"),
+                //                        .text("⚽️"),
+                .text("🏈"),
+            ],
+            confettiSize: 12,
+            rainHeight: 800,
+            openingAngle: .degrees(45),
+            closingAngle: .degrees(75),
+            radius: 350
+        )
+        .position(x: previewRect.minX, y: previewRect.maxY - 60)
+        .allowsHitTesting(false)
+        
+        ConfettiCannon(
+            trigger: $cameraModel.confettiCannonTrigger,
+            num: 50,
+            confettis: [
+                //                        .sfSymbol(symbolName: "bolt.fill"),
+                .sfSymbol(symbolName: "camera.macro"),
+                //                        .sfSymbol(symbolName: "camera.aperture"),
+                .sfSymbol(symbolName: "camera.filters"),
+                //                        .sfSymbol(symbolName: "camera.shutter.button.fill"),
+                .sfSymbol(symbolName: "photo.stack.fill"),
+                //                        .sfSymbol(symbolName: "cloud.sun.fill"),
+                .sfSymbol(symbolName: "cloud.bolt.rain"),
+                //                        .sfSymbol(symbolName: "rainbow"),
+                .sfSymbol(symbolName: "person.fill"),
+                //                        .sfSymbol(symbolName: "bird"),
+                .sfSymbol(symbolName: "mountain.2"),
+                //                        .image("camera.blueberry"),
+                .text("📸"),
+                //                        .text("🫐")
+                .text("🌤️"),
+                //                        .text("🌉"),
+                .text("🌄"),
+                //                        .text("🌅"),
+                .text("🌃"),
+                //                        .text("🍛"),
+                .text("🐶"),
+                //                        .text("🏎️"),
+                .text("🚙"),
+                //                        .text("🏀"),
+                .text("⚽️"),
+                //                        .text("🏈"),
+            ],
+            confettiSize: 12,
+            rainHeight: 800,
+            openingAngle: .degrees(105),
+            closingAngle: .degrees(135),
+            radius: 350
+        )
+        .position(x: previewRect.maxX, y: previewRect.maxY - 60)
+        .allowsHitTesting(false)
+    }
+    
+    // MARK: - Status bar
+    @ViewBuilder
+    private func statusBarView() -> some View {
+        if !cameraModel.showSimpleView {
+            StatusBarAreaView(cameraModel: cameraModel)
+                .padding()
+                .ignoresSafeArea()
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .frame(height: .zero)
+                .transition(.opacity)
+        } else {
+            Color.clear
+                .padding()
+                .ignoresSafeArea()
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .frame(height: .zero)
+                .transition(.opacity)
+        }
+    }
+    
+    // MARK: - Camera Content
+    private func cameraContent() -> some View {
+        GeometryReader { geo in
+            let previewRect = makePreviewRect(in: geo)
+            
+            ZStack {
+                backgroundColor()
+                
+                ZStack {
+                    viewFinder(previewRect)
+                    
+                    if !cameraModel.showSimpleView {
+                        zebras(previewRect)
+                        highlightClipping(previewRect)
+                        focusPeaking(previewRect)
+                        focusLoupe(previewRect)
+                        grid()
+                        level()
+                        focusBox()
+                        focusLock(previewRect)
+                        qrCode(previewRect)
+                        lensCleaning(previewRect)
+                        burstFeedback(previewRect)
+                    }
+                    
+                    manualControlOverlays(in: previewRect)
+                }
+                .blur(radius: scenePhase != .active ? 20 : 0)
+                
+                VStack(spacing: 0) {
+                    if !cameraModel.showSimpleView {
+                        VStack(spacing: 0) {
+                            topBarView()
+                            Spacer()
+                            bottomHistogram()
+                        }
+                        .transition(.opacity)
+                    } else {
+                        burstRealtimeFeedback()
+                        Spacer()
+                    }
+                    bottomBarView()
+                }
+                .allowsHitTesting(!cameraModel.isTimerCountingDown)
+                .animation(.easeInOut(duration: 0.2), value: cameraModel.showSimpleView)
+                
+                timerCountdownOverlay(in: previewRect)
+                captureFlash(previewRect)
+                confettiCannons(previewRect)
+            }
+            .ignoresSafeArea(.keyboard)
+        }
+        .safeAreaInset(edge: .top, content: statusBarView)
+    }
+    
+    // MARK: - App Content
+    private func appContent() -> some View {
+        ZStack {
+            if permissionModel.allGranted {
+                cameraContent()
+                    .animation(.easeInOut(duration: 0.2), value: cameraModel.showSimpleView)
+                    .animation(.easeInOut(duration: 0.2), value: cameraModel.isBurstCapturing)
+                    .transition(.opacity)
+            } else if permissionModel.anyDenied {
+                PermissionDeniedView(
+                    cameraGranted: permissionModel.cameraStatus == .granted,
+                    photosGranted: permissionModel.photosStatus == .granted
+                )
+                .transition(.opacity)
+            } else {
+                Color.black.ignoresSafeArea()
+            }
+        }
+    }
 }
 
 struct CaptureView: View {
@@ -210,10 +893,12 @@ struct CaptureView: View {
     @State private var cameraModel = CameraModel()
     @State private var levelModel = LevelMotionModel()
     @State private var selectedControl: ManualControl?
+    @State private var hasConfiguredCamera = false
     
     // Haptics
     @State private var hapticTrigger = 0
     @State private var hapticTriggerR = 0
+    @State private var countdownHapticTrigger = 0
     
     // Preview focus
     @State private var previewProxy = PreviewViewProxy()
@@ -230,570 +915,187 @@ struct CaptureView: View {
     @State private var visualOpacity: CGFloat = 1.0
     @State private var isAwaitingFacingFlipCompletion = false
     @State private var isAwaitingSameFacingLensCompletion = false
-    @State private var pendingFacingFlipRotation: Double = 0
     @State private var displayedBurstFeedbackMessage: String?
     @State private var isBurstFeedbackVisible = false
     @State private var burstFeedbackFadeTask: Task<Void, Never>?
     
-    private var cameraContent: some View {
-        GeometryReader { geo in
-            let previewRect = makePreviewRect(in: geo)
-            
-            ZStack {
-                Color.black.ignoresSafeArea()
-                
-                // MARK: - Camera Overlays
-                ZStack {
-                    // MARK: - Viewfinder
-                    CameraPreviewView(session: cameraModel.session, onCapture: {
-                        cameraModel.handleShutterButton {
-                            withAnimation { cameraModel.changeCapturingState(to: true) }
-                            Task { @MainActor in
-                                try? await Task.sleep(for: .milliseconds(150))
-                                withAnimation { cameraModel.changeCapturingState(to: false) }
-                            }
-                        }
-                    }, proxy: previewProxy)
-                    .scaleEffect(visualZoomScale)
-                    .rotation3DEffect(.degrees(cameraModel.flipRotation), axis: (x: 0, y: 1, z: 0))
-                    .blur(radius: visualBlur)
-                    .opacity(visualOpacity)
-                    .animation(.easeInOut, value: scenePhase)
-                    .frame(width: previewRect.width, height: previewRect.height)
-                    .position(x: previewRect.midX, y: previewRect.midY)
-                    .allowsHitTesting(!cameraModel.isTimerCountingDown && !cameraModel.isBurstCapturing)
-                    .gesture(
-                        DragGesture(minimumDistance: 0)
-                            .onChanged { value in
-                                if previewInteractionStartPoint == nil {
-                                    beginPreviewInteraction(at: value.startLocation)
-                                }
-                                updatePreviewInteraction(at: value.location)
-                            }
-                            .onEnded { value in
-                                endPreviewInteraction(at: value.location)
-                            }
-                    )
-                    .simultaneousGesture(
-                        SpatialTapGesture(count: 2)
-                            .onEnded { _ in
-                                hapticTrigger += 1
-                                withAnimation(.bouncy) {
-                                    cameraModel.toggleSelfie()
-                                }
-                            }
-                    )
-                    
-                    if !cameraModel.showSimpleView {
-                        // MARK: - Zebras
-                        if cameraModel.showZebraStripes {
-                            AnalysisOverlayView(
-                                mask: cameraModel.zebraMask,
-                                gridSize: cameraModel.analysisGridSize,
-                                style: .zebra
-                            )
-                            .frame(width: previewRect.width, height: previewRect.height)
-                            .position(x: previewRect.midX, y: previewRect.midY)
-                        }
-                        
-                        // MARK: - Highlight Clipping
-                        if cameraModel.showClipping {
-                            AnalysisOverlayView(
-                                mask: cameraModel.clippingMask,
-                                gridSize: cameraModel.analysisGridSize,
-                                style: .clipping
-                            )
-                            .frame(width: previewRect.width, height: previewRect.height)
-                            .position(x: previewRect.midX, y: previewRect.midY)
-                        }
-                        
-                        // MARK: - Focus Peaking
-                        if !cameraModel.isAutoFocus && cameraModel.showFocusPeaking {
-                            AnalysisOverlayView(
-                                mask: cameraModel.focusPeakingMask,
-                                gridSize: cameraModel.analysisGridSize,
-                                style: .focusPeaking
-                            )
-                            .frame(width: previewRect.width, height: previewRect.height)
-                            .position(x: previewRect.midX, y: previewRect.midY)
-                        }
-                        
-                        // MARK: - Focus Loupe
-                        if !cameraModel.isAutoFocus && cameraModel.showFocusLoupe, cameraModel.loupeImage != nil {
-                            let loupeSize: CGFloat = previewRect.width / 3
-                            FocusLoupeView(loupeImage: cameraModel.loupeImage)
-                                .frame(width: loupeSize, height: loupeSize)
-                                .clipShape(Circle())
-                                .overlay(
-                                    Circle()
-                                        .stroke(.white.opacity(0.5), lineWidth: 1.5)
-                                )
-                                .shadow(color: .black.opacity(0.5), radius: 8, x: 0, y: 2)
-                                .position(x: previewRect.midX, y: previewRect.midY)
-                                .allowsHitTesting(false)
-                                .transition(.opacity)
-                        }
-                        
-                        // MARK: - Crop frame overlay
-                        if cameraModel.shouldShowGrid {
-                            CropOverlayView(aspectRatio: cameraModel.captureAspectRatio)
-                                .ignoresSafeArea()
-                        }
-                        
-                        // MARK: - Level / Horizon overlay
-                        if cameraModel.shouldShowLevel {
-                            LevelOverlayView(model: levelModel)
-                                .ignoresSafeArea()
-                        }
-                    }
-                    
-                    // MARK: - Tap to focus overlay
-                    if !cameraModel.isBurstCapturing, cameraModel.isTapFocusIndicatorVisible, let indicatorPoint = cameraModel.tapFocusIndicatorPoint {
-                        FocusReticleView(
-                            lockLabel: cameraModel.tapFocusLockLabel,
-                            exposureOffset: cameraModel.tapFocusIndicatorOffset,
-                            showsExposureHandle: cameraModel.canAdjustTapPointExposureBias,
-                            isDimmed: cameraModel.isTapFocusIndicatorDimmed
-                        )
-                        .position(indicatorPoint)
-                        .transition(.opacity)
-                    }
-                    
-                    // MARK: - Focus lock overlay
-                    ZStack {
-                        if !cameraModel.isBurstCapturing, let lockLabel = cameraModel.tapFocusLockLabel {
-                            Text(lockLabel)
-                                .font(.system(size: 12, weight: .bold))
-                                .foregroundStyle(.yellow)
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 6)
-                                .background(.black.opacity(0.55), in: .capsule)
-                                .position(x: previewRect.midX, y: previewRect.midY - previewRect.height / 2 + 20)
-                                .transition(.opacity)
-                        }
-                    }
-                    .animation(.bouncy, value: cameraModel.tapFocusLockLabel)
-                    
-                    // MARK: - QR Code
-                    ZStack {
-                        if !cameraModel.isTimerCountingDown, !cameraModel.isBurstCapturing, let url = cameraModel.detectedCodeURL {
-                            VStack(spacing: 4) {
-                                Text(copiedString)
-                                    .font(.system(size: 10, weight: .bold))
-                                    .fontWidth(.expanded)
-                                    .foregroundStyle(.yellow.opacity(0.8))
-                                    .padding(8)
-                                    .glassEffect()
-                                Button {
-                                    UIApplication.shared.open(url)
-                                    cameraModel.ignoreCurrentCode()
-                                } label: {
-                                    HStack(spacing: 8) {
-                                        Image(systemName: linkSymbolName)
-                                        Text(url.host ?? backupURLName)
-                                            .lineLimit(1)
-                                    }
-                                    .font(.system(size: 14, weight: .bold))
-                                    .fontWidth(.expanded)
-                                }
-                                .buttonStyle(.glass)
-                                .padding(.horizontal)
-                                
-                                Button(closeLinkTitle, systemImage: closeSymbolName) {
-                                    cameraModel.ignoreCurrentCode()
-                                }
-                                .font(.system(size: 10, weight: .bold))
-                                .fontWidth(.expanded)
-                                .foregroundStyle(.yellow.opacity(0.8))
-                                .buttonStyle(.glass)
-                            }
-                            .position(x: previewRect.midX, y: previewRect.midY)
-                            .transition(.opacity)
-                        }
-                    }
-                    .animation(.bouncy, value: cameraModel.detectedCodeURL)
-                    
-                    // MARK: - Lens Cleaning Hint
-                    ZStack {
-                        if !cameraModel.isTimerCountingDown, !cameraModel.isBurstCapturing, cameraModel.shouldShowLensCleaningHint {
-                            VStack(spacing: 4) {
-                                Button {
-                                    hapticTriggerR += 1
-                                    cameraModel.dismissLensCleaningHint()
-                                } label: {
-                                    HStack(spacing: 8) {
-                                        Image(systemName: lensCleaningSymbolName)
-                                        Text(lensCleaningTitle)
-                                    }
-                                    .font(.system(size: 14, weight: .bold))
-                                    .fontWidth(.expanded)
-                                }
-                                .buttonStyle(.glass)
-                                .padding(.horizontal)
-                                
-                                Button(closeCleaningTitle, systemImage: closeSymbolName) {
-                                    cameraModel.dismissLensCleaningHint()
-                                }
-                                .font(.system(size: 10, weight: .bold))
-                                .fontWidth(.expanded)
-                                .foregroundStyle(.yellow.opacity(0.8))
-                                .buttonStyle(.glass)
-                            }
-                            .position(x: previewRect.midX, y: previewRect.midY)
-                            .transition(.opacity)
-                        }
-                    }
-                    .animation(.bouncy, value: cameraModel.shouldShowLensCleaningHint)
-                    
-                    // MARK: - Burst Feedback
-                    if let displayedBurstFeedbackMessage {
-                        Text(displayedBurstFeedbackMessage)
-                            .font(.system(size: 16, weight: .bold))
-                            .fontWidth(.expanded)
-                            .foregroundStyle(.white)
-                            .padding(.horizontal, 14)
-                            .padding(.vertical, 10)
-                            .background(.black.opacity(0.6), in: .capsule)
-                            .position(x: previewRect.midX, y: previewRect.midY)
-                            .allowsHitTesting(false)
-                            .opacity(isBurstFeedbackVisible ? 1 : 0)
-                    }
-                }
-                .blur(radius: scenePhase != .active ? 20 : 0)
-                
-                // MARK: - UI Overlays
-                VStack(spacing: 0) {
-                    if !cameraModel.showSimpleView {
-                        VStack(spacing: 0) {
-                            TopBarView(cameraModel: cameraModel, selectedControl: $selectedControl)
-                                .offset(y:-10)
-                            
-                            Spacer()
-                            
-                            if let selectedControl {
-                                ManualControlsView(cameraModel: cameraModel, control: selectedControl)
-                                    .padding(.bottom, cameraModel.histogramModeLarge != .none ? 10 : 30)
-                            }
-                            
-                            ZStack {
-                                if cameraModel.histogramModeLarge != .none {
-                                    HistogramView(
-                                        mode: cameraModel.histogramModeLarge,
-                                        size: .large,
-                                        lumaData: cameraModel.histogramData,
-                                        redData: cameraModel.redHistogram,
-                                        greenData: cameraModel.greenHistogram,
-                                        blueData: cameraModel.blueHistogram,
-                                        waveformData: cameraModel.waveformData
-                                    )
-                                    .frame(height: 60)
-                                    .padding(.horizontal, 20)
-                                    .padding(.bottom, 30)
-                                    .onTapGesture {
-                                        hapticTrigger += 1
-                                        cameraModel.cycleHistogramMode(mode: &cameraModel.histogramModeLarge)
-                                    }
-                                    .onLongPressGesture {
-                                        hapticTriggerR += 1
-                                        cameraModel.hideHistogram(for: .large)
-                                    }
-                                    .transition(.scale(scale: 0.5, anchor: .center).combined(with: .opacity))
-                                }
-                            }
-                            .animation(.bouncy, value: cameraModel.histogramModeLarge)
-                        }
-                        .transition(.opacity)
-                    } else {
-                        if cameraModel.isBurstCapturing {
-                            VStack(spacing: 6) {
-                                Text(cameraModel.burstCaptureStatusLabel)
-                                    .font(.system(size: 16, weight: .bold))
-                                    .fontWidth(.expanded)
-                                    .monospacedDigit()
-                                    .contentTransition(.numericText())
-                                
-                                if cameraModel.shouldShowBurstIntervalCountdown {
-                                    Text(cameraModel.burstIntervalCountdownLabel)
-                                        .font(.system(size: 16, weight: .bold))
-                                        .fontWidth(.expanded)
-                                        .monospacedDigit()
-                                        .contentTransition(.numericText(countsDown: true))
-                                }
-                            }
-                            .foregroundStyle(.white)
-                            .padding(.horizontal, 14)
-                            .padding(.vertical, 10)
-                            .background(.black.opacity(0.6), in: .rect(cornerRadius: 8))
-                            .allowsHitTesting(false)
-                            .padding(.top, 16)
-                            .transition(.opacity)
-                        }
-                        
-                        Spacer()
-                    }
-                    
-                    BottomBarView(
-                        cameraModel: cameraModel,
-                        shutterCount: $shutterCount,
-                        shutterCountBurst: $shutterCountBurst
-                    )
-                    .padding(.bottom, 30)
-                }
-                .allowsHitTesting(!cameraModel.isTimerCountingDown)
-                .animation(.easeInOut(duration: 0.2), value: cameraModel.showSimpleView)
-                
-                // MARK: - Timer countdown
-                timerCountdownOverlay(in: previewRect)
-                
-                // MARK: - Capture flash
-                if cameraModel.isCapturing {
-                    Color.white.opacity(0.3)
-                        .frame(width: previewRect.width, height: previewRect.height)
-                        .position(x: previewRect.midX, y: previewRect.midY)
-                        .animation(.easeOut(duration: 0.15), value: cameraModel.isCapturing)
-                }
-                
-                // MARK: - Confetti cannons
-                ConfettiCannon(
-                    trigger: $cameraModel.confettiCannonTrigger,
-                    num: 50,
-                    confettis: [
-                        .sfSymbol(symbolName: "bolt.fill"),
-//                        .sfSymbol(symbolName: "camera.macro"),
-                        .sfSymbol(symbolName: "camera.aperture"),
-//                        .sfSymbol(symbolName: "camera.filters"),
-                        .sfSymbol(symbolName: "camera.shutter.button.fill"),
-//                        .sfSymbol(symbolName: "photo.stack.fill"),
-                        .sfSymbol(symbolName: "cloud.sun.fill"),
-//                        .sfSymbol(symbolName: "cloud.bolt.rain"),
-                        .sfSymbol(symbolName: "rainbow"),
-//                        .sfSymbol(symbolName: "person.fill"),
-                        .sfSymbol(symbolName: "bird"),
-//                        .sfSymbol(symbolName: "mountain.2"),
-                        .image("camera.blueberry"),
-//                        .text("📸"),
-                        .text("🫐"),
-//                        .text("🌤️"),
-                        .text("🌉"),
-//                        .text("🌄"),
-                        .text("🌅"),
-//                        .text("🌃"),
-                        .text("🍛"),
-//                        .text("🐶"),
-                        .text("🏎️"),
-//                        .text("🚙"),
-                        .text("🏀"),
-//                        .text("⚽️"),
-                        .text("🏈"),
-                    ],
-                    confettiSize: 12,
-                    rainHeight: 800,
-                    openingAngle: .degrees(45),
-                    closingAngle: .degrees(75),
-                    radius: 350
-                )
-                .position(x: previewRect.minX, y: previewRect.maxY - 60)
-                .allowsHitTesting(false)
-                
-                ConfettiCannon(
-                    trigger: $cameraModel.confettiCannonTrigger,
-                    num: 50,
-                    confettis: [
-//                        .sfSymbol(symbolName: "bolt.fill"),
-                        .sfSymbol(symbolName: "camera.macro"),
-//                        .sfSymbol(symbolName: "camera.aperture"),
-                        .sfSymbol(symbolName: "camera.filters"),
-//                        .sfSymbol(symbolName: "camera.shutter.button.fill"),
-                        .sfSymbol(symbolName: "photo.stack.fill"),
-//                        .sfSymbol(symbolName: "cloud.sun.fill"),
-                        .sfSymbol(symbolName: "cloud.bolt.rain"),
-//                        .sfSymbol(symbolName: "rainbow"),
-                        .sfSymbol(symbolName: "person.fill"),
-//                        .sfSymbol(symbolName: "bird"),
-                        .sfSymbol(symbolName: "mountain.2"),
-//                        .image("camera.blueberry"),
-                        .text("📸"),
-//                        .text("🫐")
-                        .text("🌤️"),
-//                        .text("🌉"),
-                        .text("🌄"),
-//                        .text("🌅"),
-                        .text("🌃"),
-//                        .text("🍛"),
-                        .text("🐶"),
-//                        .text("🏎️"),
-                        .text("🚙"),
-//                        .text("🏀"),
-                        .text("⚽️"),
-//                        .text("🏈"),
-                    ],
-                    confettiSize: 12,
-                    rainHeight: 800,
-                    openingAngle: .degrees(105),
-                    closingAngle: .degrees(135),
-                    radius: 350
-                )
-                .position(x: previewRect.maxX, y: previewRect.maxY - 60)
-                .allowsHitTesting(false)
+    var body: some View {
+        appContent()
+            .animation(.easeInOut(duration: 0.4), value: permissionModel.allGranted)
+            .animation(.easeInOut(duration: 0.4), value: permissionModel.anyDenied)
+            .sensoryFeedback(.impact, trigger: hapticTrigger)
+            .sensoryFeedback(.impact(flexibility: .soft), trigger: hapticTriggerR)
+            .sensoryFeedback(.selection, trigger: countdownHapticTrigger)
+            .sensoryFeedback(.impact(flexibility: .soft), trigger: cameraModel.detectedCodeURL)
+            .sensoryFeedback(.impact(flexibility: .soft), trigger: cameraModel.tap​Focus​Lock​Haptic​Trigger)
+            .statusBarHidden()
+            .onAppear(perform: handleOnAppear)
+            .onDisappear(perform: handleOnDisappear)
+            .onChange(of: permissionModel.allGranted, handleOnChangeOfPermissionsGranted)
+            .onChange(of: cameraModel.shouldShowLevel, handleOnChangeOfShowingLevel)
+            .onChange(of: scenePhase, handleOnChangeOfScenePhase)
+            .onChange(of: cameraModel.showSimpleView, handleOnChangeOfSimpleView)
+            .onChange(of: cameraModel.burstFeedbackMessage, updateBurstFeedbackOverlay)
+            .onChange(of: cameraModel.activeLens, handleOnChangeOfActiveLens)
+            .onChange(of: cameraModel.lensSwitchCompletionCount, handleOnChangeOfLensSwitchCount)
+            .onReceive(NotificationCenter.default.publisher(for: UIDevice.deviceDidShakeNotification), perform: handleOnRecieveShake)
+            .alert(errorString, isPresented: $cameraModel.showError) {
+                Button(okButtonString, role: .cancel) {}
+            } message: {
+                Text(cameraModel.errorMessage)
             }
-            .ignoresSafeArea(.keyboard)
-        }
-        .safeAreaInset(edge: .top) {
-            // MARK: - Status bar
-            if !cameraModel.showSimpleView {
-                StatusBarAreaView(cameraModel: cameraModel)
-                    .padding()
-                    .ignoresSafeArea()
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .frame(height: .zero)
-                    .transition(.opacity)
-            } else {
-                Color.clear
-                    .padding()
-                    .ignoresSafeArea()
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .frame(height: .zero)
-                    .transition(.opacity)
+            .fullScreenCover(isPresented: Binding(get: {
+                cameraModel.appView == .settings
+            }, set: { _, _ in
+                cameraModel.hideSettings()
+            })) {
+                SettingsView(
+                    cameraModel: cameraModel,
+                    shutterCount: $shutterCount,
+                    shutterCountBurst: $shutterCountBurst,
+                    resetToDefaults: cameraModel.resetToDefaults)
             }
-        }
-        .animation(.easeInOut(duration: 0.2), value: cameraModel.showSimpleView)
-        .animation(.easeInOut(duration: 0.2), value: cameraModel.isBurstCapturing)
+    }
+}
+
+// MARK: - On Change functions
+extension CaptureView {
+    private func triggerShutterFeedback() {
+        hapticTrigger += 1
     }
     
-    var body: some View {
-        ZStack {
-            if permissionModel.allGranted {
-                cameraContent
-                    .transition(.opacity)
-            } else if permissionModel.anyDenied {
-                PermissionDeniedView(
-                    cameraGranted: permissionModel.cameraStatus == .granted,
-                    photosGranted: permissionModel.photosStatus == .granted
-                )
-                .transition(.opacity)
-            } else {
-                Color.black.ignoresSafeArea()
-            }
+    private func triggerCountdownFeedback() {
+        countdownHapticTrigger += 1
+    }
+    
+    private func handleOnAppear() {
+        let standardShutterCount = $shutterCount
+        cameraModel.onStandardPhotoSaved = {
+            standardShutterCount.wrappedValue += 1
         }
-        .animation(.easeInOut(duration: 0.4), value: permissionModel.allGranted)
-        .animation(.easeInOut(duration: 0.4), value: permissionModel.anyDenied)
-        .statusBarHidden()
-        .sensoryFeedback(.impact, trigger: hapticTrigger)
-        .sensoryFeedback(.impact(flexibility: .soft), trigger: hapticTriggerR)
-        .sensoryFeedback(.impact(flexibility: .soft), trigger: cameraModel.detectedCodeURL)
-        .sensoryFeedback(.impact(flexibility: .soft), trigger: cameraModel.tap​Focus​Lock​Haptic​Trigger)
-        .onAppear {
+        cameraModel.onTimerCountdownSecond = triggerCountdownFeedback
+        configureCameraIfPermitted()
+        levelModel.startUpdates()
+        levelModel.setLevelDisplayEnabled(cameraModel.shouldShowLevel && !cameraModel.showSimpleView)
+        
+        // Pass gravity updates to camera model
+        levelModel.onGravityUpdate = { gx, gy, gz in
+            cameraModel.lastGravity = (gx, gy, gz)
+        }
+    }
+    
+    private func handleOnDisappear() {
+        cameraModel.stopBurstCapture()
+        cameraModel.onStandardPhotoSaved = nil
+        cameraModel.onTimerCountdownSecond = nil
+        burstFeedbackFadeTask?.cancel()
+        levelModel.stopUpdates()
+        cameraModel.clearTapPointInteraction(resetDeviceState: false)
+    }
+    
+    private func configureCameraIfPermitted() {
+        guard permissionModel.allGranted else { return }
+        
+        if hasConfiguredCamera {
+            cameraModel.startSession()
+        } else {
+            hasConfiguredCamera = true
             cameraModel.configure()
+        }
+    }
+    
+    private func handleOnChangeOfPermissionsGranted(_: Bool, new: Bool) {
+        if new {
+            configureCameraIfPermitted()
             levelModel.startUpdates()
             levelModel.setLevelDisplayEnabled(cameraModel.shouldShowLevel && !cameraModel.showSimpleView)
-            
-            // Pass gravity updates to camera model
-            levelModel.onGravityUpdate = { gx, gy, gz in
-                cameraModel.lastGravity = (gx, gy, gz)
-            }
-        }
-        .onDisappear {
+        } else {
             cameraModel.stopBurstCapture()
-            burstFeedbackFadeTask?.cancel()
+            cameraModel.stopSession()
             levelModel.stopUpdates()
-            cameraModel.clearTapPointInteraction(resetDeviceState: false)
         }
-        .onChange(of: cameraModel.shouldShowLevel) { _, new in
-            levelModel.setLevelDisplayEnabled(new && !cameraModel.showSimpleView)
+    }
+    
+    private func handleOnChangeOfShowingLevel(_: Bool, new: Bool) {
+        levelModel.setLevelDisplayEnabled(new && !cameraModel.showSimpleView)
+    }
+    
+    private func handleOnChangeOfScenePhase(_: ScenePhase, newPhase: ScenePhase) {
+        if newPhase == .active {
+            configureCameraIfPermitted()
+            levelModel.startUpdates() // Always start
+            levelModel.setLevelDisplayEnabled(cameraModel.shouldShowLevel && !cameraModel.showSimpleView)
+        } else {
+            cameraModel.stopBurstCapture()
+            cameraModel.stopSession()
+            levelModel.stopUpdates() // Only stop when backgrounded
+            if newPhase == .background {
+                cameraModel.clearIgnoredCodes()
+            }
         }
-        .onChange(of: scenePhase) { _, newPhase in
-            if newPhase == .active {
-                cameraModel.startSession()
-                levelModel.startUpdates() // Always start
-                levelModel.setLevelDisplayEnabled(cameraModel.shouldShowLevel && !cameraModel.showSimpleView)
-            } else {
-                cameraModel.stopBurstCapture()
-                cameraModel.stopSession()
-                levelModel.stopUpdates() // Only stop when backgrounded
-                if newPhase == .background {
-                    cameraModel.clearIgnoredCodes()
+    }
+    
+    private func handleOnChangeOfSimpleView(_: Bool, new: Bool) {
+        levelModel.setLevelDisplayEnabled(!new && cameraModel.shouldShowLevel)
+    }
+    
+    private func handleOnChangeOfActiveLens(_ oldLens: Lens, _ newLens: Lens) {
+        cameraModel.clearTapPointInteraction(resetDeviceState: false)
+        // Handle visual "zoom" bump to mask lens hardware switch
+        if oldLens.isFront == newLens.isFront {
+            // Use a light zoom/blur mask for same-facing lens changes.
+            isAwaitingSameFacingLensCompletion = true
+            let oldValue = Double(oldLens.label) ?? 1.0
+            let newValue = Double(newLens.label) ?? 1.0
+            let isZoomIn = newValue > oldValue
+            let targetScale: CGFloat = isZoomIn ? 1.035 : 0.965
+            withAnimation(.easeIn(duration: 0.15)) {
+                visualZoomScale = targetScale
+                visualOpacity = 0.62
+                visualBlur = 6
+            }
+        } else {
+            // Keep the motion continuous; only the de-blur waits for the hardware swap.
+            isAwaitingFacingFlipCompletion = true
+            let edgeRotation: Double = newLens.isFront ? -82 : 82
+            withAnimation(.easeInOut(duration: 0.22)) {
+                visualOpacity = 0.06
+                visualBlur = 18
+                cameraModel.flipRotation = edgeRotation
+            }
+            Task { @MainActor in
+                try? await Task.sleep(for: .milliseconds(220))
+                withAnimation(.easeOut(duration: 0.05)) {
+                    cameraModel.flipRotation = 0
                 }
             }
         }
-        .onChange(of: cameraModel.showSimpleView) { _, new in
-            levelModel.setLevelDisplayEnabled(!new && cameraModel.shouldShowLevel)
-        }
-        .onChange(of: cameraModel.burstFeedbackMessage) { _, new in
-            updateBurstFeedbackOverlay(new)
-        }
-        .onChange(of: cameraModel.activeLens) { oldLens, newLens in
-            cameraModel.clearTapPointInteraction(resetDeviceState: false)
-            // Handle visual "zoom" bump to mask lens hardware switch
-            if oldLens.isFront == newLens.isFront {
-                // Use a light zoom/blur mask for same-facing lens changes.
-                isAwaitingSameFacingLensCompletion = true
-                let oldValue = Double(oldLens.label) ?? 1.0
-                let newValue = Double(newLens.label) ?? 1.0
-                let isZoomIn = newValue > oldValue
-                let targetScale: CGFloat = isZoomIn ? 1.035 : 0.965
-                withAnimation(.easeIn(duration: 0.14)) {
-                    visualZoomScale = targetScale
-                    visualOpacity = 0.72
-                    visualBlur = 6
-                }
-            } else {
-                // Keep the motion continuous; only the de-blur waits for the hardware swap.
-                isAwaitingFacingFlipCompletion = true
-                pendingFacingFlipRotation = newLens.isFront ? -80 : 80
-                withAnimation(.easeIn(duration: 0.12)) {
-                    visualOpacity = 0.1
-                    visualBlur = 18
-                    cameraModel.flipRotation = newLens.isFront ? 80 : -80
-                }
-                Task { @MainActor in
-                    try? await Task.sleep(for: .milliseconds(120))
-                    cameraModel.flipRotation = pendingFacingFlipRotation
-                    withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
-                        cameraModel.flipRotation = 0
-                    }
-                }
+    }
+    
+    private func handleOnChangeOfLensSwitchCount() {
+        if isAwaitingSameFacingLensCompletion {
+            isAwaitingSameFacingLensCompletion = false
+            withAnimation(.easeOut(duration: 0.22)) {
+                visualZoomScale = 1.0
+                visualBlur = 0
+                visualOpacity = 1.0
             }
         }
-        .onChange(of: cameraModel.lensSwitchCompletionCount) {
-            if isAwaitingSameFacingLensCompletion {
-                isAwaitingSameFacingLensCompletion = false
-                withAnimation(.easeOut(duration: 0.22)) {
-                    visualZoomScale = 1.0
-                    visualBlur = 0
-                    visualOpacity = 1.0
-                }
-            }
-            
-            if isAwaitingFacingFlipCompletion {
-                isAwaitingFacingFlipCompletion = false
-                withAnimation(.easeOut(duration: 0.18)) {
-                    visualBlur = 0
-                    visualOpacity = 1.0
-                }
+        
+        if isAwaitingFacingFlipCompletion {
+            isAwaitingFacingFlipCompletion = false
+            withAnimation(.easeOut(duration: 0.28)) {
+                visualBlur = 0
+                visualOpacity = 1.0
             }
         }
-        .onReceive(NotificationCenter.default.publisher(for: UIDevice.deviceDidShakeNotification)) { _ in
-            guard !cameraModel.isBurstCapturing else { return }
-            if let url = cameraModel.detectedCodeURL {
-                UIApplication.shared.open(url)
-                cameraModel.ignoreCurrentCode()
-            }
-        }
-        .alert(errorString, isPresented: $cameraModel.showError) {
-            Button(okButtonString, role: .cancel) {}
-        } message: {
-            Text(cameraModel.errorMessage)
-        }
-        .fullScreenCover(isPresented: Binding(get: {
-            cameraModel.appView == .settings
-        }, set: { _, _ in
-            cameraModel.hideSettings()
-        })) {
-            SettingsView(
-                cameraModel: cameraModel,
-                shutterCount: $shutterCount,
-                shutterCountBurst: $shutterCountBurst,
-                resetToDefaults: cameraModel.resetToDefaults)
+    }
+    
+    private func handleOnRecieveShake(_: Notification) {
+        guard !cameraModel.isBurstCapturing else { return }
+        if let url = cameraModel.detectedCodeURL {
+            UIApplication.shared.open(url)
+            cameraModel.ignoreCurrentCode()
         }
     }
 }

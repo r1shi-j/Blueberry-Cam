@@ -4,7 +4,13 @@ import Foundation
 extension CameraModel {
     private var tapFocusHideDelay: Duration { .seconds(2) }
     private var tapFocusAdjustmentIgnoreDuration: TimeInterval { 1.0 }
+    private var tapFocusRetakeProtectionDuration: TimeInterval { 2.5 }
     private var tapFocusLensPositionChangeThreshold: Float { 0.05 }
+    
+    private var isTapFocusRetakeProtected: Bool {
+        guard let tapFocusRetakeProtectionUntil else { return false }
+        return Date() < tapFocusRetakeProtectionUntil
+    }
     
     var canHandleTapPointInteraction: Bool {
         isAutoFocus || isAutoExposure
@@ -59,18 +65,17 @@ extension CameraModel {
         guard tapFocusIndicatorPoint != nil,
               tapFocusLockLabel == nil,
               isAutoFocus,
-              !isTapFocusInteractionActive else { return }
-        clearTapPointInteraction(resetDeviceState: false)
-        if isAutoExposure {
-            applyExposureBias()
-        }
+              !isTapFocusInteractionActive,
+              !isTapFocusRetakeProtected else { return }
+        clearTapPointInteraction()
     }
     
     func handleAutoFocusRetake() {
         guard isAutoFocus,
               tapFocusIndicatorPoint != nil,
               tapFocusLockLabel == nil,
-              !isTapFocusInteractionActive else { return }
+              !isTapFocusInteractionActive,
+              !isTapFocusRetakeProtected else { return }
         if ignoredTapFocusAdjustmentEvents > 0 {
             if let deadline = ignoredTapFocusAdjustmentDeadline, Date() <= deadline {
                 ignoredTapFocusAdjustmentEvents -= 1
@@ -80,10 +85,7 @@ extension CameraModel {
             ignoredTapFocusAdjustmentEvents = 0
             ignoredTapFocusAdjustmentDeadline = nil
         }
-        clearTapPointInteraction(resetDeviceState: false)
-        if isAutoExposure {
-            applyExposureBias()
-        }
+        clearTapPointInteraction()
     }
     
     func handleLensPositionChange(_ lensPosition: Float) {
@@ -91,14 +93,12 @@ extension CameraModel {
               tapFocusIndicatorPoint != nil,
               tapFocusLockLabel == nil,
               !isTapFocusInteractionActive,
+              !isTapFocusRetakeProtected,
               ignoredTapFocusAdjustmentEvents == 0,
               ignoredTapFocusAdjustmentDeadline == nil,
               let baseline = tapFocusLensPositionBaseline else { return }
         guard abs(lensPosition - baseline) >= tapFocusLensPositionChangeThreshold else { return }
-        clearTapPointInteraction(resetDeviceState: false)
-        if isAutoExposure {
-            applyExposureBias()
-        }
+        clearTapPointInteraction()
     }
     
     func applyManualFocus() {
@@ -184,12 +184,20 @@ extension CameraModel {
         tapExposureBias = 0
         ignoredTapFocusAdjustmentEvents = 0
         ignoredTapFocusAdjustmentDeadline = nil
+        tapFocusRetakeProtectionUntil = nil
         tapFocusLensPositionBaseline = nil
         
         guard resetDeviceState, let d = device else { return }
         try? d.lockForConfiguration()
+        let centerPoint = CGPoint(x: 0.5, y: 0.5)
+        if isAutoFocus, d.isFocusPointOfInterestSupported {
+            d.focusPointOfInterest = centerPoint
+        }
         if isAutoFocus, d.isFocusModeSupported(.continuousAutoFocus) {
             d.focusMode = .continuousAutoFocus
+        }
+        if isAutoExposure, d.isExposurePointOfInterestSupported {
+            d.exposurePointOfInterest = centerPoint
         }
         if isAutoExposure, d.isExposureModeSupported(.continuousAutoExposure) {
             d.exposureMode = .continuousAutoExposure
@@ -207,6 +215,7 @@ extension CameraModel {
         updateTapFocusIndicatorOffset(forExposureBias: 0)
         ignoredTapFocusAdjustmentEvents = isAutoFocus ? 1 : 0
         ignoredTapFocusAdjustmentDeadline = isAutoFocus ? Date().addingTimeInterval(tapFocusAdjustmentIgnoreDuration) : nil
+        tapFocusRetakeProtectionUntil = isAutoFocus ? Date().addingTimeInterval(tapFocusRetakeProtectionDuration) : nil
         switch (isAutoFocus, isAutoExposure) {
             case (true, true):
                 applyAutoFocusAndMeter(at: devicePoint)
@@ -231,6 +240,7 @@ extension CameraModel {
         updateTapFocusIndicatorOffset(forExposureBias: 0)
         ignoredTapFocusAdjustmentEvents = isAutoFocus ? 1 : 0
         ignoredTapFocusAdjustmentDeadline = isAutoFocus ? Date().addingTimeInterval(tapFocusAdjustmentIgnoreDuration) : nil
+        tapFocusRetakeProtectionUntil = isAutoFocus ? Date().addingTimeInterval(tapFocusRetakeProtectionDuration) : nil
         if isAutoExposure {
             applyAutoFocusAndMeter(at: devicePoint)
             scheduleTapPointLock(focus: true, exposure: true)
@@ -247,9 +257,8 @@ extension CameraModel {
         tapFocusLensPositionMonitorTask?.cancel()
         tapFocusLensPositionBaseline = nil
         tapFocusLensPositionMonitorTask = Task { @MainActor in
-            try? await Task.sleep(for: .seconds(tapFocusAdjustmentIgnoreDuration))
+            try? await Task.sleep(for: .seconds(tapFocusRetakeProtectionDuration))
             guard !Task.isCancelled,
-                  ignoredTapFocusAdjustmentEvents == 0 || ignoredTapFocusAdjustmentDeadline == nil,
                   tapFocusIndicatorPoint != nil,
                   tapFocusLockLabel == nil,
                   !isTapFocusInteractionActive,

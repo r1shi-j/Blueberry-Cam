@@ -229,6 +229,8 @@ extension LockedCameraModel {
             case .off:
                 timerMode = .threeSeconds
             case .threeSeconds:
+                timerMode = .fiveSeconds
+            case .fiveSeconds:
                 timerMode = .tenSeconds
             case .tenSeconds:
                 timerMode = .off

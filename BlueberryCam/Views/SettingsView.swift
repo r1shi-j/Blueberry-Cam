@@ -102,7 +102,7 @@ struct SettingsView: View {
                         Image(systemName: "scope")
                     }
                 }
-                                
+                
                 NavigationLink {
                     Form {
                         Text("Locked Capture opens BLueberry Cam from system surfaces like Control Centre and the Lock Screen. Some full-app features are unavailable there, including bursts, capture celebrations, overlays such as historgrams, zebras, highlight clipping, focus peaking, focus loupe, level and grid, as well as selfie cameras, geotagging location, recognising barcodes. Settings, clean UI and filters will also not be available. Any settings above which you have changed will not be read and so the defaults the app shipped with will be used.")
@@ -264,5 +264,5 @@ private enum ShutterCountResetTarget {
     SettingsView(
         cameraModel: cameraModel,
         shutterCount: $shutterCount,
-        shutterCountBurst: $shutterCountBurst) { }    
+        shutterCountBurst: $shutterCountBurst) { }
 }

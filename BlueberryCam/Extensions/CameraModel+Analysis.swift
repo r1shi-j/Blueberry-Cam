@@ -30,17 +30,25 @@ extension CameraModel: AVCaptureDataOutputSynchronizerDelegate, AVCaptureVideoDa
     nonisolated func processFrame(pixelBuffer: CVPixelBuffer, depthData: AVDepthData?) {
         guard !shouldPauseAnalysis else { return }
         
-        Task { @MainActor in
-            if let d = self.device {
-                self.liveISO = d.iso
-                self.liveShutter = Self.formatShutter(d.exposureDuration)
-                let tnt = d.temperatureAndTintValues(for: d.deviceWhiteBalanceGains)
-                self.liveWB = "\(Int(tnt.temperature))K"
-                self.liveFocus = Double(d.lensPosition).formatted(.number.precision(.fractionLength(2)))
+        let frameNumber = frameCounter.next()
+        if frameNumber.isMultiple(of: 3) {
+            Task { @MainActor in
+                if let d = self.device {
+                    self.liveISO = d.iso
+                    self.liveShutter = Self.formatShutter(d.exposureDuration)
+                    let tnt = d.temperatureAndTintValues(for: d.deviceWhiteBalanceGains)
+                    self.liveWB = "\(Int(tnt.temperature))K"
+                    self.liveFocus = Double(d.lensPosition).formatted(.number.precision(.fractionLength(2)))
+                    self.syncAutoRulerValues(
+                        iso: d.iso,
+                        exposureDuration: d.exposureDuration,
+                        whiteBalanceTemperature: tnt.temperature,
+                        lensPosition: d.lensPosition
+                    )
+                }
             }
         }
         
-        let frameNumber = frameCounter.next()
         let wantsLoupe = loupeEnabledForAnalysis
         let wantsPeaking = peakingEnabledForAnalysis
         let wantsZebra = zebraEnabledForAnalysis
@@ -51,7 +59,8 @@ extension CameraModel: AVCaptureDataOutputSynchronizerDelegate, AVCaptureVideoDa
         let wantsHistogramLarge = modeLarge != .none
         let wantsWaveform = modeSmall == .waveform || modeLarge == .waveform
         let wantsColorHistogram = modeSmall == .color || modeSmall == .parade || modeLarge == .color || modeLarge == .parade
-        let wantsAnyAnalysis = wantsPeaking || wantsZebra || wantsClipping || wantsHistogramSmall || wantsHistogramLarge
+        let shouldComputePeaking = wantsPeaking
+        let wantsAnyAnalysis = shouldComputePeaking || wantsZebra || wantsClipping || wantsHistogramSmall || wantsHistogramLarge
         
         // Generate loupe image from center crop (every 4th frame for performance)
         if wantsLoupe, frameNumber.isMultiple(of: 4) {
@@ -113,13 +122,9 @@ extension CameraModel: AVCaptureDataOutputSynchronizerDelegate, AVCaptureVideoDa
         }
         
         guard wantsAnyAnalysis else {
-            if !peakingTemporalScores.isEmpty {
+            if !wantsPeaking, !peakingTemporalScores.isEmpty {
                 peakingTemporalScores = []
             }
-            return
-        }
-        
-        if wantsPeaking, frameNumber.isMultiple(of: 2) {
             return
         }
         
@@ -135,11 +140,11 @@ extension CameraModel: AVCaptureDataOutputSynchronizerDelegate, AVCaptureVideoDa
         var gHist = wantsColorHistogram ? [Float](repeating: 0, count: 256) : []
         var bHist = wantsColorHistogram ? [Float](repeating: 0, count: 256) : []
         var count: Float = 0
-        let step = wantsPeaking ? 6 : 8
+        let step = wantsPeaking ? 5 : 8
         let sampleWidth = max(1, width  / step)
         let sampleHeight = max(1, height / step)
         let sampleCount  = sampleWidth * sampleHeight
-        var lumaGrid = wantsPeaking ? [Float](repeating: 0, count: sampleCount) : []
+        var lumaGrid = shouldComputePeaking ? [Float](repeating: 0, count: sampleCount) : []
         var zebra = wantsZebra ? [UInt8](repeating: 0, count: sampleCount) : []
         var clipping = wantsClipping ? [UInt8](repeating: 0, count: sampleCount) : []
         
@@ -181,7 +186,7 @@ extension CameraModel: AVCaptureDataOutputSynchronizerDelegate, AVCaptureVideoDa
                 let px = min(width - 1, sx * step)
                 let (r, g, b, luma) = readPixel(px, py)
                 let idx = sy * sampleWidth + sx
-                if wantsPeaking {
+                if shouldComputePeaking {
                     lumaGrid[idx] = luma
                 }
                 if wantsZebra {
@@ -211,23 +216,16 @@ extension CameraModel: AVCaptureDataOutputSynchronizerDelegate, AVCaptureVideoDa
             }
         }
         
-        var peaking = [UInt8](repeating: 0, count: sampleCount)
+        var peakingMaskToPublish: [UInt8]?
         
-        let depthGrid = wantsPeaking ? depthData.flatMap {
-            extractDepthGrid(from: $0, targetWidth: sampleWidth, targetHeight: sampleHeight)
-        } : nil
-        
-        if wantsPeaking, sampleWidth > 5, sampleHeight > 5 {
+        if shouldComputePeaking, sampleWidth > 5, sampleHeight > 5 {
+            var peaking = [UInt8](repeating: 0, count: sampleCount)
             var scoreMap = [Float](repeating: 0, count: sampleCount)
             var directionMap = [UInt8](repeating: 0, count: sampleCount)
             var scoreSum: Float = 0
             var scoreSumSquares: Float = 0
             var scoreCount: Float = 0
             var scoreMax: Float = 0
-            let focusDepth = focusDistanceEstimate(
-                lensPosition: lastLensPosition,
-                minimumFocusDistance: minimumFocusDistanceForAnalysis
-            )
             
             for y in 2..<(sampleHeight - 2) {
                 for x in 2..<(sampleWidth - 2) {
@@ -247,31 +245,17 @@ extension CameraModel: AVCaptureDataOutputSynchronizerDelegate, AVCaptureVideoDa
                     let bc2 = lumaGrid[(y + 2) * sampleWidth + x]
                     let ringMean = (tc2 + ml2 + mr2 + bc2) * 0.25
                     
-                    let gx = -3 * tl - 10 * ml - 3 * bl + 3 * tr + 10 * mr + 3 * br
-                    let gy = -3 * tl - 10 * tc - 3 * tr + 3 * bl + 10 * bc + 3 * br
-                    let gradient = sqrt(gx * gx + gy * gy)
+                    let gx = -tl - (2 * ml) - bl + tr + (2 * mr) + br
+                    let gy = -tl - (2 * tc) - tr + bl + (2 * bc) + br
+                    let gradientMagnitude = abs(gx) + abs(gy)
                     let laplacian = abs((4 * mc) - tc - bc - ml - mr)
-                    let wideGradient = sqrt(pow(mr2 - ml2, 2) + pow(bc2 - tc2, 2))
-                    let coarseContrast = abs(mc - ringMean)
-                    let microResponse = max(0, (laplacian * 2.8) - (wideGradient * 1.35) - (coarseContrast * 1.15))
-                    let narrowness = max(0, gradient - (wideGradient * 1.1))
-                    var score = microResponse + (narrowness * 0.22)
-                    
-                    if let depthGrid {
-                        let depth = depthGrid[i]
-                        if depth.isFinite, depth > 0 {
-                            score *= depthWeight(
-                                for: depth,
-                                focusDepth: focusDepth,
-                                depthGrid: depthGrid,
-                                index: i,
-                                rowStride: sampleWidth
-                            )
-                        }
-                    }
+                    let broadGradient = abs(mr2 - ml2) + abs(bc2 - tc2)
+                    let broadContrast = abs(mc - ringMean)
+                    let fineResponse = max(0, (laplacian * 2.6) - (broadGradient * 0.58) - (broadContrast * 0.42))
+                    var score = fineResponse * (laplacian + (gradientMagnitude * 0.08))
                     
                     if peakingTemporalScores.count == sampleCount {
-                        score = max(score, peakingTemporalScores[i] * 0.55)
+                        score = max(score, peakingTemporalScores[i] * 0.06)
                     }
                     
                     scoreMap[i] = score
@@ -283,48 +267,35 @@ extension CameraModel: AVCaptureDataOutputSynchronizerDelegate, AVCaptureVideoDa
                 }
             }
             
-            peakingTemporalScores = scoreMap.map { $0 * 0.78 }
+            peakingTemporalScores = scoreMap.map { $0 * 0.16 }
             
             let scoreMean = scoreCount > 0 ? scoreSum / scoreCount : 0
             let variance = scoreCount > 0 ? max(0, (scoreSumSquares / scoreCount) - (scoreMean * scoreMean)) : 0
             let scoreSigma = sqrt(variance)
-            let percentileThreshold = percentile(of: scoreMap, at: 0.97)
-            let threshold = max(scoreMean + (scoreSigma * 1.6), percentileThreshold * 0.92, scoreMax * 0.3)
-            let highThreshold = max(threshold * 1.35, scoreMax * 0.45)
+            let percentileThreshold = percentile(of: scoreMap, at: 0.91, sampleStride: 3)
+            let threshold = max(scoreMean + (scoreSigma * 0.95), percentileThreshold * 0.78, scoreMax * 0.045, 55)
+            let highThreshold = max(threshold * 1.45, scoreMax * 0.28)
             
-            var preliminaryPeaking = [UInt8](repeating: 0, count: sampleCount)
             for y in 2..<(sampleHeight - 2) {
                 for x in 2..<(sampleWidth - 2) {
                     let i = y * sampleWidth + x
                     let score = scoreMap[i]
                     guard score >= threshold else { continue }
-                    guard isDirectionalMaximum(scoreMap, index: i, rowStride: sampleWidth, direction: directionMap[i]) else {
+                    let isStrongEdge = score >= highThreshold * 0.72
+                    guard isStrongEdge || isDirectionalMaximum(scoreMap, index: i, rowStride: sampleWidth, direction: directionMap[i]) else {
                         continue
                     }
                     
                     let normalized = min(1, max(0, (score - threshold) / max(highThreshold - threshold, 1)))
-                    let intensity = UInt8(max(140, Int(140 + (normalized * 115))))
-                    preliminaryPeaking[i] = intensity
+                    peaking[i] = UInt8(max(120, Int(120 + (normalized * 135))))
                 }
             }
-            
-            for y in 2..<(sampleHeight - 2) {
-                for x in 2..<(sampleWidth - 2) {
-                    let i = y * sampleWidth + x
-                    let intensity = preliminaryPeaking[i]
-                    guard intensity > 0 else { continue }
-                    
-                    peaking[i] = max(peaking[i], intensity)
-                    if intensity > 220 {
-                        peaking[i - 1] = max(peaking[i - 1], intensity / 4)
-                        peaking[i + 1] = max(peaking[i + 1], intensity / 4)
-                        peaking[i - sampleWidth] = max(peaking[i - sampleWidth], intensity / 4)
-                        peaking[i + sampleWidth] = max(peaking[i + sampleWidth], intensity / 4)
-                    }
-                }
-            }
+            peakingMaskToPublish = peaking
         } else {
-            peakingTemporalScores = []
+            if !wantsPeaking {
+                peakingTemporalScores = []
+                peakingMaskToPublish = []
+            }
         }
         
         let normalizedHistogram: [Float]? = (wantsHistogramSmall || wantsHistogramLarge) && count > 0 ? hist.map  { $0 / count } : nil
@@ -358,7 +329,7 @@ extension CameraModel: AVCaptureDataOutputSynchronizerDelegate, AVCaptureVideoDa
         }
         
         let analysisSize = CGSize(width: sampleWidth, height: sampleHeight)
-        let peakingMask = peaking
+        let peakingMask = peakingMaskToPublish
         let zebraMask = zebra
         let capturedWfRGBN = wfRGBN
         let clipMask = clipping
@@ -370,7 +341,7 @@ extension CameraModel: AVCaptureDataOutputSynchronizerDelegate, AVCaptureVideoDa
             if let normB { self.blueHistogram = normB }
             self.waveformData = capturedWfRGBN
             self.analysisGridSize = analysisSize
-            self.focusPeakingMask = peakingMask
+            if let peakingMask { self.focusPeakingMask = peakingMask }
             self.zebraMask = zebraMask
             self.clippingMask = clipMask
         }
@@ -486,8 +457,15 @@ extension CameraModel: AVCaptureDataOutputSynchronizerDelegate, AVCaptureVideoDa
         }
     }
     
-    nonisolated func percentile(of values: [Float], at percentile: Float) -> Float {
-        let positives = values.filter { $0 > 0 }
+    nonisolated func percentile(of values: [Float], at percentile: Float, sampleStride: Int = 1) -> Float {
+        var positives: [Float] = []
+        positives.reserveCapacity(max(1, values.count / max(1, sampleStride)))
+        for index in stride(from: 0, to: values.count, by: max(1, sampleStride)) {
+            let value = values[index]
+            if value > 0 {
+                positives.append(value)
+            }
+        }
         guard !positives.isEmpty else { return 0 }
         let sorted = positives.sorted()
         let index = min(sorted.count - 1, max(0, Int(Float(sorted.count - 1) * percentile)))

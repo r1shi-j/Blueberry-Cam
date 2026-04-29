@@ -4,14 +4,11 @@ import Foundation
 extension CameraModel {
     private var tapPointExposureBiasLimit: Float { 2.0 }
     private var tapPointExposureHandleTravel: CGFloat { 40 }
-    private var tapPointDragPointsPerEV: CGFloat { tapPointExposureHandleTravel / CGFloat(tapPointExposureBiasLimit) }
+    private var tapPointDragPointsPerEV: CGFloat { 96 }
+    private var tapPointExposureBiasStep: Float { 0.025 }
     
     func applyManualExposure() {
         clearTapPointInteraction(resetDeviceState: false)
-        if manualShutterDenominator > 0 {
-            applyManualExposureWithDenominator(manualShutterDenominator)
-            return
-        }
         exposureDebounceTask?.cancel()
         exposureDebounceTask = Task {
             try? await Task.sleep(for: .milliseconds(50))
@@ -77,7 +74,8 @@ extension CameraModel {
         let deltaEV = Float(-verticalDrag / tapPointDragPointsPerEV)
         let lowerBound = max(minExposureBias, -tapPointExposureBiasLimit)
         let upperBound = min(maxExposureBias, tapPointExposureBiasLimit)
-        let clamped = max(lowerBound, min(upperBound, startBias + deltaEV))
+        let stepped = ((startBias + deltaEV) / tapPointExposureBiasStep).rounded() * tapPointExposureBiasStep
+        let clamped = max(lowerBound, min(upperBound, stepped))
         if abs(tapExposureBias - clamped) > 0.01 {
             tapExposureBias = clamped
             applyExposureBias()

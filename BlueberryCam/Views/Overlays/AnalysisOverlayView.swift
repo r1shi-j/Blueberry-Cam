@@ -42,13 +42,15 @@ struct AnalysisOverlayView: View {
                         
                         switch style {
                             case .focusPeaking:
-                                let opacity = 0.25 + (Double(intensity) / 255.0) * 0.7
-                                let inset = max(0.2, min(cellWidth, cellHeight) * 0.1)
-                                let highlightRect = rect.insetBy(dx: inset, dy: inset)
-                                context.fill(
-                                    Path(roundedRect: highlightRect, cornerRadius: min(cellWidth, cellHeight) * 0.22),
-                                    with: .color(.green.opacity(opacity))
+                                let opacity = 0.35 + (Double(intensity) / 255.0) * 0.55
+                                let diameter = max(1.8, min(cellWidth, cellHeight) * 0.64)
+                                let dot = CGRect(
+                                    x: rect.midX - diameter / 2,
+                                    y: rect.midY - diameter / 2,
+                                    width: diameter,
+                                    height: diameter
                                 )
+                                context.fill(Path(ellipseIn: dot), with: .color(.green.opacity(opacity)))
                             case .zebra:
                                 let r = max(0.75, min(cellWidth, cellHeight) * 0.45)
                                 let dot = CGRect(x: rect.midX - r, y: rect.midY - r, width: r * 2, height: r * 2)

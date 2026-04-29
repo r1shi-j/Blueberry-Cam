@@ -70,47 +70,46 @@ extension CameraModel {
         let ev = AVCaptureSlider("Exposure", symbolName: "plusminus", in: -4.0...4.0, step: 0.1)
         ev.prominentValues = [-4.0, -3.5, -3.0, -2.5, -2.0, -1.5, -1.0, -0.5, 0.0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0]
         ev.localizedValueFormat = "%@ EV"
-        // Seed to current EV value
         let clampedEV = max(-4.0, min(4.0, exposureBias))
         ev.value = round(clampedEV * 10) / 10.0
         ev.setActionQueue(.main) { [weak self] value in
             guard let self, !self.isUpdatingHardwareControl else { return }
-            if abs(self.exposureBias - value) > 0.01 {
-                self.exposureBias = value
-                self.applyExposureBias()
-            }
+            self.setExposureBias(value)
         }
         self.evControl = ev
         session.addControl(ev)
         
-        // ISO Slider — use step-safe bounds (ceil min to next 50, floor max to prev 50)
-        // This ensures min/max are exact multiples of the step so AVCaptureSlider never throws
-        let isoSliderMin = ceil(minISO / 50.0) * 50.0
-        let isoSliderMax = floor(maxISO / 50.0) * 50.0
-        guard isoSliderMin <= isoSliderMax else { return }
-        let isoSlider = AVCaptureSlider("ISO", symbolName: "film", in: isoSliderMin...isoSliderMax, step: 50.0)
-        isoSlider.prominentValues = [100, 200, 400, 800, 1600, 3200, 6400]
-        // Seed the slider to the current iso (clamped & snapped)
-        let seedISO = max(isoSliderMin, min(isoSliderMax, round(iso / 50.0) * 50.0))
-        isoSlider.value = seedISO
-        isoSlider.setActionQueue(.main) { [weak self] value in
-            guard let self, !self.isUpdatingHardwareControl else { return }
-            if abs(self.iso - value) > 1.0 {
-                self.iso = value
-                self.applyManualExposure()
+        // ISO Index Picker - mirrors the app ruler stops instead of exposing a long raw hardware range.
+        let isoPickerStops = isoStops.isEmpty ? availableISOStops : isoStops
+        if !isoPickerStops.isEmpty {
+            let isoPicker = AVCaptureIndexPicker("ISO", symbolName: "film", numberOfIndexes: isoPickerStops.count) { index in
+                guard isoPickerStops.indices.contains(index) else { return "" }
+                return Self.formatISO(isoPickerStops[index])
             }
+            isoPicker.selectedIndex = nearestISOStopIndex(in: isoPickerStops, to: iso) ?? 0
+            isoPicker.setActionQueue(.main) { [weak self] index in
+                guard let self, !self.isUpdatingHardwareControl else { return }
+                let stops = self.isoStops.isEmpty ? self.availableISOStops : self.isoStops
+                guard stops.indices.contains(index) else { return }
+                
+                let nextISO = stops[index]
+                if abs(self.iso - nextISO) > 0.1 {
+                    self.iso = nextISO
+                    self.applyManualExposure()
+                }
+            }
+            self.isoControl = isoPicker
+            session.addControl(isoPicker)
         }
-        self.isoControl = isoSlider
-        session.addControl(isoSlider)
         
-        // Shutter Speed Index Picker — index 0 is fastest (left), max index is slowest (right)
+        // Shutter Speed Index Picker - index 0 is slowest, max index is fastest.
         // This solves both the negative sign formatting limitations of AVCaptureSlider
         // and ensures we only select valid stops for the current camera.
         if shutterSpeeds.count > 0 {
             let ssPicker = AVCaptureIndexPicker("Shutter Speed", symbolName: "lightspectrum.horizontal", numberOfIndexes: shutterSpeeds.count) { [weak self] index in
                 guard let self else { return "" }
                 guard index >= 0 && index < self.shutterSpeeds.count else { return "" }
-                return Self.formatShutter(self.shutterSpeeds[index])
+                return Self.formatCameraControlShutter(self.shutterSpeeds[index])
             }
             // Seed to current shutterIndex
             let clampedIdx = max(0, min(shutterSpeeds.count - 1, shutterIndex))
@@ -119,7 +118,6 @@ extension CameraModel {
                 guard let self, !self.isUpdatingHardwareControl else { return }
                 if self.shutterIndex != index {
                     self.shutterIndex = index
-                    self.manualShutterDenominator = 0 // clear manual denominator
                     self.applyManualExposure()
                 }
             }
@@ -127,15 +125,12 @@ extension CameraModel {
             session.addControl(ssPicker)
         }
         
-        // Focus Slider
-        // Trick: slider runs 0...100 so iOS formats it as whole numbers, and we prefix with "0."
-        let focus = AVCaptureSlider("Focus", symbolName: "scope", in: 0...100, step: 1)
-        focus.localizedValueFormat = "0.%@"
-        focus.value = Float(lensPosition * 100.0)
+        let focus = AVCaptureSlider("Focus", symbolName: "scope", in: 0...1, step: 0.01)
+        focus.value = lensPosition
         focus.setActionQueue(.main) { [weak self] value in
-            guard let self, !self.isUpdatingHardwareControl else { return }
-            let normalized = value / 100.0
-            if abs(self.lensPosition - normalized) > 0.01 {
+            guard let self, !self.isUpdatingHardwareControl, !self.isAutoFocus else { return }
+            let normalized = max(0.0, min(1.0, value))
+            if abs(self.lensPosition - normalized) >= 0.005 {
                 self.lensPosition = normalized
                 self.applyManualFocus()
             }
@@ -193,14 +188,12 @@ extension CameraModel {
     
     func syncISOToHardware() {
         guard let ctrl = isoControl else { return }
-        let raw = max(minISO, min(maxISO, iso))
-        let snapped = round(raw / 50.0) * 50.0
-        let safeMin = ceil(minISO / 50.0) * 50.0
-        let safeMax = floor(maxISO / 50.0) * 50.0
-        let final = max(safeMin, min(safeMax, snapped))
-        if abs(ctrl.value - final) > 0.1 {
+        let stops = isoStops.isEmpty ? availableISOStops : isoStops
+        guard let selectedIndex = nearestISOStopIndex(in: stops, to: iso) else { return }
+        
+        if ctrl.selectedIndex != selectedIndex {
             isUpdatingHardwareControl = true
-            ctrl.value = final
+            ctrl.selectedIndex = selectedIndex
             isUpdatingHardwareControl = false
         }
     }
@@ -217,10 +210,9 @@ extension CameraModel {
     func syncFocusToHardware() {
         guard let ctrl = focusControl else { return }
         let clamped = max(0.0, min(1.0, lensPosition))
-        let sliderValue = Float(clamped * 100.0)
-        if abs(ctrl.value - sliderValue) > 1.0 {
+        if abs(ctrl.value - clamped) >= 0.005 {
             isUpdatingHardwareControl = true
-            ctrl.value = sliderValue
+            ctrl.value = clamped
             isUpdatingHardwareControl = false
         }
     }

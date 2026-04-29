@@ -10,10 +10,13 @@ extension CameraModel {
     
     func switchLens(to lens: Lens) {
         let lens = switchableLens(for: lens)
+        guard !isSwitchingLens else { return }
         guard lens != activeLens else { return }
         guard let previewCamera = AVCaptureDevice.default(lens.deviceType, for: .video, position: lens.position) else { return }
+        let previousLens = activeLens
         
         // 1. Instant UI update to trigger animations and selection state
+        isSwitchingLens = true
         self.activeLens = lens
         self.flipRotation = 0
         self.primeResolutionOptions(for: lens, device: previewCamera)
@@ -35,6 +38,10 @@ extension CameraModel {
                   let input = try? AVCaptureDeviceInput(device: cam),
                   self.session.canAddInput(input) else {
                 self.session.commitConfiguration()
+                Task { @MainActor in
+                    self.activeLens = previousLens
+                    self.isSwitchingLens = false
+                }
                 return
             }
             self.session.addInput(input)
@@ -61,19 +68,19 @@ extension CameraModel {
             }
             
             self.session.commitConfiguration()
+            if self.photoOutput.connection(with: .video) != nil,
+               let largest = cam.activeFormat.supportedMaxPhotoDimensions.max(by: {
+                   Int($0.width) * Int($0.height) < Int($1.width) * Int($1.height)
+               }) {
+                self.photoOutput.maxPhotoDimensions = largest
+            }
             
             // 4. Final synchronization back to UI state
             Task { @MainActor in
                 self.device = cam
-                self.rotationCoordinator = AVCaptureDevice.RotationCoordinator(device: cam, previewLayer: nil)
+                self.lensSwitchCompletionCount += 1
                 self.configureLensSmudgeDetection(for: cam)
                 self.configureSubjectAreaMonitoring(for: cam)
-                
-                if let largest = cam.activeFormat.supportedMaxPhotoDimensions.max(by: {
-                    Int($0.width) * Int($0.height) < Int($1.width) * Int($1.height)
-                }) {
-                    self.photoOutput.maxPhotoDimensions = largest
-                }
                 
                 self.buildAvailableFormats()
                 let previousShutterDuration: CMTime? = (!self.isAutoExposure && self.shutterSpeeds.indices.contains(self.shutterIndex)) ? self.shutterSpeeds[self.shutterIndex] : nil
@@ -95,7 +102,7 @@ extension CameraModel {
                     self.isAutoFocus = true
                 }
                 self.applyPendingCaptureModeAfterLensSwitch()
-                self.lensSwitchCompletionCount += 1
+                self.isSwitchingLens = false
             }
         }
     }
@@ -167,7 +174,6 @@ extension CameraModel {
     }
     
     func setCustomShutter(to val: Int) {
-        manualShutterDenominator = 0
         shutterIndex = val
     }
     
@@ -277,6 +283,36 @@ extension CameraModel {
         }
     }
     
+    func applyMacroMode() {
+        if isMacroEnabled {
+            guard let d = device else { return }
+            try? d.lockForConfiguration()
+            
+            // 2. Apply "Macro" zoom (typically 2.0x on UW to match 1x FOV)
+            if activeLens == .ultraWide {
+                d.videoZoomFactor = 2.0
+            }
+            
+            // 3. Optimize focus for near objects if supported
+            if d.isAutoFocusRangeRestrictionSupported {
+                d.autoFocusRangeRestriction = .near
+            }
+            
+            d.unlockForConfiguration()
+        } else {
+            guard let d = device else { return }
+            try? d.lockForConfiguration()
+            if d.isAutoFocusRangeRestrictionSupported {
+                d.autoFocusRangeRestriction = .none
+            }
+            // Reset zoom if we were in the macro-zoom state
+            if activeLens == .ultraWide && d.videoZoomFactor == 2.0 {
+                d.videoZoomFactor = 1.0
+            }
+            d.unlockForConfiguration()
+        }
+    }
+    
     func cycleTimerMode() {
         if isBurstModeEnabled {
             isBurstModeEnabled = false
@@ -286,9 +322,24 @@ extension CameraModel {
             case .off:
                 timerMode = .threeSeconds
             case .threeSeconds:
+                timerMode = .fiveSeconds
+            case .fiveSeconds:
                 timerMode = .tenSeconds
             case .tenSeconds:
                 timerMode = .off
+        }
+    }
+    
+    func cycleFocusAssistMode() {
+        if showFocusPeaking {
+            showFocusPeaking = false
+            showFocusLoupe = true
+        } else if showFocusLoupe {
+            showFocusLoupe = false
+            showFocusPeaking = false
+        } else {
+            showFocusPeaking = true
+            showFocusLoupe = false
         }
     }
     

@@ -107,6 +107,11 @@ extension HistogramView {
         let padY = (cellH - dotH) * 0.5
         let densityThreshold: Float = size == .small ? 0.018 : 0.010
         let alphaScale: Double = size == .small ? 0.88 : 0.98
+        var rowWeightedR = [Float](repeating: 0, count: wfRows)
+        var rowWeightedG = [Float](repeating: 0, count: wfRows)
+        var rowWeightedB = [Float](repeating: 0, count: wfRows)
+        var rowDensitySum = [Float](repeating: 0, count: wfRows)
+        var rowPeakDensity = [Float](repeating: 0, count: wfRows)
         
         for outCol in 0..<clampedCols {
             let srcStart = Int((CGFloat(outCol) * CGFloat(wfCols) / CGFloat(clampedCols)).rounded(.down))
@@ -119,11 +124,13 @@ extension HistogramView {
             )
             guard srcStart < srcEnd else { continue }
             
-            var rowWeightedR = [Float](repeating: 0, count: wfRows)
-            var rowWeightedG = [Float](repeating: 0, count: wfRows)
-            var rowWeightedB = [Float](repeating: 0, count: wfRows)
-            var rowDensitySum = [Float](repeating: 0, count: wfRows)
-            var rowPeakDensity = [Float](repeating: 0, count: wfRows)
+            for row in 0..<wfRows {
+                rowWeightedR[row] = 0
+                rowWeightedG[row] = 0
+                rowWeightedB[row] = 0
+                rowDensitySum[row] = 0
+                rowPeakDensity[row] = 0
+            }
             let sourceCount = Float(srcEnd - srcStart)
             
             for srcCol in srcStart..<srcEnd {

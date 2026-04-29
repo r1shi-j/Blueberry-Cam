@@ -57,5 +57,11 @@ struct BlueberryCamApp: App {
 
 // MARK: - Next Steps
 // Implement 3rd row on TopBarView: Macro, ***dual cam***, (raw) burst, flash, timer buttons
-// Click on any readout -> shows vertical slider right side screen like halide (and add animations to knock on effects)
-/// slider shows the auto value constantly updating, manually changing it turns on manual mode, for ss/iso have left iso right ss?
+
+// customisable background color instead of black, .blue.opacity(0.3)
+/// in setttings: have disclosure group of colours as circles, store as an index
+
+// top bar readouts slow to click
+
+// photos on locked camera have xlong file name
+// update locked camera

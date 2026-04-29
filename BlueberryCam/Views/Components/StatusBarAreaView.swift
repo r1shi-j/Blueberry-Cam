@@ -10,6 +10,7 @@ extension CameraModel {
     }
 }
 
+// MARK: Properties
 extension StatusBarAreaView {
     private var chartSymbolName: String {
         "chart.bar.fill"
@@ -40,6 +41,98 @@ extension StatusBarAreaView {
     }
 }
 
+// MARK: Subviews
+extension StatusBarAreaView {
+    // MARK: - Small histogram
+    private func smallHistogram() -> some View {
+        HistogramView(
+            mode: cameraModel.histogramModeSmall,
+            size: .small,
+            lumaData: cameraModel.histogramData,
+            redData: cameraModel.redHistogram,
+            greenData: cameraModel.greenHistogram,
+            blueData: cameraModel.blueHistogram,
+            waveformData: cameraModel.waveformData
+        )
+        .onTapGesture {
+            hapticTrigger += 1
+            cameraModel.cycleHistogramMode(mode: &cameraModel.histogramModeSmall)
+        }
+        .onLongPressGesture {
+            hapticTriggerR += 1
+            cameraModel.hideHistogram(for: .small)
+        }
+        .transition(.scale(scale: 0.5, anchor: .center).combined(with: .opacity))
+    }
+    
+    // MARK: - Hide large histogram
+    private func hideLargeHistogram() -> some View {
+        Button {
+            hapticTrigger += 1
+            cameraModel.hideHistogram(for: .large)
+        } label: {
+            Image(systemName: chartSymbolName)
+                .font(.system(size: 12, weight: .bold))
+                .foregroundStyle(.black)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 5)
+                .background(.yellow)
+                .clipShape(.capsule)
+        }
+        .padding(.leading)
+    }
+    
+    // MARK: - Show histograms
+    private func showHistograms() -> some View {
+        Button {
+            hapticTrigger += 1
+            cameraModel.cycleHistogramMode(mode: &cameraModel.histogramModeSmall, size: .small)
+            cameraModel.cycleHistogramMode(mode: &cameraModel.histogramModeLarge, size: .large)
+        } label: {
+            Image(systemName: chartSymbolName)
+                .font(.system(size: 12, weight: .bold))
+                .foregroundStyle(Colors.buttonText)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 5)
+                .background(Colors.buttonBackground)
+                .clipShape(.capsule)
+        }
+        .padding(.leading)
+    }
+    
+    // MARK: - Zebra toggle
+    private func zebras() -> some View {
+        Button {
+            hapticTrigger += 1
+            cameraModel.toggleZebraStripes()
+        } label: {
+            Text(zebrasTitle)
+                .font(.system(size: 12, weight: .bold, design: .monospaced))
+                .foregroundStyle(zebrasForegroundColor)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 5)
+                .background(zebrasBackgroundColor)
+                .clipShape(.circle)
+        }
+    }
+    
+    // MARK: - Highlight clipping toggle
+    private func clipping() -> some View {
+        Button {
+            hapticTrigger += 1
+            cameraModel.toggleClipping()
+        } label: {
+            Text(highlightClippingTitle)
+                .font(.system(size: 12, weight: .bold, design: .monospaced))
+                .foregroundStyle(clippingForegroundColor)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 5)
+                .background(clippingBackgroundColor)
+                .clipShape(.circle)
+        }
+    }
+}
+
 struct StatusBarAreaView: View {
     @Bindable var cameraModel: CameraModel
     @State private var hapticTrigger = 0
@@ -48,57 +141,14 @@ struct StatusBarAreaView: View {
     var body: some View {
         VStack(spacing: 8) {
             HStack(alignment: .center, spacing: 24) {
-                // MARK: - Histogram toggle
                 ZStack {
                     if cameraModel.shouldShowSmallHistogram {
-                        HistogramView(
-                            mode: cameraModel.histogramModeSmall,
-                            size: .small,
-                            lumaData: cameraModel.histogramData,
-                            redData: cameraModel.redHistogram,
-                            greenData: cameraModel.greenHistogram,
-                            blueData: cameraModel.blueHistogram,
-                            waveformData: cameraModel.waveformData
-                        )
-                        .onTapGesture {
-                            hapticTrigger += 1
-                            cameraModel.cycleHistogramMode(mode: &cameraModel.histogramModeSmall)
-                        }
-                        .onLongPressGesture {
-                            hapticTriggerR += 1
-                            cameraModel.hideHistogram(for: .small)
-                        }
-                        .transition(.scale(scale: 0.5, anchor: .center).combined(with: .opacity))
+                        smallHistogram()
                     } else {
                         if cameraModel.shouldShowHideLargeHistogram {
-                            Button {
-                                hapticTrigger += 1
-                                cameraModel.hideHistogram(for: .large)
-                            } label: {
-                                Image(systemName: chartSymbolName)
-                                    .font(.system(size: 12, weight: .bold))
-                                    .foregroundStyle(.black)
-                                    .padding(.horizontal, 8)
-                                    .padding(.vertical, 5)
-                                    .background(.yellow)
-                                    .clipShape(.capsule)
-                            }
-                            .padding(.leading)
+                            hideLargeHistogram()
                         } else {
-                            Button {
-                                hapticTrigger += 1
-                                cameraModel.cycleHistogramMode(mode: &cameraModel.histogramModeSmall, size: .small)
-                                cameraModel.cycleHistogramMode(mode: &cameraModel.histogramModeLarge, size: .large)
-                            } label: {
-                                Image(systemName: chartSymbolName)
-                                    .font(.system(size: 12, weight: .bold))
-                                    .foregroundStyle(Colors.buttonText)
-                                    .padding(.horizontal, 8)
-                                    .padding(.vertical, 5)
-                                    .background(Colors.buttonBackground)
-                                    .clipShape(.capsule)
-                            }
-                            .padding(.leading)
+                            showHistograms()
                         }
                     }
                 }
@@ -106,34 +156,9 @@ struct StatusBarAreaView: View {
                 
                 Spacer()
                 
-                HStack(alignment: .center, spacing: 12) {
-                    // MARK: - Zebra toggle
-                    Button {
-                        hapticTrigger += 1
-                        cameraModel.toggleZebraStripes()
-                    } label: {
-                        Text(zebrasTitle)
-                            .font(.system(size: 12, weight: .bold, design: .monospaced))
-                            .foregroundStyle(zebrasForegroundColor)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 5)
-                            .background(zebrasBackgroundColor)
-                            .clipShape(.capsule)
-                    }
-                    
-                    // MARK: - Highlight clipping toggle
-                    Button {
-                        hapticTrigger += 1
-                        cameraModel.toggleClipping()
-                    } label: {
-                        Text(highlightClippingTitle)
-                            .font(.system(size: 12, weight: .bold, design: .monospaced))
-                            .foregroundStyle(clippingForegroundColor)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 5)
-                            .background(clippingBackgroundColor)
-                            .clipShape(.capsule)
-                    }
+                HStack(alignment: .center, spacing: 16) {
+                    zebras()
+                    clipping()
                 }
             }
         }
