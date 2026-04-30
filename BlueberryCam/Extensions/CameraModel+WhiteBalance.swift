@@ -2,6 +2,8 @@ internal import AVFoundation
 import Foundation
 
 extension CameraModel {
+    var formattedWhiteBalance: String { "\(Int(whiteBalanceTargetKelvin))K" }
+    
     func applyManualWhiteBalance() {
         guard let d = device else { return }
         
@@ -54,5 +56,22 @@ extension CameraModel {
             d.whiteBalanceMode = .continuousAutoWhiteBalance
         }
         d.unlockForConfiguration()
+    }
+    
+    func snappedWhiteBalanceKelvin(_ kelvin: Float) -> Float {
+        let steppedKelvin = (kelvin / 100).rounded() * 100
+        return min(max(steppedKelvin, CameraModel.minWhiteBalance), CameraModel.maxWhiteBalance)
+    }
+    
+    func setWhiteBalanceTargetKelvin(_ kelvin: Float) {
+        let clampedKelvin = snappedWhiteBalanceKelvin(kelvin)
+        
+        guard clampedKelvin != whiteBalanceTargetKelvin || isAutoWhiteBalance else { return }
+        
+        if isAutoWhiteBalance {
+            isAutoWhiteBalance = false
+        }
+        whiteBalanceTargetKelvin = clampedKelvin
+        liveWB = formattedWhiteBalance
     }
 }

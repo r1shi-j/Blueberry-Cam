@@ -4,6 +4,10 @@ import Foundation
 
 extension CameraModel {
     // MARK: - UI Controls
+    var showSimpleView: Bool {
+        appView == .clean || appView == .settings || isBurstCapturing || (isTimerCountingDown && shouldHideUIWhileCountingDown)
+    }
+    
     func hideSettings() {
         appView = .standard
     }
@@ -195,6 +199,39 @@ extension CameraModel {
                 setAutoFocus()
             case .wb:
                 isAutoWhiteBalance = true
+        }
+    }
+    
+    func syncAutoRulerValues(
+        iso liveISO: Float,
+        exposureDuration: CMTime,
+        whiteBalanceTemperature: Float,
+        lensPosition liveLensPosition: Float
+    ) {
+        if isAutoExposure {
+            let nextISO = nearestISOStop(to: liveISO)
+            if abs(iso - nextISO) > 0.1 {
+                iso = nextISO
+            }
+            
+            if let nextShutterIndex = nearestShutterIndex(to: exposureDuration),
+               shutterIndex != nextShutterIndex {
+                shutterIndex = nextShutterIndex
+            }
+        }
+        
+        if isAutoWhiteBalance {
+            let nextWhiteBalance = snappedWhiteBalanceKelvin(whiteBalanceTemperature)
+            if abs(whiteBalanceTargetKelvin - nextWhiteBalance) >= 50 {
+                whiteBalanceTargetKelvin = nextWhiteBalance
+            }
+        }
+        
+        if isAutoFocus {
+            let nextLensPosition = snappedFocusPosition(liveLensPosition)
+            if abs(lensPosition - nextLensPosition) >= 0.005 {
+                lensPosition = nextLensPosition
+            }
         }
     }
     

@@ -7,6 +7,8 @@ extension CameraModel {
     private var tapFocusRetakeProtectionDuration: TimeInterval { 2.5 }
     private var tapFocusLensPositionChangeThreshold: Float { 0.05 }
     
+    var formattedFocus: String { Double(lensPosition).formatted(.number.precision(.fractionLength(2))) }
+    
     private var isTapFocusRetakeProtected: Bool {
         guard let tapFocusRetakeProtectionUntil else { return false }
         return Date() < tapFocusRetakeProtectionUntil
@@ -337,5 +339,24 @@ extension CameraModel {
             guard !Task.isCancelled else { return }
             self.isAdjustingManualFocus = false
         }
+    }
+    
+    func snappedFocusPosition(_ position: Float) -> Float {
+        let steppedPosition = (position / 0.01).rounded() * 0.01
+        return min(max(steppedPosition, 0), 1)
+    }
+    
+    func setManualFocusPosition(_ position: Float) {
+        let clampedPosition = snappedFocusPosition(position)
+        
+        guard clampedPosition != lensPosition || isAutoFocus else { return }
+        
+        if isAutoFocus {
+            isAutoFocus = false
+        }
+        lensPosition = clampedPosition
+        liveFocus = formattedFocus
+        applyManualFocus()
+        endManualFocusAdjustment()
     }
 }

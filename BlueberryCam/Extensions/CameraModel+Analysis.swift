@@ -2,32 +2,15 @@ internal import AVFoundation
 import CoreMedia
 import Foundation
 
-extension CameraModel: AVCaptureDataOutputSynchronizerDelegate, AVCaptureVideoDataOutputSampleBufferDelegate {
-    // FALLBACK: Used when LiDAR/Depth is not available or connections fail
+extension CameraModel: AVCaptureVideoDataOutputSampleBufferDelegate {
     nonisolated func captureOutput(_ output: AVCaptureOutput,
                                    didOutput sampleBuffer: CMSampleBuffer,
                                    from connection: AVCaptureConnection) {
         guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
-        processFrame(pixelBuffer: pixelBuffer, depthData: nil)
+        processFrame(pixelBuffer: pixelBuffer)
     }
     
-    // MAIN: Used for LiDAR/Depth synchronized frames
-    nonisolated func dataOutputSynchronizer(_ synchronizer: AVCaptureDataOutputSynchronizer,
-                                            didOutput synchronizedDataCollection: AVCaptureSynchronizedDataCollection) {
-        
-        guard let syncedVideoData = synchronizedDataCollection.synchronizedData(for: videoOutput) as? AVFoundation.AVCaptureSynchronizedSampleBufferData,
-              !syncedVideoData.sampleBufferWasDropped else { return }
-        
-        let sampleBuffer = syncedVideoData.sampleBuffer
-        guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
-        
-        let syncedDepthData = synchronizedDataCollection.synchronizedData(for: depthOutput) as? AVFoundation.AVCaptureSynchronizedDepthData
-        let depthData = syncedDepthData?.depthData
-        
-        processFrame(pixelBuffer: pixelBuffer, depthData: depthData)
-    }
-    
-    nonisolated func processFrame(pixelBuffer: CVPixelBuffer, depthData: AVDepthData?) {
+    nonisolated func processFrame(pixelBuffer: CVPixelBuffer) {
         guard !shouldPauseAnalysis else { return }
         
         let frameNumber = frameCounter.next()
@@ -345,94 +328,6 @@ extension CameraModel: AVCaptureDataOutputSynchronizerDelegate, AVCaptureVideoDa
             self.zebraMask = zebraMask
             self.clippingMask = clipMask
         }
-    }
-    
-    nonisolated func extractDepthGrid(from depthData: AVDepthData, targetWidth: Int, targetHeight: Int) -> [Float]? {
-        let convertedDepth = depthData.converting(toDepthDataType: kCVPixelFormatType_DepthFloat32)
-        let depthMap = convertedDepth.depthDataMap
-        CVPixelBufferLockBaseAddress(depthMap, .readOnly)
-        defer { CVPixelBufferUnlockBaseAddress(depthMap, .readOnly) }
-        
-        let width = CVPixelBufferGetWidth(depthMap)
-        let height = CVPixelBufferGetHeight(depthMap)
-        
-        var result = [Float](repeating: 0, count: targetWidth * targetHeight)
-        
-        guard let baseAddress = CVPixelBufferGetBaseAddress(depthMap) else { return nil }
-        let bytesPerRow = CVPixelBufferGetBytesPerRow(depthMap)
-        let rowStride = bytesPerRow / MemoryLayout<Float32>.stride
-        let floatBase = baseAddress.assumingMemoryBound(to: Float32.self)
-        
-        for ty in 0..<targetHeight {
-            let fy = (Float(ty) + 0.5) * Float(height) / Float(targetHeight) - 0.5
-            let y0 = max(0, min(height - 1, Int(floor(fy))))
-            let y1 = min(height - 1, y0 + 1)
-            let wy = fy - Float(y0)
-            
-            for tx in 0..<targetWidth {
-                let fx = (Float(tx) + 0.5) * Float(width) / Float(targetWidth) - 0.5
-                let x0 = max(0, min(width - 1, Int(floor(fx))))
-                let x1 = min(width - 1, x0 + 1)
-                let wx = fx - Float(x0)
-                
-                let d00 = floatBase[(y0 * rowStride) + x0]
-                let d10 = floatBase[(y0 * rowStride) + x1]
-                let d01 = floatBase[(y1 * rowStride) + x0]
-                let d11 = floatBase[(y1 * rowStride) + x1]
-                
-                let top = d00 + ((d10 - d00) * wx)
-                let bottom = d01 + ((d11 - d01) * wx)
-                let depthValue = top + ((bottom - top) * wy)
-                result[ty * targetWidth + tx] = depthValue.isFinite && depthValue > 0 ? depthValue : 0
-            }
-        }
-        
-        return result
-    }
-    
-    nonisolated func focusDistanceEstimate(lensPosition: Float, minimumFocusDistance: Float) -> Float? {
-        guard minimumFocusDistance > 0 else { return nil }
-        
-        let clampedLens = min(max(lensPosition, 0), 1)
-        let nearDistance = max(0.08, minimumFocusDistance)
-        let farDistance: Float = 8.0
-        let nearDiopters = 1 / nearDistance
-        let farDiopters = 1 / farDistance
-        
-        // AVCaptureDevice documents 0.0 as nearest focus and 1.0 as furthest.
-        // Interpolating in diopters behaves much closer to real focus travel than linear meters.
-        let t = pow(1 - clampedLens, 1.35)
-        let diopters = farDiopters + ((nearDiopters - farDiopters) * t)
-        return diopters > 0 ? (1 / diopters) : nil
-    }
-    
-    nonisolated func depthWeight(for depth: Float,
-                                 focusDepth: Float?,
-                                 depthGrid: [Float],
-                                 index: Int,
-                                 rowStride: Int) -> Float {
-        var weight: Float = 1.0
-        
-        if let focusDepth, focusDepth.isFinite, focusDepth > 0 {
-            let tolerance = max(0.05, focusDepth * 0.16)
-            let delta = abs(depth - focusDepth)
-            let normalized = delta / tolerance
-            let planeWeight = exp(-(normalized * normalized) * 0.9)
-            weight *= max(0.03, planeWeight)
-        }
-        
-        let left = depthGrid[index - 1]
-        let right = depthGrid[index + 1]
-        let up = depthGrid[index - rowStride]
-        let down = depthGrid[index + rowStride]
-        let neighborhood = [left, right, up, down].filter { $0.isFinite && $0 > 0 }
-        if !neighborhood.isEmpty {
-            let averageDelta = neighborhood.reduce(0) { $0 + abs($1 - depth) } / Float(neighborhood.count)
-            let discontinuityPenalty = min(1, averageDelta / max(depth * 0.08, 0.03))
-            weight *= 1.0 - (discontinuityPenalty * 0.22)
-        }
-        
-        return max(0.02, min(weight, 1.02))
     }
     
     nonisolated func quantizedGradientDirection(gx: Float, gy: Float) -> UInt8 {
