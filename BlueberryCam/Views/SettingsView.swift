@@ -191,9 +191,9 @@ struct SettingsView: View {
                     }
                 }
             }
-            .alert("Are you sure you want to reset all custom settings?", isPresented: $isShowingDefaultsResetAlert) {
-                Button("Cancel", role: .cancel) { }
-                Button("Reset", role: .destructive, action: resetToDefaults)
+            .alert(Alerts.resetSettingsTitle, isPresented: $isShowingDefaultsResetAlert) {
+                Button(Alerts.cancel, role: .cancel) { }
+                Button(Alerts.reset, role: .destructive, action: resetToDefaults)
             }
             .alert(countResetTarget?.confirmationTitle ?? "", isPresented: Binding(get: {
                 countResetTarget != nil
@@ -202,8 +202,8 @@ struct SettingsView: View {
                     countResetTarget = nil
                 }
             })) {
-                Button("Cancel", role: .cancel) { }
-                Button("Reset", role: .destructive) {
+                Button(Alerts.cancel, role: .cancel) { }
+                Button(Alerts.reset, role: .destructive) {
                     switch countResetTarget {
                         case .standard:
                             shutterCount = 0

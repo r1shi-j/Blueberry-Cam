@@ -1,10 +1,14 @@
 import SwiftUI
 
 extension LensSelectorView {
-    private var lensCircleSize: CGFloat { 48 }
-    private var activeLensCircleSize: CGFloat { 54 }
-    private var d_centres: CGFloat { (lensCircleSize/2)+(activeLensCircleSize/2)+10 }
+    // MARK: - Constants
+    private enum Style {
+        static let lensCircleSize: CGFloat = 48
+        static let activeLensCircleSize: CGFloat = 54
+        static let d_centres: CGFloat = (lensCircleSize/2)+(activeLensCircleSize/2)+10
+    }
     
+    // MARK: - Properties
     private var displayedLenses: [Lens] {
         let lenses = cameraModel.activeLens.isFront ? frontLenses : backLenses
         
@@ -24,7 +28,8 @@ extension LensSelectorView {
     }
     
     private func lensOffset(at index: Int, count: Int) -> CGSize {
-        switch count {
+        let d_centres = Style.d_centres
+        return switch count {
             case 1:
                 CGSize(width: -((d_centres)*cos(.pi/4)), height: -((d_centres)*sin(.pi/4)))
             case 2:
@@ -62,18 +67,19 @@ extension LensSelectorView {
     private func switchToLens(_ lens: Lens) {
         hapticTrigger += 1
         cameraModel.switchLens(to: lens)
-        withAnimation(.bouncy) {
+        withAnimation(Animations.bouncy) {
             isExpanded = false
         }
     }
     
     private func toggleExpanded() {
         hapticTrigger += 1
-        withAnimation(.bouncy) {
+        withAnimation(Animations.bouncy) {
             isExpanded.toggle()
         }
     }
     
+    // MARK: - Subviews
     private func lensButton(_ lens: Lens, isActive: Bool) -> some View {
         Button {
             if isActive {
@@ -87,8 +93,8 @@ extension LensSelectorView {
                 .bold(isActive)
                 .foregroundStyle(isActive ? .black : .white.opacity(0.86))
                 .frame(
-                    width: isActive ? activeLensCircleSize : lensCircleSize,
-                    height: isActive ? activeLensCircleSize : lensCircleSize
+                    width: isActive ? Style.activeLensCircleSize : Style.lensCircleSize,
+                    height: isActive ? Style.activeLensCircleSize : Style.lensCircleSize
                 )
                 .contentShape(.circle)
         }
@@ -112,7 +118,7 @@ extension LensSelectorView {
                 Text(lens.label)
                     .font(.system(.callout, design: .monospaced))
                     .foregroundStyle(.white.opacity(0.86))
-                    .frame(width: lensCircleSize, height: lensCircleSize)
+                    .frame(width: Style.lensCircleSize, height: Style.lensCircleSize)
                     .contentShape(.circle)
             }
             .buttonStyle(.plain)
@@ -129,8 +135,11 @@ extension LensSelectorView {
     }
 }
 
+// MARK: - View
 struct LensSelectorView: View {
     @Bindable var cameraModel: CameraModel
+    let height: CGFloat
+    
     @State private var isExpanded = false
     @State private var hapticTrigger = 0
     
@@ -147,9 +156,9 @@ struct LensSelectorView: View {
                 lensButton(cameraModel.activeLens, isActive: true)
             }
         }
-        .frame(width: 82, height: 82)
-        .animation(.bouncy, value: isExpanded)
-        .animation(.bouncy, value: cameraModel.activeLens)
+        .frame(width: height, height: height)
+        .animation(Animations.bouncy, value: isExpanded)
+        .animation(Animations.bouncy, value: cameraModel.activeLens)
         .sensoryFeedback(.impact, trigger: hapticTrigger)
     }
 }

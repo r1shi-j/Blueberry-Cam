@@ -1,17 +1,26 @@
 import SwiftUI
 
-extension CameraModel {
-    fileprivate var shouldShowSmallHistogram: Bool {
-        histogramModeSmall != .none
+extension StatusBarAreaView {
+    // MARK: - Constants
+    private enum Style {
+        static let viewHeight: CGFloat = 30
+        static let viewHPadding: CGFloat = 30
+        static let viewHSpacing: CGFloat = 24
+        static let viewVSpacing: CGFloat = 8
+        static let overlayButtonsHSpacing: CGFloat = 16
+        static let disabledOpacity = 0.3
+        static let selectedForeground: Color = .black
+        static let selectedBackground: Color = .yellow
+        static let horizontalButtonPadding: CGFloat = 8
+        static let verticalButtonPadding: CGFloat = 5
     }
     
-    fileprivate var shouldShowHideLargeHistogram: Bool {
-        histogramModeLarge != .none
+    private enum Fonts {
+        static let button: Font = .system(size: 12, weight: .bold)
+        static let text: Font = .system(size: 12, weight: .bold, design: .monospaced)
     }
-}
-
-// MARK: Properties
-extension StatusBarAreaView {
+    
+    // MARK: - Properties
     private var chartSymbolName: String {
         "chart.bar.fill"
     }
@@ -39,10 +48,16 @@ extension StatusBarAreaView {
     private var clippingBackgroundColor: Color {
         cameraModel.showClipping ? .yellow : Colors.buttonBackground
     }
-}
-
-// MARK: Subviews
-extension StatusBarAreaView {
+    
+    private var shouldShowSmallHistogram: Bool {
+        cameraModel.histogramModeSmall != .none
+    }
+    
+    private var shouldShowHideLargeHistogram: Bool {
+        cameraModel.histogramModeLarge != .none
+    }
+    
+    // MARK: Subviews
     // MARK: - Small histogram
     private func smallHistogram() -> some View {
         HistogramView(
@@ -72,10 +87,10 @@ extension StatusBarAreaView {
             cameraModel.hideHistogram(for: .large)
         } label: {
             Image(systemName: chartSymbolName)
-                .font(.system(size: 12, weight: .bold))
+                .font(Fonts.button)
                 .foregroundStyle(.black)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 5)
+                .padding(.horizontal, Style.horizontalButtonPadding)
+                .padding(.vertical, Style.verticalButtonPadding)
                 .background(.yellow)
                 .clipShape(.capsule)
         }
@@ -90,10 +105,10 @@ extension StatusBarAreaView {
             cameraModel.cycleHistogramMode(mode: &cameraModel.histogramModeLarge, size: .large)
         } label: {
             Image(systemName: chartSymbolName)
-                .font(.system(size: 12, weight: .bold))
+                .font(Fonts.button)
                 .foregroundStyle(Colors.buttonText)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 5)
+                .padding(.horizontal, Style.horizontalButtonPadding)
+                .padding(.vertical, Style.verticalButtonPadding)
                 .background(Colors.buttonBackground)
                 .clipShape(.capsule)
         }
@@ -107,10 +122,10 @@ extension StatusBarAreaView {
             cameraModel.toggleZebraStripes()
         } label: {
             Text(zebrasTitle)
-                .font(.system(size: 12, weight: .bold, design: .monospaced))
+                .font(Fonts.text)
                 .foregroundStyle(zebrasForegroundColor)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 5)
+                .padding(.horizontal, Style.horizontalButtonPadding)
+                .padding(.vertical, Style.verticalButtonPadding)
                 .background(zebrasBackgroundColor)
                 .clipShape(.circle)
         }
@@ -123,47 +138,48 @@ extension StatusBarAreaView {
             cameraModel.toggleClipping()
         } label: {
             Text(highlightClippingTitle)
-                .font(.system(size: 12, weight: .bold, design: .monospaced))
+                .font(Fonts.text)
                 .foregroundStyle(clippingForegroundColor)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 5)
+                .padding(.horizontal, Style.horizontalButtonPadding)
+                .padding(.vertical, Style.verticalButtonPadding)
                 .background(clippingBackgroundColor)
                 .clipShape(.circle)
         }
     }
 }
 
+// MARK: - View
 struct StatusBarAreaView: View {
     @Bindable var cameraModel: CameraModel
     @State private var hapticTrigger = 0
     @State private var hapticTriggerR = 0
     
     var body: some View {
-        VStack(spacing: 8) {
-            HStack(alignment: .center, spacing: 24) {
+        VStack(spacing: Style.viewVSpacing) {
+            HStack(alignment: .center, spacing: Style.viewHSpacing) {
                 ZStack {
-                    if cameraModel.shouldShowSmallHistogram {
+                    if shouldShowSmallHistogram {
                         smallHistogram()
                     } else {
-                        if cameraModel.shouldShowHideLargeHistogram {
+                        if shouldShowHideLargeHistogram {
                             hideLargeHistogram()
                         } else {
                             showHistograms()
                         }
                     }
                 }
-                .animation(.bouncy, value: cameraModel.histogramModeSmall)
+                .animation(Animations.bouncy, value: cameraModel.histogramModeSmall)
                 
                 Spacer()
                 
-                HStack(alignment: .center, spacing: 16) {
+                HStack(alignment: .center, spacing: Style.overlayButtonsHSpacing) {
                     zebras()
                     clipping()
                 }
             }
         }
-        .padding(.horizontal, 30)
-        .frame(height: 30)
+        .padding(.horizontal, Style.viewHPadding)
+        .frame(height: Style.viewHeight)
         .sensoryFeedback(.impact, trigger: hapticTrigger)
         .sensoryFeedback(.impact(flexibility: .soft), trigger: hapticTriggerR)
     }

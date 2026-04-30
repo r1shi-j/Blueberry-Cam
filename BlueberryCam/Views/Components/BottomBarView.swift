@@ -1,22 +1,20 @@
 import SwiftUI
 
-extension CameraModel {
-    fileprivate var shutterTint: Color {
-        if isBurstCapturing { return .yellow.mix(with: .orange, by: 0.3).opacity(0.6) }
-        if isBurstModeEnabled { return .yellow.opacity(0.8) }
-        return captureMode == .raw ? .blue.mix(with: .mint, by: 0.5).opacity(0.4) : .white.opacity(0.2)
-    }
-}
-
-// MARK: Properties
 extension BottomBarView {
+    // MARK: - Constants
+    private enum Style {
+        static let buttonHeight: CGFloat = 82
+        static let counterForegroundStyle: Color = .white.opacity(0.6)
+    }
+    
+    // MARK: - Properties
     private var photosLinkSymbolName: String {
         "photo.on.rectangle.angled.fill"
     }
     
     private func openPhotosApp() {
         guard let url = URL(string: "photos-redirect://") else { return }
-        UIApplication.shared.open(url)
+        openURL(url)
     }
     
     private var isShowingBurstCount: Bool {
@@ -30,95 +28,87 @@ extension BottomBarView {
     private var displayedShutterCountLabel: String {
         displayedShutterCount.formatted()
     }
-}
-
-// MARK: Subviews
-extension BottomBarView {
+    
+    private var shutterTint: Color {
+        if cameraModel.isBurstCapturing { return .yellow.mix(with: .orange, by: 0.3).opacity(0.6) }
+        if cameraModel.isBurstModeEnabled { return .yellow.opacity(0.8) }
+        return cameraModel.captureMode == .raw ? .blue.mix(with: .mint, by: 0.5).opacity(0.4) : .white.opacity(0.2)
+    }
+    
+    // MARK: Subviews
     // MARK: - Photos shortcut
-    @ViewBuilder
     private func photosShortcut() -> some View {
-        if !cameraModel.showSimpleView {
-            Button(action: openPhotosApp) {
-                Image(systemName: photosLinkSymbolName)
-                    .font(.system(size: 20))
-                    .symbolRenderingMode(.hierarchical)
-                    .tint(.primary)
-                    .padding()
-                    .clipShape(.circle)
-                    .glassEffect(.regular.interactive().tint(.black.mix(with: .white, by: 0.2)), in: .circle)
-            }
-            .frame(height: 82)
-            .frame(maxWidth: .infinity)
-            .overlay {
-                Text(displayedShutterCountLabel)
-                    .font(.caption)
-                    .fontWidth(.expanded)
-                    .foregroundStyle(.white.opacity(0.6))
-                    .contentTransition(.numericText())
-                    .offset(y: 41)
-            }
-            .transition(.opacity)
+        Button(action: openPhotosApp) {
+            Image(systemName: photosLinkSymbolName)
+                .font(.system(size: 20))
+                .symbolRenderingMode(.hierarchical)
+                .tint(.primary)
+                .padding()
+                .clipShape(.circle)
+                .glassEffect(.regular.interactive().tint(.black.mix(with: .white, by: 0.2)), in: .circle)
         }
+        .frame(height: Style.buttonHeight)
+        .frame(maxWidth: .infinity)
+        .overlay {
+            Text(displayedShutterCountLabel)
+                .font(.caption)
+                .fontWidth(.expanded)
+                .foregroundStyle(Style.counterForegroundStyle)
+                .contentTransition(.numericText())
+                .offset(y: Style.buttonHeight / 2)
+        }
+        .transition(.opacity)
     }
     
     // MARK: - Shutter button
-    @ViewBuilder
     private func shutterButton() -> some View {
-        if !(cameraModel.isTimerCountingDown && cameraModel.shouldHideUIWhileCountingDown) {
-            ZStack {
-                Circle()
-                    .frame(width: 82, height: 82)
-                    .glassEffect(.regular.tint(cameraModel.shutterTint).interactive())
-                Button {
-                    onShutterFeedback()
-                    cameraModel.handleShutterButton {
-                        withAnimation { cameraModel.changeCapturingState(to: true) }
-                        Task { @MainActor in
-                            try? await Task.sleep(for: .milliseconds(150))
-                            withAnimation { cameraModel.changeCapturingState(to: false) }
-                        }
-                    } onBurstPhotoCaptured: {
-                        onShutterFeedback()
-                        shutterCountBurst += 1
-                    }
-                } label: {
-                    Circle()
-                        .fill(.white)
-                        .frame(width: 69, height: 69)
+        ShutterButton(tint: shutterTint, height: Style.buttonHeight) {
+            onShutterFeedback()
+            cameraModel.handleShutterButton {
+                withAnimation { cameraModel.changeCapturingState(to: true) }
+                Task { @MainActor in
+                    try? await Task.sleep(for: Durations.shutter)
+                    withAnimation { cameraModel.changeCapturingState(to: false) }
                 }
-                .glassEffect(.regular.interactive())
+            } onBurstPhotoCaptured: {
+                onShutterFeedback()
+                shutterCountBurst += 1
             }
-            .frame(maxWidth: .infinity)
-            .transition(.opacity)
         }
     }
     
     // MARK: - Lens picker
-    @ViewBuilder
     private func lensPicker() -> some View {
-        if !cameraModel.showSimpleView {
-            LensSelectorView(cameraModel: cameraModel)
-                .frame(height: 82)
-                .frame(maxWidth: .infinity)
-                .transition(.opacity)
-        }
+        LensSelectorView(cameraModel: cameraModel, height: Style.buttonHeight)
+            .frame(height: Style.buttonHeight)
+            .frame(maxWidth: .infinity)
+            .transition(.opacity)
     }
 }
 
+// MARK: - View
 struct BottomBarView: View {
+    @Environment(\.openURL) private var openURL
+    
     @Bindable var cameraModel: CameraModel
     @Binding var shutterCount: Int
     @Binding var shutterCountBurst: Int
     let onShutterFeedback: () -> Void
     
     var body: some View {
-        VStack() {
+        VStack {
             HStack(alignment: .center, spacing: 0) {
-                photosShortcut()
-                shutterButton()
-                lensPicker()
+                if !cameraModel.showSimpleView {
+                    photosShortcut()
+                }
+                if !(cameraModel.isTimerCountingDown && cameraModel.shouldHideUIWhileCountingDown) {
+                    shutterButton()
+                }
+                if !cameraModel.showSimpleView {
+                    lensPicker()
+                }
             }
         }
-        .animation(.easeInOut(duration: 0.2), value: cameraModel.showSimpleView)
+        .animation(Animations.easeInOut, value: cameraModel.showSimpleView)
     }
 }

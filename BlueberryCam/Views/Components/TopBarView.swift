@@ -1,158 +1,191 @@
 internal import AVFoundation
 import SwiftUI
 
-extension CameraModel {
+extension TopBarView {
+    // MARK: - Constants
+    private enum Style {
+        static let disabledOpacity = 0.3
+        static let selectedForeground: Color = .black
+        static let selectedBackground: Color = .yellow
+        static let buttonHeight: CGFloat = 18
+        static let horizontalButtonPadding: CGFloat = 8
+        static let verticalButtonPadding: CGFloat = 5
+        static let horizontalPickerPadding: CGFloat = 10
+        static let pickerCornerRadius: CGFloat = 6
+        static let rowSpacing: CGFloat = 14
+        static let row1Spacing: CGFloat = 12
+        static let row2Spacing: CGFloat = 16
+        static let row3Spacing: CGFloat = 16
+        static let row1HPadding: CGFloat = 4
+        static let row2HPadding: CGFloat = 8
+        static let row3HPadding: CGFloat = 8
+    }
+    
+    private enum Fonts {
+        static let picker: Font = .system(size: 12, weight: .medium)
+        static let readoutSize: CGFloat = 14
+        static let button: Font = .system(size: 12, weight: .bold)
+        static let buttonInfo: Font = .system(size: 12, weight: .medium, design: .monospaced)
+    }
+    
+    // MARK: Properties
     // MARK: - Format/resolution properties
-    fileprivate func resolutionForeground(for isSelected: Bool, isEnabled: Bool) -> Color {
-        guard isEnabled else { return Colors.buttonText.opacity(0.3) }
-        return isSelected ? .black : .white
+    private func resolutionForeground(for isSelected: Bool, isEnabled: Bool) -> Color {
+        guard isEnabled else { return Colors.buttonText.opacity(Style.disabledOpacity) }
+        return isSelected ? Style.selectedForeground : .white
     }
     
-    fileprivate func resolutionBackground(for isSelected: Bool, isEnabled: Bool) -> Color {
-        guard isEnabled else { return Colors.buttonBackground.opacity(0.3) }
-        return isSelected ? .yellow : Colors.buttonBackground
+    private func resolutionBackground(for isSelected: Bool, isEnabled: Bool) -> Color {
+        guard isEnabled else { return Colors.buttonBackground.opacity(Style.disabledOpacity) }
+        return isSelected ? Style.selectedBackground : Colors.buttonBackground
     }
     
-    fileprivate func formatForeground(for mode: CaptureMode, isEnabled: Bool) -> Color {
-        guard isEnabled else { return Colors.buttonText.opacity(0.3) }
-        return captureMode == mode ? .black : .white
+    private func formatForeground(for mode: CaptureMode, isEnabled: Bool) -> Color {
+        guard isEnabled else { return Colors.buttonText.opacity(Style.disabledOpacity) }
+        return cameraModel.captureMode == mode ? Style.selectedForeground : .white
     }
     
-    fileprivate func formatBackground(for mode: CaptureMode, isEnabled: Bool) -> Color {
-        guard isEnabled else { return Colors.buttonBackground.opacity(0.3) }
-        return captureMode == mode ? .yellow : Colors.buttonBackground
+    private func formatBackground(for mode: CaptureMode, isEnabled: Bool) -> Color {
+        guard isEnabled else { return Colors.buttonBackground.opacity(Style.disabledOpacity) }
+        return cameraModel.captureMode == mode ? Style.selectedBackground : Colors.buttonBackground
     }
     
     // MARK: - Flash properties
-    fileprivate var flashButtonForeground: Color {
-        flashMode == .off || !supportsFlash ? Colors.buttonText : .black
+    private var flashButtonSymbol: String {
+        switch cameraModel.flashMode {
+            case .off, .on: "bolt.fill"
+            case .auto: "bolt.badge.automatic.fill"
+            @unknown default: "bolt.badge.xmark.fill"
+        }
     }
     
-    fileprivate var flashButtonBackground: Color {
-        flashMode == .off || !supportsFlash ? Colors.buttonBackground : .yellow
+    private var flashButtonForeground: Color {
+        cameraModel.flashMode == .off || !cameraModel.supportsFlash ? Colors.buttonText : Style.selectedForeground
     }
     
-    fileprivate var flashButtonOpacity: Double {
-        (supportsFlash && isAutoExposure && !isBurstModeEnabled) ? 1.0 : 0.3
+    private var flashButtonBackground: Color {
+        cameraModel.flashMode == .off || !cameraModel.supportsFlash ? Colors.buttonBackground : Style.selectedBackground
     }
     
-    fileprivate var isFlashButtonDisabled: Bool {
-        !(supportsFlash && isAutoExposure && !isBurstModeEnabled)
+    private var flashButtonOpacity: Double {
+        (cameraModel.supportsFlash && cameraModel.isAutoExposure && !cameraModel.isBurstModeEnabled) ? 1.0 : Style.disabledOpacity
+    }
+    
+    private var isFlashButtonDisabled: Bool {
+        !(cameraModel.supportsFlash && cameraModel.isAutoExposure && !cameraModel.isBurstModeEnabled)
     }
     
     // MARK: - Macro properties
-    fileprivate var macroButtonSymbol: String {
+    private var macroButtonSymbol: String {
         "camera.macro"
     }
     
-    fileprivate var macroButtonForeground: Color {
-        isMacroEnabled ? .black : Colors.buttonText
+    private var macroButtonForeground: Color {
+        cameraModel.isMacroEnabled ? Style.selectedForeground : Colors.buttonText
     }
     
-    fileprivate var macroButtonBackground: Color {
-        isMacroEnabled ? .yellow : Colors.buttonBackground
+    private var macroButtonBackground: Color {
+        cameraModel.isMacroEnabled ? Style.selectedBackground : Colors.buttonBackground
     }
     
     // MARK: - Dual Camera properties
-    fileprivate var dualcamButtonSymbol: String {
+    private var dualcamButtonSymbol: String {
         "inset.filled.rectangle.and.person.filled"
     }
     
-    fileprivate var dualcamButtonForeground: Color {
+    private var dualcamButtonForeground: Color {
         Colors.buttonText
     }
     
-    fileprivate var dualcamButtonBackground: Color {
+    private var dualcamButtonBackground: Color {
         Colors.buttonBackground
     }
     
-    fileprivate var dualcamButtonOpacity: Double {
-        0.3
+    private var dualcamButtonOpacity: Double {
+        Style.disabledOpacity
     }
     
-    fileprivate var isDualcamButtonDisabled: Bool {
+    private var isDualcamButtonDisabled: Bool {
         true
     }
     
     // MARK: - Burst properties
-    fileprivate var burstButtonSymbol: String {
+    private var burstButtonSymbol: String {
         "square.stack.3d.down.right"
     }
     
-    fileprivate var burstButtonForeground: Color {
-        isBurstModeEnabled ? .black : Colors.buttonText
+    private var burstButtonForeground: Color {
+        cameraModel.isBurstModeEnabled ? Style.selectedForeground : Colors.buttonText
     }
     
-    fileprivate var burstButtonBackground: Color {
-        isBurstModeEnabled ? .yellow : Colors.buttonBackground
+    private var burstButtonBackground: Color {
+        cameraModel.isBurstModeEnabled ? Style.selectedBackground : Colors.buttonBackground
     }
     
-    fileprivate var burstButtonOpacity: Double {
-        timerMode == .off && !isTimerCountingDown ? 1.0 : 0.3
+    private var burstButtonOpacity: Double {
+        cameraModel.timerMode == .off && !cameraModel.isTimerCountingDown ? 1.0 : Style.disabledOpacity
     }
     
-    fileprivate var isBurstButtonDisabled: Bool {
-        timerMode != .off || isTimerCountingDown
+    private var isBurstButtonDisabled: Bool {
+        cameraModel.timerMode != .off || cameraModel.isTimerCountingDown
     }
     
     // MARK: - Timer properties
-    fileprivate var timerButtonSymbol: String {
+    private var timerButtonSymbol: String {
         "timer"
     }
     
-    fileprivate var timerButtonForeground: Color {
-        timerMode == .off ? Colors.buttonText : .black
+    private var timerButtonForeground: Color {
+        cameraModel.timerMode == .off ? Colors.buttonText : Style.selectedForeground
     }
     
-    fileprivate var timerButtonBackground: Color {
-        timerMode == .off ? Colors.buttonBackground : .yellow
+    private var timerButtonBackground: Color {
+        cameraModel.timerMode == .off ? Colors.buttonBackground : Style.selectedBackground
     }
     
-    fileprivate var timerButtonOpacity: Double {
-        isBurstModeEnabled ? 0.3 : 1.0
+    private var timerButtonOpacity: Double {
+        cameraModel.isBurstModeEnabled ? Style.disabledOpacity : 1.0
     }
     
-    fileprivate var isTimerButtonDisabled: Bool {
-        isBurstModeEnabled
+    private var isTimerButtonDisabled: Bool {
+        cameraModel.isBurstModeEnabled
     }
     
     // MARK: - Selfie Switch properties
-    fileprivate var selfieButtonSymbol: String {
+    private var selfieButtonSymbol: String {
         "arrow.trianglehead.2.clockwise.rotate.90.camera.fill"
     }
     
-    fileprivate var selfieButtonForeground: Color {
+    private var selfieButtonForeground: Color {
         Colors.buttonText
     }
     
-    fileprivate var selfieButtonBackground: Color {
+    private var selfieButtonBackground: Color {
         Colors.buttonBackground
     }
     
     // MARK: - Focus Assist properties
-    fileprivate var focusAssistButtonSymbol: String {
-        if showFocusLoupe {
+    private var focusAssistButtonSymbol: String {
+        if cameraModel.showFocusLoupe {
             return "plus.magnifyingglass"
         }
         
-        if showFocusPeaking {
+        if cameraModel.showFocusPeaking {
             return "person.and.background.dotted"
         }
         
         return "camera.viewfinder"
     }
     
-    fileprivate var focusAssistButtonForeground: Color {
-        showFocusLoupe || showFocusPeaking ? .black : .green
+    private var focusAssistButtonForeground: Color {
+        cameraModel.showFocusLoupe || cameraModel.showFocusPeaking ? Style.selectedForeground : .green
     }
     
-    fileprivate var focusAssistButtonBackground: Color {
-        showFocusLoupe || showFocusPeaking ? .green : Colors.buttonBackground
+    private var focusAssistButtonBackground: Color {
+        cameraModel.showFocusLoupe || cameraModel.showFocusPeaking ? .green : Colors.buttonBackground
     }
-}
-
-// MARK: - Functions
-extension TopBarView {
+    
+    
     private var parsedBurstInterval: Double? {
         Double(burstIntervalInput)
     }
@@ -163,17 +196,17 @@ extension TopBarView {
     
     private var isBurstIntervalInputValid: Bool {
         guard let parsedBurstInterval else { return false }
-        return parsedBurstInterval >= 0.2 && parsedBurstInterval <= 5.0
+        return parsedBurstInterval >= CameraModel.burstIntervalMin && parsedBurstInterval <= CameraModel.burstIntervalMax
     }
     
     private var isBurstFrameLimitInputValid: Bool {
         guard let parsedBurstFrameLimit else { return false }
-        return parsedBurstFrameLimit >= 1 && parsedBurstFrameLimit <= 100
+        return parsedBurstFrameLimit >= CameraModel.burstFrameLimitMin && parsedBurstFrameLimit <= CameraModel.burstFrameLimitMax
     }
     
     private func readoutColor(for control: ManualControl) -> Color {
         guard !isReadoutDisabled(for: control) else {
-            return Colors.buttonText.opacity(0.3)
+            return Colors.buttonText.opacity(Style.disabledOpacity)
         }
         
         switch control {
@@ -224,7 +257,7 @@ extension TopBarView {
         guard !isReadoutDisabled(for: control) else { return }
         
         hapticTriggerR += 1
-        withAnimation(.smooth(duration: 0.34)) {
+        withAnimation(Animations.readoutShown) {
             cameraModel.resetControl(for: control)
             selectedControl = nil
         }
@@ -234,7 +267,7 @@ extension TopBarView {
         guard !isReadoutDisabled(for: control) else { return }
         
         hapticTrigger += 1
-        withAnimation(.smooth(duration: 0.34)) {
+        withAnimation(Animations.readoutShown) {
             if isExposurePairControl(control), isExposurePairControl(selectedControl) {
                 selectedControl = nil
             } else {
@@ -242,16 +275,14 @@ extension TopBarView {
             }
         }
     }
-}
-
-// MARK: - Subviews
-extension TopBarView {
+    
+    // MARK: - Subviews
     // MARK: - Readouts
     private func readouts() -> some View {
         ForEach(ManualControl.allCases, id: \.self) { control in
             Text(readoutTitle(for: control))
                 .padding(.horizontal, 4)
-                .font(.system(size: 14, weight: isReadoutSelected(control) && !isReadoutDisabled(for: control) ? .black : .regular, design: .monospaced))
+                .font(.system(size: Fonts.readoutSize, weight: isReadoutSelected(control) && !isReadoutDisabled(for: control) ? .black : .regular, design: .monospaced))
                 .underline(isReadoutUnderlined(for: control))
                 .foregroundStyle(readoutColor(for: control))
                 .onTapGesture(count: 2) {
@@ -277,24 +308,24 @@ extension TopBarView {
                     let isEnabled = cameraModel.isResolutionEnabled(opt)
                     Button {
                         hapticTrigger += 1
-                        withAnimation(.bouncy) {
+                        withAnimation(Animations.bouncy) {
                             cameraModel.selectResolution(opt)
                         }
                     } label: {
                         Text(opt.label)
-                            .font(.system(size: 12, weight: .medium))
+                            .font(Fonts.picker)
                             .fontWidth(.expanded)
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 5)
-                            .background(cameraModel.resolutionBackground(for: isSelected, isEnabled: isEnabled))
-                            .foregroundStyle(cameraModel.resolutionForeground(for: isSelected, isEnabled: isEnabled))
+                            .padding(.horizontal, Style.horizontalPickerPadding)
+                            .padding(.vertical, Style.verticalButtonPadding)
+                            .background(resolutionBackground(for: isSelected, isEnabled: isEnabled))
+                            .foregroundStyle(resolutionForeground(for: isSelected, isEnabled: isEnabled))
                     }
                     .disabled(!isEnabled)
                 }
             }
-            .clipShape(.rect(cornerRadius: 6))
-            .overlay(RoundedRectangle(cornerRadius: 6).stroke(.white.opacity(0.2), lineWidth: 1))
-            .animation(.bouncy, value: cameraModel.availableResolutions)
+            .clipShape(.rect(cornerRadius: Style.pickerCornerRadius))
+            .overlay(RoundedRectangle(cornerRadius: Style.pickerCornerRadius).stroke(.white.opacity(0.2), lineWidth: 1))
+            .animation(Animations.bouncy, value: cameraModel.availableResolutions)
             .transition(.opacity.combined(with: .scale(scale: 0.5)))
         }
     }
@@ -306,24 +337,24 @@ extension TopBarView {
                 let isEnabled = cameraModel.isFormatEnabled(mode)
                 Button {
                     hapticTrigger += 1
-                    withAnimation(.bouncy) {
+                    withAnimation(Animations.bouncy) {
                         cameraModel.changeCaptureFormat(to: mode)
                     }
                 } label: {
                     Text(mode.rawValue)
-                        .font(.system(size: 12, weight: .medium))
+                        .font(Fonts.picker)
                         .fontWidth(.expanded)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 5)
-                        .background(cameraModel.formatBackground(for: mode, isEnabled: isEnabled))
-                        .foregroundStyle(cameraModel.formatForeground(for: mode, isEnabled: isEnabled))
+                        .padding(.horizontal, Style.horizontalPickerPadding)
+                        .padding(.vertical, Style.verticalButtonPadding)
+                        .background(formatBackground(for: mode, isEnabled: isEnabled))
+                        .foregroundStyle(formatForeground(for: mode, isEnabled: isEnabled))
                 }
                 .disabled(!isEnabled)
             }
         }
-        .clipShape(.rect(cornerRadius: 6))
-        .overlay(RoundedRectangle(cornerRadius: 6).stroke(.white.opacity(0.2), lineWidth: 1))
-        .animation(.bouncy, value: cameraModel.availableResolutions)
+        .clipShape(.rect(cornerRadius: Style.pickerCornerRadius))
+        .overlay(RoundedRectangle(cornerRadius: Style.pickerCornerRadius).stroke(.white.opacity(0.2), lineWidth: 1))
+        .animation(Animations.bouncy, value: cameraModel.availableResolutions)
         
     }
     
@@ -331,14 +362,14 @@ extension TopBarView {
     private func flashButton() -> some View {
         Button {
             hapticTrigger += 1
-            withAnimation(.bouncy) {
+            withAnimation(Animations.bouncy) {
                 cameraModel.cycleFlashMode()
             }
         } label: {
-            imageIcon(systemName: cameraModel.flashLabel, foregroundStyle: cameraModel.flashButtonForeground, background: cameraModel.flashButtonBackground)
+            imageIcon(systemName: flashButtonSymbol, foregroundStyle: flashButtonForeground, background: flashButtonBackground)
         }
-        .opacity(cameraModel.flashButtonOpacity)
-        .disabled(cameraModel.isFlashButtonDisabled)
+        .opacity(flashButtonOpacity)
+        .disabled(isFlashButtonDisabled)
     }
     
     // MARK: - Macro
@@ -347,13 +378,13 @@ extension TopBarView {
         if cameraModel.supportsMacro && !cameraModel.activeLens.isFront {
             Button {
                 hapticTrigger += 1
-                withAnimation(.bouncy) {
+                withAnimation(Animations.bouncy) {
                     cameraModel.toggleMacroMode()
                 }
             } label: {
-                imageIcon(systemName: cameraModel.macroButtonSymbol, foregroundStyle: cameraModel.macroButtonForeground, background: cameraModel.macroButtonBackground)
+                imageIcon(systemName: macroButtonSymbol, foregroundStyle: macroButtonForeground, background: macroButtonBackground)
             }
-            .animation(.bouncy, value: cameraModel.activeLens)
+            .animation(Animations.bouncy, value: cameraModel.activeLens)
             .transition(.opacity.combined(with: .scale))
         }
     }
@@ -363,23 +394,23 @@ extension TopBarView {
         Button {
             hapticTrigger += 1
         } label: {
-            imageIcon(systemName: cameraModel.dualcamButtonSymbol, foregroundStyle: cameraModel.dualcamButtonForeground, background: cameraModel.dualcamButtonBackground)
+            imageIcon(systemName: dualcamButtonSymbol, foregroundStyle: dualcamButtonForeground, background: dualcamButtonBackground)
         }
-        .disabled(cameraModel.isDualcamButtonDisabled)
-        .opacity(cameraModel.dualcamButtonOpacity)
+        .disabled(isDualcamButtonDisabled)
+        .opacity(dualcamButtonOpacity)
     }
     
     // MARK: - Burst
     private func burstButton() -> some View {
-        imageIcon(foregroundStyle: cameraModel.burstButtonForeground, background: cameraModel.burstButtonBackground) {
+        imageIcon(foregroundStyle: burstButtonForeground, background: burstButtonBackground) {
             HStack(spacing: 10) {
                 Button {
                     hapticTrigger += 1
-                    withAnimation(.bouncy) {
+                    withAnimation(Animations.bouncy) {
                         cameraModel.toggleBurstMode()
                     }
                 } label: {
-                    Image(systemName: cameraModel.burstButtonSymbol)
+                    Image(systemName: burstButtonSymbol)
                 }
                 
                 if cameraModel.isBurstModeEnabled {
@@ -394,7 +425,7 @@ extension TopBarView {
                     }
                     .onTapGesture(count: 2) {
                         hapticTriggerR += 1
-                        withAnimation(.bouncy) {
+                        withAnimation(Animations.bouncy) {
                             cameraModel.setBurstInterval(seconds: nil)
                         }
                     }
@@ -409,7 +440,7 @@ extension TopBarView {
                     }
                     .onTapGesture(count: 2) {
                         hapticTriggerR += 1
-                        withAnimation(.bouncy) {
+                        withAnimation(Animations.bouncy) {
                             cameraModel.setBurstFrameLimit(nil)
                         }
                     }
@@ -417,45 +448,45 @@ extension TopBarView {
                 }
             }
         }
-        .font(.system(size: 12, weight: .bold))
-        .disabled(cameraModel.isBurstButtonDisabled)
-        .opacity(cameraModel.burstButtonOpacity)
+        .font(Fonts.button)
+        .disabled(isBurstButtonDisabled)
+        .opacity(burstButtonOpacity)
     }
     
     // MARK: - Timer
     private func timerButton() -> some View {
         Button {
             hapticTrigger += 1
-            withAnimation(.bouncy) {
+            withAnimation(Animations.bouncy) {
                 cameraModel.cycleTimerMode()
             }
         } label: {
-            imageIcon(foregroundStyle: cameraModel.timerButtonForeground, background: cameraModel.timerButtonBackground) {
+            imageIcon(foregroundStyle: timerButtonForeground, background: timerButtonBackground) {
                 HStack(spacing: 4) {
-                    Image(systemName: cameraModel.timerButtonSymbol)
-                        .font(.system(size: 12, weight: .bold))
+                    Image(systemName: timerButtonSymbol)
+                        .font(Fonts.button)
                     
                     if cameraModel.timerMode != .off {
                         Text(cameraModel.timerMode.label)
-                            .font(.system(size: 12, weight: .medium, design: .monospaced))
+                            .font(Fonts.buttonInfo)
                     }
                 }
             }
         }
-        .animation(.bouncy, value: cameraModel.timerMode)
-        .disabled(cameraModel.isTimerButtonDisabled)
-        .opacity(cameraModel.timerButtonOpacity)
+        .animation(Animations.bouncy, value: cameraModel.timerMode)
+        .disabled(isTimerButtonDisabled)
+        .opacity(timerButtonOpacity)
     }
     
     // MARK: - Selfie switch
     private func selfieButton() -> some View {
         Button {
             hapticTrigger += 1
-            withAnimation(.easeInOut(duration: 0.28)) {
+            withAnimation(Animations.selfieToggled) {
                 cameraModel.toggleSelfie()
             }
         } label: {
-            imageIcon(systemName: cameraModel.selfieButtonSymbol, foregroundStyle: cameraModel.selfieButtonForeground, background: cameraModel.selfieButtonBackground)
+            imageIcon(systemName: selfieButtonSymbol, foregroundStyle: selfieButtonForeground, background: selfieButtonBackground)
                 .rotation3DEffect(
                     .degrees(cameraModel.activeLens.isFront ? 180 : 0),
                     axis: (x: 0, y: 1, z: 0),
@@ -471,39 +502,40 @@ extension TopBarView {
         if !cameraModel.isAutoFocus {
             Button {
                 hapticTrigger += 1
-                withAnimation(.bouncy) {
+                withAnimation(Animations.bouncy) {
                     cameraModel.cycleFocusAssistMode()
                 }
             } label: {
-                imageIcon(systemName: cameraModel.focusAssistButtonSymbol, foregroundStyle: cameraModel.focusAssistButtonForeground, background: cameraModel.focusAssistButtonBackground)
+                imageIcon(systemName: focusAssistButtonSymbol, foregroundStyle: focusAssistButtonForeground, background: focusAssistButtonBackground)
             }
             .transition(.opacity.combined(with: .scale))
-            .animation(.bouncy, value: cameraModel.isAutoFocus)
+            .animation(Animations.bouncy, value: cameraModel.isAutoFocus)
         }
     }
     
     private func imageIcon(systemName: String, foregroundStyle: Color, background: Color) -> some View {
         Image(systemName: systemName)
-            .font(.system(size: 12, weight: .bold))
-            .frame(height: 18)
+            .font(Fonts.button)
+            .frame(height: Style.buttonHeight)
             .foregroundStyle(foregroundStyle)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 5)
+            .padding(.horizontal, Style.horizontalButtonPadding)
+            .padding(.vertical, Style.verticalButtonPadding)
             .background(background)
             .clipShape(.capsule)
     }
     
     private func imageIcon<Content: View>(foregroundStyle: Color, background: Color, @ViewBuilder content: () -> Content) -> some View {
         content()
-            .frame(height: 18)
+            .frame(height: Style.buttonHeight)
             .foregroundStyle(foregroundStyle)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 5)
+            .padding(.horizontal, Style.horizontalButtonPadding)
+            .padding(.vertical, Style.verticalButtonPadding)
             .background(background)
             .clipShape(.capsule)
     }
 }
 
+// MARK: - View
 struct TopBarView: View {
     @Bindable var cameraModel: CameraModel
     @Binding var selectedControl: ManualControl?
@@ -515,22 +547,22 @@ struct TopBarView: View {
     @State private var burstFrameLimitInput = ""
     
     var body: some View {
-        VStack(spacing: 14) {
+        VStack(spacing: Style.rowSpacing) {
             // MARK: Row 1
-            HStack(alignment: .center, spacing: 12) {
+            HStack(alignment: .center, spacing: Style.row1Spacing) {
                 readouts()
             }
-            .padding(.horizontal, 4)
+            .padding(.horizontal, Style.row1HPadding)
             
             // MARK: Row 2
-            HStack(alignment: .center, spacing: 16) {
+            HStack(alignment: .center, spacing: Style.row2Spacing) {
                 resolutionPicker()
                 formatPicker()
             }
-            .padding(.horizontal, 8)
+            .padding(.horizontal, Style.row2HPadding)
             
             // MARK: Row 3
-            HStack(alignment: .center, spacing: 16) {
+            HStack(alignment: .center, spacing: Style.row3Spacing) {
                 flashButton()
                 macroButton()
                 // TODO: dualcamButton()
@@ -539,47 +571,47 @@ struct TopBarView: View {
                 selfieButton()
                 focusHelperButton()
             }
-            .padding(.horizontal, 8)
-            .animation(.bouncy, value: cameraModel.isAutoFocus)
+            .padding(.horizontal, Style.row3HPadding)
+            .animation(Animations.bouncy, value: cameraModel.isAutoFocus)
         }
         .sensoryFeedback(.impact, trigger: hapticTrigger)
         .sensoryFeedback(.impact(flexibility: .soft), trigger: hapticTriggerR)
-        .alert("Burst Interval", isPresented: $isShowingBurstIntervalAlert) {
-            TextField("Auto", text: $burstIntervalInput)
+        .alert(Alerts.burstIntervalTitle, isPresented: $isShowingBurstIntervalAlert) {
+            TextField(Alerts.auto, text: $burstIntervalInput)
                 .keyboardType(.decimalPad)
-            Button("OK") {
+            Button(Alerts.ok) {
                 if let parsedBurstInterval {
                     cameraModel.setBurstInterval(seconds: parsedBurstInterval)
                 }
             }
             .disabled(!isBurstIntervalInputValid)
-            Button("Auto") {
+            Button(Alerts.auto) {
                 cameraModel.setBurstInterval(seconds: nil)
             }
-            Button("Cancel", role: .cancel) {}
+            Button(Alerts.cancel, role: .cancel) {}
         } message: {
-            Text("Time (seconds) between frames.\nRange: 0.2 to 5.0.\nMay not be guaranteed for smaller intervals. Auto shoots as fast as safely possible.")
+            Text(Alerts.burstIntervalMessage)
         }
-        .alert("Burst Frames", isPresented: $isShowingBurstFrameLimitAlert) {
-            TextField("Infinity", text: $burstFrameLimitInput)
+        .alert(Alerts.burstFramesTitle, isPresented: $isShowingBurstFrameLimitAlert) {
+            TextField(Alerts.infinityString, text: $burstFrameLimitInput)
                 .keyboardType(.numberPad)
-            Button("OK") {
+            Button(Alerts.ok) {
                 if let parsedBurstFrameLimit {
                     cameraModel.setBurstFrameLimit(parsedBurstFrameLimit)
                 }
             }
             .disabled(!isBurstFrameLimitInputValid)
-            Button("Auto") {
+            Button(Alerts.auto) {
                 cameraModel.setBurstFrameLimit(nil)
             }
-            Button("Cancel", role: .cancel) {}
+            Button(Alerts.cancel, role: .cancel) {}
         } message: {
-            Text("Number of frames to capture.\nRange: 1 to 100.\nAuto keeps shooting until you tap the shutter button again.")
+            Text(Alerts.burstFramesMessage)
         }
         .onChange(of: cameraModel.isAutoExposure) { _, isAutoExposure in
             guard !isAutoExposure, selectedControl == .ev else { return }
             
-            withAnimation(.bouncy) {
+            withAnimation(Animations.bouncy) {
                 selectedControl = nil
             }
         }

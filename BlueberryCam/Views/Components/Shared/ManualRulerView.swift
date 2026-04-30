@@ -45,7 +45,7 @@ struct ManualRulerView: View {
         .onChange(of: value) { _, newValue in
             guard dragStartValue == nil else { return }
             
-            withAnimation(.snappy) {
+            withAnimation(Animations.manualControlSnap) {
                 displayedValue = newValue
             }
         }

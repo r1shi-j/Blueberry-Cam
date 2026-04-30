@@ -29,8 +29,6 @@ extension CaptureView {
     private var lensCleaningTitle: String { "You lens may need cleaning" }
     private var closeCleaningTitle: String { "Done" }
     private var lensCleaningSymbolName: String { "camera.aperture" }
-    private var errorString: String { "Error" }
-    private var okButtonString: String { "OK" }
     private var tapHoldDuration: TimeInterval { 0.7 }
     private var tapMoveTolerance: CGFloat { 18 }
     private var focusReticleSliderXTolerance: CGFloat { 24 }
@@ -80,7 +78,7 @@ extension CaptureView {
         
         if let message {
             displayedBurstFeedbackMessage = message
-            withAnimation(.easeInOut(duration: 0.2)) {
+            withAnimation(Animations.easeInOut) {
                 isBurstFeedbackVisible = true
             }
             return
@@ -205,7 +203,7 @@ extension CaptureView {
             cameraModel.handleShutterButton {
                 withAnimation { cameraModel.changeCapturingState(to: true) }
                 Task { @MainActor in
-                    try? await Task.sleep(for: .milliseconds(150))
+                    try? await Task.sleep(for: Durations.shutter)
                     withAnimation { cameraModel.changeCapturingState(to: false) }
                 }
             } onBurstPhotoCaptured: {
@@ -221,7 +219,7 @@ extension CaptureView {
         )
         .blur(radius: visualBlur)
         .opacity(visualOpacity)
-        .animation(.easeInOut, value: scenePhase)
+        .animation(Animations.viewFinderShown, value: scenePhase)
         .frame(width: previewRect.width, height: previewRect.height)
         .position(x: previewRect.midX, y: previewRect.midY)
         .allowsHitTesting(!cameraModel.isTimerCountingDown && !cameraModel.isBurstCapturing)
@@ -241,7 +239,7 @@ extension CaptureView {
             SpatialTapGesture(count: 2)
                 .onEnded { _ in
                     hapticTrigger += 1
-                    withAnimation(.easeInOut(duration: 0.28)) {
+                    withAnimation(Animations.selfieToggled) {
                         cameraModel.toggleSelfie()
                     }
                 }
@@ -357,7 +355,7 @@ extension CaptureView {
                     .transition(.opacity)
             }
         }
-        .animation(.bouncy, value: cameraModel.tapFocusLockLabel)
+        .animation(Animations.bouncy, value: cameraModel.tapFocusLockLabel)
     }
     
     // MARK: - QR Code
@@ -399,7 +397,7 @@ extension CaptureView {
                 .transition(.opacity)
             }
         }
-        .animation(.bouncy, value: cameraModel.detectedCodeURL)
+        .animation(Animations.bouncy, value: cameraModel.detectedCodeURL)
     }
     
     // MARK: - Lens Cleaning Hint
@@ -434,7 +432,7 @@ extension CaptureView {
                 .transition(.opacity)
             }
         }
-        .animation(.bouncy, value: cameraModel.shouldShowLensCleaningHint)
+        .animation(Animations.bouncy, value: cameraModel.shouldShowLensCleaningHint)
     }
     
     // MARK: - Burst Feedback
@@ -472,7 +470,7 @@ extension CaptureView {
                                 get: { cameraModel.exposureBias },
                                 set: { cameraModel.setExposureBias($0) }
                             ),
-                            range: -4...4,
+                            range: -CameraModel.minEV...CameraModel.maxEV,
                             step: 0.1,
                             majorTickStride: 5,
                             accessibilityLabel: "Exposure value",
@@ -500,7 +498,7 @@ extension CaptureView {
                                 get: { cameraModel.whiteBalanceTargetKelvin },
                                 set: { cameraModel.setWhiteBalanceTargetKelvin($0) }
                             ),
-                            range: 2000...10000,
+                            range: CameraModel.minWhiteBalance...CameraModel.maxWhiteBalance,
                             step: 100,
                             majorTickStride: 5,
                             accessibilityLabel: "White balance",
@@ -523,7 +521,7 @@ extension CaptureView {
                 }
             }
         }
-        .animation(.smooth(duration: 0.34), value: selectedControl)
+        .animation(Animations.manualControlShown, value: selectedControl)
     }
     
     private func manualISOOverlay(in previewRect: CGRect) -> some View {
@@ -626,7 +624,7 @@ extension CaptureView {
                 .transition(.scale(scale: 0.5, anchor: .center).combined(with: .opacity))
             }
         }
-        .animation(.bouncy, value: cameraModel.histogramModeLarge)
+        .animation(Animations.bouncy, value: cameraModel.histogramModeLarge)
     }
     
     // MARK: - Burst Real time Feedback
@@ -686,8 +684,8 @@ extension CaptureView {
                         .transition(countdownTextTransition)
                 }
             }
-            .animation(.spring(response: 0.45, dampingFraction: 0.8), value: cameraModel.isTimerCountingDown)
-            .animation(.easeInOut(duration: 0.12), value: cameraModel.timerCountdownValue)
+            .animation(Animations.timerShown, value: cameraModel.isTimerCountingDown)
+            .animation(Animations.timerCountdown, value: cameraModel.timerCountdownValue)
         }
     }
     
@@ -698,7 +696,7 @@ extension CaptureView {
             Color.white.opacity(0.3)
                 .frame(width: previewRect.width, height: previewRect.height)
                 .position(x: previewRect.midX, y: previewRect.midY)
-                .animation(.easeOut(duration: 0.15), value: cameraModel.isCapturing)
+                .animation(Animations.captureFlash, value: cameraModel.isCapturing)
         }
     }
     
@@ -852,7 +850,7 @@ extension CaptureView {
                     bottomBarView()
                 }
                 .allowsHitTesting(!cameraModel.isTimerCountingDown)
-                .animation(.easeInOut(duration: 0.2), value: cameraModel.showSimpleView)
+                .animation(Animations.easeInOut, value: cameraModel.showSimpleView)
                 
                 timerCountdownOverlay(in: previewRect)
                 captureFlash(previewRect)
@@ -868,8 +866,8 @@ extension CaptureView {
         ZStack {
             if permissionModel.allGranted {
                 cameraContent()
-                    .animation(.easeInOut(duration: 0.2), value: cameraModel.showSimpleView)
-                    .animation(.easeInOut(duration: 0.2), value: cameraModel.isBurstCapturing)
+                    .animation(Animations.easeInOut, value: cameraModel.showSimpleView)
+                    .animation(Animations.easeInOut, value: cameraModel.isBurstCapturing)
                     .transition(.opacity)
             } else if permissionModel.anyDenied {
                 PermissionDeniedView(
@@ -921,8 +919,8 @@ struct CaptureView: View {
     
     var body: some View {
         appContent()
-            .animation(.easeInOut(duration: 0.4), value: permissionModel.allGranted)
-            .animation(.easeInOut(duration: 0.4), value: permissionModel.anyDenied)
+            .animation(Animations.permissionsShown, value: permissionModel.allGranted)
+            .animation(Animations.permissionsShown, value: permissionModel.anyDenied)
             .sensoryFeedback(.impact, trigger: hapticTrigger)
             .sensoryFeedback(.impact(flexibility: .soft), trigger: hapticTriggerR)
             .sensoryFeedback(.selection, trigger: countdownHapticTrigger)
@@ -939,8 +937,8 @@ struct CaptureView: View {
             .onChange(of: cameraModel.activeLens, handleOnChangeOfActiveLens)
             .onChange(of: cameraModel.lensSwitchCompletionCount, handleOnChangeOfLensSwitchCount)
             .onReceive(NotificationCenter.default.publisher(for: UIDevice.deviceDidShakeNotification), perform: handleOnRecieveShake)
-            .alert(errorString, isPresented: $cameraModel.showError) {
-                Button(okButtonString, role: .cancel) {}
+            .alert(Alerts.error, isPresented: $cameraModel.showError) {
+                Button(Alerts.ok, role: .cancel) {}
             } message: {
                 Text(cameraModel.errorMessage)
             }

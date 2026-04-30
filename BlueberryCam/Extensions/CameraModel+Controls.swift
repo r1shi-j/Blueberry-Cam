@@ -67,10 +67,10 @@ extension CameraModel {
         //        }
         
         // EV Slider
-        let ev = AVCaptureSlider("Exposure", symbolName: "plusminus", in: -4.0...4.0, step: 0.1)
+        let ev = AVCaptureSlider("Exposure", symbolName: "plusminus", in: CameraModel.minEV...CameraModel.maxEV, step: 0.1)
         ev.prominentValues = [-4.0, -3.5, -3.0, -2.5, -2.0, -1.5, -1.0, -0.5, 0.0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0]
         ev.localizedValueFormat = "%@ EV"
-        let clampedEV = max(-4.0, min(4.0, exposureBias))
+        let clampedEV = max(CameraModel.minEV, min(CameraModel.maxEV, exposureBias))
         ev.value = round(clampedEV * 10) / 10.0
         ev.setActionQueue(.main) { [weak self] value in
             guard let self, !self.isUpdatingHardwareControl else { return }
@@ -139,9 +139,9 @@ extension CameraModel {
         session.addControl(focus)
         
         // White Balance Slider
-        let wb = AVCaptureSlider("White Balance", symbolName: "thermometer.sun.fill", in: 2000...10000, step: 100)
+        let wb = AVCaptureSlider("White Balance", symbolName: "thermometer.sun.fill", in: CameraModel.minWhiteBalance...CameraModel.maxWhiteBalance, step: 100)
         wb.localizedValueFormat = "%@K"
-        wb.value = max(2000, min(10000, whiteBalanceTargetKelvin))
+        wb.value = max(CameraModel.minWhiteBalance, min(CameraModel.maxWhiteBalance, whiteBalanceTargetKelvin))
         wb.setActionQueue(.main) { [weak self] value in
             guard let self, !self.isUpdatingHardwareControl else { return }
             if abs(self.whiteBalanceTargetKelvin - value) > 10 {
@@ -177,7 +177,7 @@ extension CameraModel {
     
     func syncEVToHardware() {
         guard let ctrl = evControl else { return }
-        let clamped = max(-4.0, min(4.0, exposureBias))
+        let clamped = max(CameraModel.minEV, min(CameraModel.maxEV, exposureBias))
         let snapped = round(clamped * 10.0) / 10.0
         if abs(ctrl.value - snapped) > 0.01 {
             isUpdatingHardwareControl = true
@@ -219,7 +219,7 @@ extension CameraModel {
     
     func syncWBToHardware() {
         guard let ctrl = wbControl else { return }
-        let clamped = max(2000, min(10000, whiteBalanceTargetKelvin))
+        let clamped = max(CameraModel.minWhiteBalance, min(CameraModel.maxWhiteBalance, whiteBalanceTargetKelvin))
         if abs(ctrl.value - clamped) > 1.0 {
             isUpdatingHardwareControl = true
             ctrl.value = clamped

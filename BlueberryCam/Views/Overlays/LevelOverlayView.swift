@@ -27,7 +27,7 @@ struct LevelOverlayView: View {
                     .transition(.opacity)
             }
         }
-        .animation(.easeInOut(duration: 0.25), value: model.displayMode)
+        .animation(Animations.levelShown, value: model.displayMode)
         .allowsHitTesting(false)
         .ignoresSafeArea()
     }

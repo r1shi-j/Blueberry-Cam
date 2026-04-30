@@ -162,6 +162,8 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
     var liveFocus: String = ""
     
     // MARK: - Manual controls
+    static let minEV: Float = -4
+    static let maxEV: Float = 4
     var isAutoExposure: Bool = true {
         didSet {
             if oldValue != isAutoExposure {
@@ -268,6 +270,8 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
     @ObservationIgnored
     nonisolated(unsafe) private(set) var minimumFocusDistanceForAnalysis: Float = 0
     var focusPeakingHoldTask: Task<Void, Never>?
+    static let minWhiteBalance: Float = 2000
+    static let maxWhiteBalance: Float = 10000
     var isAutoWhiteBalance: Bool = true {
         didSet {
             if oldValue != isAutoWhiteBalance {
@@ -573,14 +577,6 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
         return !photoOutput.supportedFlashModes.isEmpty
     }
     
-    var flashLabel: String {
-        switch flashMode {
-            case .off, .on: "bolt.fill"
-            case .auto: "bolt.badge.automatic.fill"
-            @unknown default: "bolt.badge.xmark.fill"
-        }
-    }
-    
     private func nearestISOStop(to value: Float) -> Float {
         let stops = availableISOStops
         guard let nearestIndex = nearestISOStopIndex(in: stops, to: value) else {
@@ -606,7 +602,7 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
     
     private func snappedWhiteBalanceKelvin(_ kelvin: Float) -> Float {
         let steppedKelvin = (kelvin / 100).rounded() * 100
-        return min(max(steppedKelvin, 2000), 10000)
+        return min(max(steppedKelvin, CameraModel.minWhiteBalance), CameraModel.maxWhiteBalance)
     }
     
     private func snappedFocusPosition(_ position: Float) -> Float {
@@ -651,8 +647,8 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
         guard isAutoExposure else { return }
         
         let steppedBias = (bias / 0.1).rounded() * 0.1
-        let lowerBound = max(minExposureBias, -4.0)
-        let upperBound = min(maxExposureBias, 4.0)
+        let lowerBound = max(minExposureBias, CameraModel.minEV)
+        let upperBound = min(maxExposureBias, CameraModel.maxEV)
         let clampedBias = min(max(steppedBias, lowerBound), upperBound)
         
         guard clampedBias != exposureBias else { return }
@@ -1425,6 +1421,11 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
         }
     }
     
+    static let burstIntervalMin = 0.2
+    static let burstIntervalMax = 5.0
+    static let burstFrameLimitMin = 1
+    static let burstFrameLimitMax = 100
+    
     var shouldShowBurstIntervalCountdown: Bool {
         guard isBurstCapturing, let burstIntervalSeconds else { return false }
         return burstIntervalSeconds >= 1.0
@@ -1437,7 +1438,7 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
     
     func setBurstInterval(seconds: Double?) {
         if let seconds {
-            burstIntervalSeconds = min(5.0, max(0.2, seconds))
+            burstIntervalSeconds = min(CameraModel.burstIntervalMax, max(CameraModel.burstIntervalMin, seconds))
         } else {
             burstIntervalSeconds = nil
         }
@@ -1445,7 +1446,7 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
     
     func setBurstFrameLimit(_ limit: Int?) {
         if let limit {
-            burstFrameLimit = min(100, max(1, limit))
+            burstFrameLimit = min(CameraModel.burstFrameLimitMax, max(CameraModel.burstFrameLimitMin, limit))
         } else {
             burstFrameLimit = nil
         }

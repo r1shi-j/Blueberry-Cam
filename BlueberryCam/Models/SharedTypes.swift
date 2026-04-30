@@ -23,6 +23,42 @@ enum Fonts {
     static let manualValue: Font = .system(size: 12, weight: .medium, design: .monospaced)
 }
 
+enum Alerts {
+    static let ok = "OK"
+    static let cancel = "Cancel"
+    static let auto = "Auto"
+    static let error = "Error"
+    static let reset = "Reset"
+    static let infinityString = "Infinity"
+    static let resetSettingsTitle = "Are you sure you want to reset all custom settings?"
+    static let burstIntervalTitle = "Burst Interval"
+    static let burstIntervalMessage = "Time (seconds) between frames.\nRange: 0.2 to 5.0.\nMay not be guaranteed for smaller intervals. Auto shoots as fast as safely possible."
+    static let burstFramesTitle = "Burst Frames"
+    static let burstFramesMessage = "Number of frames to capture.\nRange: 1 to 100.\nAuto keeps shooting until you tap the shutter button again."
+}
+//static let burstIntervalMessage = "Time (seconds) between frames.\nRange: \(CameraModel.burstIntervalMin) to \(CameraModel.burstIntervalMax).\nMay not be guaranteed for smaller intervals. Auto shoots as fast as safely possible."
+//static let burstFramesTitle = "Burst Frames"
+//static let burstFramesMessage = "Number of frames to capture.\nRange: \(CameraModel.burstFrameLimitMin) to \(CameraModel.burstFrameLimitMax).\nAuto keeps shooting until you tap the shutter button again."
+
+enum Animations {
+    static let easeInOut: Animation = .easeInOut(duration: 0.2)
+    static let bouncy: Animation = .bouncy
+    static let viewFinderShown: Animation = .easeInOut
+    static let levelShown: Animation = .easeInOut(duration: 0.25)
+    static let timerShown: Animation = .spring(response: 0.45, dampingFraction: 0.8)
+    static let timerCountdown: Animation = .easeInOut(duration: 0.12)
+    static let manualControlShown: Animation = .smooth(duration: 0.34)
+    static let captureFlash: Animation = .easeOut(duration: 0.15)
+    static let permissionsShown: Animation = .easeInOut(duration: 0.4)
+    static let manualControlSnap: Animation = .snappy
+    static let readoutShown: Animation = .smooth(duration: 0.34)
+    static let selfieToggled: Animation = .easeInOut(duration: 0.28)
+}
+
+enum Durations {
+    static let shutter: Duration = .milliseconds(150)
+}
+
 // MARK: - AppView
 enum AppView: String, CaseIterable, Hashable {
     case clean = "Clean"

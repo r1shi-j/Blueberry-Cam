@@ -18,7 +18,11 @@ extension HistogramView {
         let minH: CGFloat = size == .small ? 0.8 : 0.5
         
         for (rawData, color) in channels {
-            let data = buckets != nil ? downsample(rawData, into: buckets!) : rawData
+            let data = if let buckets {
+                downsample(rawData, into: buckets)
+            } else {
+                rawData
+            }
             guard !data.isEmpty, let maxVal = data.max(), maxVal > 0 else { continue }
             let bw   = sz.width / CGFloat(data.count)
             let barW = max(bw - gap, 0.5)
@@ -55,7 +59,11 @@ extension HistogramView {
             (redData, .red), (greenData, .green), (blueData, .blue)
         ]
         for (panelIdx, (rawData, color)) in channels.enumerated() {
-            let data = buckets != nil ? downsample(rawData, into: buckets!) : rawData
+            let data = if let buckets {
+                downsample(rawData, into: buckets)
+            } else {
+                rawData
+            }
             guard !data.isEmpty, let maxVal = data.max(), maxVal > 0 else { continue }
             let offsetX = CGFloat(panelIdx) * panelW
             let bw = panelW / CGFloat(data.count)
@@ -194,41 +202,39 @@ struct HistogramView: View {
     let waveformData: [Float]
     
     var body: some View {
-        GeometryReader { _ in
-            ZStack(alignment: .bottomLeading) {
-                RoundedRectangle(cornerRadius: cornerRadius)
-                    .fill(.black.opacity(backgroundOpacity))
-                
-                if size == .small {
-                    Canvas { ctx, sz in
-                        switch mode {
-                            case .luminance: drawBars(ctx, sz, channels: [(lumaData, .white)], buckets: 64,  opacity: 0.85)
-                            case .color: drawBars(ctx, sz, channels: rgbChannels, buckets: 64,  opacity: 0.72)
-                            case .waveform: drawWaveform(ctx, sz, outCols: 80)
-                            case .parade: drawParade(ctx, sz, buckets: 32)
-                            case .none: return
-                        }
+        ZStack(alignment: .bottomLeading) {
+            RoundedRectangle(cornerRadius: cornerRadius)
+                .fill(.black.opacity(backgroundOpacity))
+            
+            if size == .small {
+                Canvas { ctx, sz in
+                    switch mode {
+                        case .luminance: drawBars(ctx, sz, channels: [(lumaData, .white)], buckets: 64,  opacity: 0.85)
+                        case .color: drawBars(ctx, sz, channels: rgbChannels, buckets: 64,  opacity: 0.72)
+                        case .waveform: drawWaveform(ctx, sz, outCols: 80)
+                        case .parade: drawParade(ctx, sz, buckets: 32)
+                        case .none: return
                     }
-                    .clipShape(.rect(cornerRadius: cornerRadius))
-                    .frame(width: 80, height: 30)
-                } else {
-                    Canvas { ctx, sz in
-                        switch mode {
-                            case .luminance: drawBars(ctx, sz, channels: [(lumaData, .white)], buckets: nil, opacity: 0.78)
-                            case .color: drawBars(ctx, sz, channels: rgbChannels, buckets: nil, opacity: 0.65)
-                            case .waveform: drawWaveform(ctx, sz, outCols: WaveformConstants.wfCols)
-                            case .parade: drawParade(ctx, sz, buckets: nil)
-                            case .none: return
-                        }
-                    }
-                    .clipShape(.rect(cornerRadius: cornerRadius))
-                    
-                    Text(mode.rawValue.uppercased())
-                        .font(.system(size: 8, weight: .bold, design: .monospaced))
-                        .foregroundStyle(.white.opacity(0.45))
-                        .padding(.horizontal, 6)
-                        .padding(.bottom, 3)
                 }
+                .clipShape(.rect(cornerRadius: cornerRadius))
+                .frame(width: 80, height: 30)
+            } else {
+                Canvas { ctx, sz in
+                    switch mode {
+                        case .luminance: drawBars(ctx, sz, channels: [(lumaData, .white)], buckets: nil, opacity: 0.78)
+                        case .color: drawBars(ctx, sz, channels: rgbChannels, buckets: nil, opacity: 0.65)
+                        case .waveform: drawWaveform(ctx, sz, outCols: WaveformConstants.wfCols)
+                        case .parade: drawParade(ctx, sz, buckets: nil)
+                        case .none: return
+                    }
+                }
+                .clipShape(.rect(cornerRadius: cornerRadius))
+                
+                Text(mode.rawValue.uppercased())
+                    .font(.system(size: 8, weight: .bold, design: .monospaced))
+                    .foregroundStyle(.white.opacity(0.45))
+                    .padding(.horizontal, 6)
+                    .padding(.bottom, 3)
             }
         }
     }

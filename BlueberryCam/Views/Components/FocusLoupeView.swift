@@ -1,4 +1,3 @@
-import CoreImage
 import SwiftUI
 
 struct FocusLoupeView: View {
