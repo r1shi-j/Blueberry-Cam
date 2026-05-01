@@ -3,6 +3,7 @@ import SwiftUI
 struct SettingsView: View {
     @Environment(\.dismiss) var dismiss
     @Bindable var cameraModel: CameraModel
+    @Binding var appBackgroundColorIndex: Int
     @Binding var shutterCount: Int
     @Binding var shutterCountBurst: Int
     let resetToDefaults: () -> ()
@@ -85,7 +86,7 @@ struct SettingsView: View {
                     HStack {
                         Text("Capture Behaviour")
                         Spacer()
-                        Image(systemName: "paintbrush.fill")
+                        Image(systemName: "camera.shutter.button")
                     }
                 } footer: {
                     Text("Faster burst capture prioritises speed over quality. Burst feedback shows a quick summary when a burst finishes. Precise Timer shows milliseconds instead of just seconds. Lens smudge detection is supported and always enabled.")
@@ -122,6 +123,64 @@ struct SettingsView: View {
                         Text("About")
                         Spacer()
                         Image(systemName: "info.circle")
+                    }
+                }
+                
+                Section {
+                    NavigationLink {
+                        ZStack {
+                            Color.black.ignoresSafeArea()
+                                .overlay(backgroundColors[appBackgroundColorIndex].opacity(0.5))
+                            Form {
+                                ForEach(backgroundColors.indices, id: \.self) { index in
+                                    Button {
+                                        appBackgroundColorIndex = index
+                                    } label: {
+                                        HStack {
+                                            Circle()
+                                                .fill(.black)
+                                                .overlay {
+                                                    Circle()
+                                                        .fill(backgroundColors[index])
+                                                }
+                                                .frame(width: 20, height: 20)
+                                            
+                                            Spacer()
+                                            
+                                            if appBackgroundColorIndex == index {
+                                                Image(systemName: "checkmark")
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            .scrollContentBackground(.hidden)
+                        }
+                        .environment(\.colorScheme, .dark)
+                        .navigationTitle("App Background")
+                        .toolbarColorScheme(.dark, for: .navigationBar)
+                        .tint(.white)
+                    } label: {
+                        HStack {
+                            Text("App Background")
+                            Spacer()
+                            Circle()
+                                .fill(.black)
+                                .overlay {
+                                    Circle()
+                                        .fill(backgroundColors[appBackgroundColorIndex])
+                                }
+                                .frame(width: 20, height: 20)
+                        }
+                    }
+
+                    // Text("Accent Color")
+                    // Text("App Icon")
+                } header: {
+                    HStack {
+                        Text("Customisation")
+                        Spacer()
+                        Image(systemName: "paintbrush.fill")
                     }
                 }
                 
@@ -259,10 +318,12 @@ private enum ShutterCountResetTarget {
 
 #Preview {
     @Previewable @State var cameraModel = CameraModel()
+    @Previewable @State var appBackgroundColorIndex = 2
     @Previewable @State var shutterCount = 0
     @Previewable @State var shutterCountBurst = 0
     SettingsView(
         cameraModel: cameraModel,
+        appBackgroundColorIndex: $appBackgroundColorIndex,
         shutterCount: $shutterCount,
         shutterCountBurst: $shutterCountBurst) { }
 }

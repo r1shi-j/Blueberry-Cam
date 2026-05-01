@@ -194,6 +194,7 @@ extension CaptureView {
     // MARK: - Background Color
     private func backgroundColor() -> some View {
         Color.black.ignoresSafeArea()
+            .overlay(backgroundColors[appBackgroundColorIndex])
     }
     
     // MARK: - Viewfinder
@@ -885,6 +886,7 @@ extension CaptureView {
 struct CaptureView: View {
     @Environment(\.scenePhase) private var scenePhase
     
+    @Binding var appBackgroundColorIndex: Int
     @Binding var shutterCount: Int
     @Binding var shutterCountBurst: Int
     @Bindable var permissionModel: PermissionModel
@@ -949,6 +951,7 @@ struct CaptureView: View {
             })) {
                 SettingsView(
                     cameraModel: cameraModel,
+                    appBackgroundColorIndex: $appBackgroundColorIndex,
                     shutterCount: $shutterCount,
                     shutterCountBurst: $shutterCountBurst,
                     resetToDefaults: cameraModel.resetToDefaults)

@@ -10,6 +10,7 @@ import SwiftUI
 @main
 struct BlueberryCamApp: App {
     @Environment(\.scenePhase) private var scenePhase
+    @AppStorage("appBackgroundColorIndex") var appBackgroundColorIndex = 0
     @AppStorage("shutterCount") var shutterCount = 0
     @AppStorage("shutterCountBurst") var shutterCountBurst = 0
     @State var permissionModel = PermissionModel()
@@ -17,6 +18,7 @@ struct BlueberryCamApp: App {
     var body: some Scene {
         WindowGroup {
             CaptureView(
+                appBackgroundColorIndex: $appBackgroundColorIndex,
                 shutterCount: $shutterCount,
                 shutterCountBurst: $shutterCountBurst,
                 permissionModel: permissionModel
@@ -54,14 +56,11 @@ struct BlueberryCamApp: App {
 // Customisable accent colours (shutter color per state, top bar pickers)
 
 // MARK: - FIXME
+// top bar readouts slow to click
+// photos on locked camera have xlong file name
 
 // MARK: - Next Steps
 // Implement 3rd row on TopBarView: Macro, ***dual cam***, (raw) burst, flash, timer buttons
 
-// customisable background color instead of black, .blue.opacity(0.3)
-/// in setttings: have disclosure group of colours as circles, store as an index
-
-// top bar readouts slow to click
-
-// photos on locked camera have xlong file name
+// Finalise Main app cleanup
 // update locked camera
