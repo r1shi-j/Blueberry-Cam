@@ -707,35 +707,7 @@ extension CaptureView {
         ConfettiCannon(
             trigger: $cameraModel.confettiCannonTrigger,
             num: 50,
-            confettis: [
-                .sfSymbol(symbolName: "bolt.fill"),
-                //                        .sfSymbol(symbolName: "camera.macro"),
-                .sfSymbol(symbolName: "camera.aperture"),
-                //                        .sfSymbol(symbolName: "camera.filters"),
-                .sfSymbol(symbolName: "camera.shutter.button.fill"),
-                //                        .sfSymbol(symbolName: "photo.stack.fill"),
-                .sfSymbol(symbolName: "cloud.sun.fill"),
-                //                        .sfSymbol(symbolName: "cloud.bolt.rain"),
-                .sfSymbol(symbolName: "rainbow"),
-                //                        .sfSymbol(symbolName: "person.fill"),
-                .sfSymbol(symbolName: "bird"),
-                //                        .sfSymbol(symbolName: "mountain.2"),
-                .image("camera.blueberry"),
-                //                        .text("📸"),
-                .text("🫐"),
-                //                        .text("🌤️"),
-                .text("🌉"),
-                //                        .text("🌄"),
-                .text("🌅"),
-                //                        .text("🌃"),
-                .text("🍛"),
-                //                        .text("🐶"),
-                .text("🏎️"),
-                //                        .text("🚙"),
-                .text("🏀"),
-                //                        .text("⚽️"),
-                .text("🏈"),
-            ],
+            confettis: ConfettiObjects.left,
             confettiSize: 12,
             rainHeight: 800,
             openingAngle: .degrees(45),
@@ -748,35 +720,7 @@ extension CaptureView {
         ConfettiCannon(
             trigger: $cameraModel.confettiCannonTrigger,
             num: 50,
-            confettis: [
-                //                        .sfSymbol(symbolName: "bolt.fill"),
-                .sfSymbol(symbolName: "camera.macro"),
-                //                        .sfSymbol(symbolName: "camera.aperture"),
-                .sfSymbol(symbolName: "camera.filters"),
-                //                        .sfSymbol(symbolName: "camera.shutter.button.fill"),
-                .sfSymbol(symbolName: "photo.stack.fill"),
-                //                        .sfSymbol(symbolName: "cloud.sun.fill"),
-                .sfSymbol(symbolName: "cloud.bolt.rain"),
-                //                        .sfSymbol(symbolName: "rainbow"),
-                .sfSymbol(symbolName: "person.fill"),
-                //                        .sfSymbol(symbolName: "bird"),
-                .sfSymbol(symbolName: "mountain.2"),
-                //                        .image("camera.blueberry"),
-                .text("📸"),
-                //                        .text("🫐")
-                .text("🌤️"),
-                //                        .text("🌉"),
-                .text("🌄"),
-                //                        .text("🌅"),
-                .text("🌃"),
-                //                        .text("🍛"),
-                .text("🐶"),
-                //                        .text("🏎️"),
-                .text("🚙"),
-                //                        .text("🏀"),
-                .text("⚽️"),
-                //                        .text("🏈"),
-            ],
+            confettis: ConfettiObjects.right,
             confettiSize: 12,
             rainHeight: 800,
             openingAngle: .degrees(105),
@@ -873,7 +817,8 @@ extension CaptureView {
             } else if permissionModel.anyDenied {
                 PermissionDeniedView(
                     cameraGranted: permissionModel.cameraStatus == .granted,
-                    photosGranted: permissionModel.photosStatus == .granted
+                    photosGranted: permissionModel.photosStatus == .granted,
+                    requiresPhotos: permissionModel.requiresPhotos
                 )
                 .transition(.opacity)
             } else {
@@ -935,6 +880,7 @@ struct CaptureView: View {
             .onChange(of: cameraModel.shouldShowLevel, handleOnChangeOfShowingLevel)
             .onChange(of: scenePhase, handleOnChangeOfScenePhase)
             .onChange(of: cameraModel.showSimpleView, handleOnChangeOfSimpleView)
+            .onChange(of: cameraModel.saveLocation, handleOnChangeOfSaveLocation)
             .onChange(of: cameraModel.burstFeedbackMessage, updateBurstFeedbackOverlay)
             .onChange(of: cameraModel.activeLens, handleOnChangeOfActiveLens)
             .onChange(of: cameraModel.lensSwitchCompletionCount, handleOnChangeOfLensSwitchCount)
@@ -970,6 +916,7 @@ extension CaptureView {
     }
     
     private func handleOnAppear() {
+        permissionModel.saveLocation = cameraModel.saveLocation
         let standardShutterCount = $shutterCount
         cameraModel.onStandardPhotoSaved = {
             standardShutterCount.wrappedValue += 1
@@ -1017,12 +964,18 @@ extension CaptureView {
         }
     }
     
+    private func handleOnChangeOfSaveLocation(_: SaveLocation, new: SaveLocation) {
+        permissionModel.saveLocation = new
+        Task { await permissionModel.checkAndRequest() }
+    }
+    
     private func handleOnChangeOfShowingLevel(_: Bool, new: Bool) {
         levelModel.setLevelDisplayEnabled(new && !cameraModel.showSimpleView)
     }
     
     private func handleOnChangeOfScenePhase(_: ScenePhase, newPhase: ScenePhase) {
         if newPhase == .active {
+            cameraModel.validateFilesSaveLocation()
             configureCameraIfPermitted()
             levelModel.startUpdates() // Always start
             levelModel.setLevelDisplayEnabled(cameraModel.shouldShowLevel && !cameraModel.showSimpleView)
@@ -1099,4 +1052,39 @@ extension CaptureView {
             cameraModel.ignoreCurrentCode()
         }
     }
+}
+
+enum ConfettiObjects {
+    static let left: [ConfettiType] = [
+        .sfSymbol(symbolName: "bolt.fill"),
+        .sfSymbol(symbolName: "camera.aperture"),
+        .sfSymbol(symbolName: "camera.shutter.button.fill"),
+        .sfSymbol(symbolName: "cloud.sun.fill"),
+        .sfSymbol(symbolName: "rainbow"),
+        .sfSymbol(symbolName: "bird"),
+        .image("camera.blueberry"),
+        .text("🫐"),
+        .text("🌉"),
+        .text("🌅"),
+        .text("🍛"),
+        .text("🏎️"),
+        .text("🏀"),
+        .text("🏈"),
+    ]
+    
+    static let right: [ConfettiType] = [
+        .sfSymbol(symbolName: "camera.macro"),
+        .sfSymbol(symbolName: "camera.filters"),
+        .sfSymbol(symbolName: "photo.stack.fill"),
+        .sfSymbol(symbolName: "cloud.bolt.rain"),
+        .sfSymbol(symbolName: "person.fill"),
+        .sfSymbol(symbolName: "mountain.2"),
+        .text("📸"),
+        .text("🌤️"),
+        .text("🌄"),
+        .text("🌃"),
+        .text("🐶"),
+        .text("🚙"),
+        .text("⚽️"),
+    ]
 }

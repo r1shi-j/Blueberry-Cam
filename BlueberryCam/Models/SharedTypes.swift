@@ -174,6 +174,23 @@ enum CaptureMode: String, CaseIterable, Identifiable {
     var id: String { rawValue }
 }
 
+enum SaveLocation: String, CaseIterable, Identifiable, Sendable {
+    case photos = "Photos"
+    case files = "Files"
+    
+    var id: String { rawValue }
+    
+    nonisolated static let storageKey = "saveLocation"
+    
+    nonisolated static var stored: SaveLocation {
+        guard let value = UserDefaults.standard.string(forKey: storageKey),
+              let location = SaveLocation(rawValue: value) else {
+            return .photos
+        }
+        return location
+    }
+}
+
 // MARK: - ResolutionOption
 struct ResolutionOption: Identifiable, Equatable {
     let width: Int32
@@ -299,6 +316,10 @@ final class PhotoFilterBox: @unchecked Sendable {
     nonisolated(unsafe) var value: PhotoFilter = .off
 }
 
+final class SaveLocationBox: @unchecked Sendable {
+    nonisolated(unsafe) var value: SaveLocation = .photos
+}
+
 final class SessionURLBox: @unchecked Sendable {
     nonisolated(unsafe) var value: URL? = nil
 }
@@ -314,6 +335,7 @@ final class FrameCounter: @unchecked Sendable {
 struct PhotoCaptureContext: Sendable {
     let captureMode: CaptureMode
     let photoFilter: PhotoFilter
+    let saveLocation: SaveLocation
     let isBurst: Bool
     let burstSessionID: Int?
 }

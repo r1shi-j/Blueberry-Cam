@@ -14,6 +14,7 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
     nonisolated let frameCounter = FrameCounter()
     let _pendingCaptureModeBox = CaptureModeBox()
     let _pendingPhotoFilterBox = PhotoFilterBox()
+    let _pendingSaveLocationBox = SaveLocationBox()
     let _captureContextStore = PhotoCaptureContextStore()
     let _burstCaptureTracker = BurstCaptureTracker()
     
@@ -52,6 +53,15 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
     var defaultPhotoFilter: PhotoFilter = .off {
         didSet {
             UserDefaults.standard.set(defaultPhotoFilter.rawValue, forKey: "defaultPhotoFilter")
+        }
+    }
+    var saveLocation: SaveLocation = .stored {
+        didSet {
+            UserDefaults.standard.set(saveLocation.rawValue, forKey: SaveLocation.storageKey)
+            if saveLocation == .files {
+                ensureDefaultFileSaveLocation()
+                validateFilesSaveLocation()
+            }
         }
     }
     var defaultHistogramSmall: HistogramMode = .none {
@@ -124,6 +134,11 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
     var pendingCaptureModeAfterLensSwitch: CaptureMode?
     var activeLens: Lens = .wide
     var isSwitchingLens = false
+    
+    // MARK: - Save Location
+    var fileSaveLocationName = FileSaveLocationStore.displayName()
+    var isFileSaveLocationAvailable = true
+    var fileSaveLocationIssue: String?
     
     // MARK: - UI State
     var isCapturing: Bool = false

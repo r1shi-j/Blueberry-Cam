@@ -1,4 +1,6 @@
+import ConfettiSwiftUI
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct SettingsView: View {
     @Environment(\.dismiss) var dismiss
@@ -7,13 +9,57 @@ struct SettingsView: View {
     @Binding var shutterCount: Int
     @Binding var shutterCountBurst: Int
     let resetToDefaults: () -> ()
+    
+    @State private var confettiCount = 0
     @State private var isShowingDefaultsResetAlert = false
+    @State private var isShowingFileLocationImporter = false
     @State private var countResetTarget: ShutterCountResetTarget?
     
     var body: some View {
         NavigationStack {
             List {
                 Section {
+                    LabeledContent("Save Location ") {
+                        Picker("", selection: saveLocationSelection) {
+                            ForEach(SaveLocation.allCases) { location in
+                                Text(location.rawValue)
+                                    .tag(location)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+                        .frame(maxWidth: 200)
+                    }
+                    
+                    if cameraModel.saveLocation == .files {
+                        LabeledContent("Folder") {
+                            HStack(spacing: 10) {
+                                Button("Reset Folder", systemImage: "arrow.counterclockwise.circle.fill", action: cameraModel.resetFileSaveLocationToDefault)
+                                    .labelStyle(.iconOnly)
+                                    .foregroundStyle(.red)
+                                
+                                Button {
+                                    isShowingFileLocationImporter = true
+                                } label: {
+                                    HStack(spacing: 6) {
+                                        Image(systemName: cameraModel.isFileSaveLocationAvailable ? "folder" : "exclamationmark.triangle.fill")
+                                            .foregroundStyle(cameraModel.isFileSaveLocationAvailable ? Color.secondary : Color.red)
+                                        Text(cameraModel.fileSaveLocationName)
+                                            .lineLimit(1)
+                                    }
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                        .transition(.opacity.combined(with: .move(edge: .top)))
+                        
+                        if !cameraModel.isFileSaveLocationAvailable, let issue = cameraModel.fileSaveLocationIssue {
+                            Text(issue)
+                                .font(.footnote)
+                                .foregroundStyle(.red)
+                                .transition(.opacity.combined(with: .move(edge: .top)))
+                        }
+                    }
+                    
                     LabeledContent("Format ") {
                         Picker("", selection: $cameraModel.defaultFileFormat) {
                             ForEach(CaptureMode.allCases, id: \.self) { format in
@@ -70,10 +116,13 @@ struct SettingsView: View {
                         Text("Capture Defaults")
                         Spacer()
                         Image(systemName: "pencil.and.list.clipboard")
+                            .symbolEffect(.bounce, options: .repeat(.periodic(delay: 1)).speed(0.7))
                     }
                 } footer: {
                     Text("Used when the app starts.")
                 }
+                .animation(Animations.easeInOut, value: cameraModel.saveLocation)
+                .animation(Animations.easeInOut, value: cameraModel.isFileSaveLocationAvailable)
                 
                 Section {
                     Toggle("Geotag Location", isOn: $cameraModel.shouldGeotagLocation)
@@ -87,6 +136,7 @@ struct SettingsView: View {
                         Text("Capture Behaviour")
                         Spacer()
                         Image(systemName: "camera.shutter.button")
+                            .symbolEffect(.wiggle, options: .repeat(.periodic(delay: 1)).speed(0.7))
                     }
                 } footer: {
                     Text("Faster burst capture prioritises speed over quality. Burst feedback shows a quick summary when a burst finishes. Precise Timer shows milliseconds instead of just seconds. Lens smudge detection is supported and always enabled.")
@@ -101,6 +151,7 @@ struct SettingsView: View {
                         Text("Viewfinder")
                         Spacer()
                         Image(systemName: "scope")
+                            .symbolEffect(.bounce, options: .repeat(.periodic(delay: 1)).speed(0.7))
                     }
                 }
                 
@@ -123,6 +174,7 @@ struct SettingsView: View {
                         Text("About")
                         Spacer()
                         Image(systemName: "info.circle")
+                            .symbolEffect(.rotate.byLayer, options: .repeat(.periodic(delay: 1)).speed(0.7))
                     }
                 }
                 
@@ -173,7 +225,7 @@ struct SettingsView: View {
                                 .frame(width: 20, height: 20)
                         }
                     }
-
+                    
                     // Text("Accent Color")
                     // Text("App Icon")
                 } header: {
@@ -181,6 +233,7 @@ struct SettingsView: View {
                         Text("Customisation")
                         Spacer()
                         Image(systemName: "paintbrush.fill")
+                            .symbolEffect(.bounce, options: .repeat(.periodic(delay: 1)).speed(0.7))
                     }
                 }
                 
@@ -188,8 +241,11 @@ struct SettingsView: View {
                     Button {
                         isShowingDefaultsResetAlert = true
                     } label: {
-                        LabeledContent("Reset to Defaults") { Image(systemName: "exclamationmark.arrow.trianglehead.counterclockwise.rotate.90") }
-                            .tint(.red)
+                        LabeledContent("Reset to Defaults") {
+                            Image(systemName: "exclamationmark.arrow.trianglehead.counterclockwise.rotate.90")
+                                .symbolEffect(.rotate.byLayer.counterClockwise, options: .repeat(.periodic(delay: 1)).speed(0.7))
+                        }
+                        .tint(.red)
                     }
                     
                     // TODO: Reset tips
@@ -216,6 +272,7 @@ struct SettingsView: View {
                         Text("Danger Zone")
                         Spacer()
                         Image(systemName: "exclamationmark.triangle.fill")
+                            .symbolEffect(.bounce, options: .repeat(.periodic(delay: 1)).speed(0.7))
                     }
                 }
                 
@@ -223,20 +280,27 @@ struct SettingsView: View {
                     Button {
                         openMail(subject: "Bug Report", description: "Enter your bug report with screenshots (recommended) below this line.")
                     } label: {
-                        LabeledContent("Bug Report") { Image(systemName: "mail") }
-                            .tint(.red)
+                        LabeledContent("Bug Report") {
+                            Image(systemName: "mail")
+                                .symbolEffect(.wiggle, options: .repeat(.periodic(delay: 1)).speed(0.7))
+                        }
+                        .tint(.red)
                     }
                     Button {
                         openMail(subject: "Feature Request", description: "Enter your feature request with any mockup sketches below this line. Describe your feature in detail to the best of your extent.")
                     } label: {
-                        LabeledContent("Feature Request") { Image(systemName: "mail") }
-                            .tint(.blue)
+                        LabeledContent("Feature Request") {
+                            Image(systemName: "mail")
+                                .symbolEffect(.wiggle, options: .repeat(.periodic(delay: 1)).speed(0.7))
+                        }
+                        .tint(.blue)
                     }
                 } header: {
                     HStack {
                         Text("Contact")
                         Spacer()
                         Image(systemName: "signpost.right.and.left.fill")
+                            .symbolEffect(.bounce, options: .repeat(.periodic(delay: 1)).speed(0.7))
                     }
                 } footer: {
                     Text("© 2026 Rishi Jansari . All Rights Reserved.")
@@ -273,6 +337,69 @@ struct SettingsView: View {
                     }
                     countResetTarget = nil
                 }
+            }
+            .fileImporter(
+                isPresented: $isShowingFileLocationImporter,
+                allowedContentTypes: [.folder],
+                allowsMultipleSelection: false,
+                onCompletion: handleFileLocationImport
+            )
+            .onChange(of: cameraModel.shouldShowConfettiCannons) { _, new in
+                if new {
+                    confettiCount += 1
+                }
+            }
+        }
+        .overlay {
+            VStack {
+                Spacer()
+                HStack {
+                    ConfettiCannon(
+                        trigger: $confettiCount,
+                        num: 50,
+                        confettis: ConfettiObjects.left,
+                        confettiSize: 12,
+                        rainHeight: 800,
+                        openingAngle: .degrees(45),
+                        closingAngle: .degrees(75),
+                        radius: 350
+                    )
+                    
+                    ConfettiCannon(
+                        trigger: $confettiCount,
+                        num: 50,
+                        confettis: ConfettiObjects.right,
+                        confettiSize: 12,
+                        rainHeight: 800,
+                        openingAngle: .degrees(105),
+                        closingAngle: .degrees(135),
+                        radius: 350
+                    )
+                }
+                .padding()
+            }
+        }
+    }
+    
+    private func handleFileLocationImport(_ result: Result<[URL], Error>) {
+        switch result {
+            case .success(let urls):
+                guard let url = urls.first else { return }
+                cameraModel.selectFileSaveLocation(url)
+            case .failure(let error):
+                cameraModel.fileSaveLocationIssue = error.localizedDescription
+                cameraModel.isFileSaveLocationAvailable = false
+                cameraModel.errorMessage = error.localizedDescription
+                cameraModel.showError = true
+        }
+    }
+    
+    private var saveLocationSelection: Binding<SaveLocation> {
+        Binding {
+            cameraModel.saveLocation
+        } set: { newValue in
+            withAnimation(Animations.easeInOut) {
+                cameraModel.saveLocation = newValue
             }
         }
     }

@@ -10,18 +10,27 @@ final class PermissionModel {
     
     var cameraStatus: Status = .undetermined
     var photosStatus: Status = .undetermined
+    var saveLocation: SaveLocation = .stored
+    
+    var requiresPhotos: Bool {
+        saveLocation == .photos
+    }
     
     var allGranted: Bool {
-        cameraStatus == .granted && photosStatus == .granted
+        cameraStatus == .granted && (!requiresPhotos || photosStatus == .granted)
     }
     
     var anyDenied: Bool {
-        cameraStatus == .denied || photosStatus == .denied
+        cameraStatus == .denied || (requiresPhotos && photosStatus == .denied)
     }
     
     func checkAndRequest() async {
         await checkCamera()
-        await checkPhotos()
+        if requiresPhotos {
+            await checkPhotos()
+        } else {
+            photosStatus = .granted
+        }
     }
     
     private func checkCamera() async {

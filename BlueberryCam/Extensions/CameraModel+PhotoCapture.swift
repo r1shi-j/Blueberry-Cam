@@ -84,6 +84,7 @@ extension CameraModel {
                 self.exposureDebounceTask?.cancel()
                 self._pendingCaptureModeBox.value = self.captureMode
                 self._pendingPhotoFilterBox.value = self.selectedPhotoFilter
+                self._pendingSaveLocationBox.value = self.saveLocation
                 self.updateCaptureOrientation()
                 let completionGate = self.burstCaptureCompletionGate
                 let processingLimit = self.burstProcessingLimit
@@ -270,6 +271,7 @@ extension CameraModel {
             PhotoCaptureContext(
                 captureMode: captureMode,
                 photoFilter: selectedPhotoFilter,
+                saveLocation: saveLocation,
                 isBurst: isBurst,
                 burstSessionID: burstSessionID
             ),
@@ -442,6 +444,7 @@ extension CameraModel {
         exposureDebounceTask?.cancel()
         _pendingCaptureModeBox.value = captureMode
         _pendingPhotoFilterBox.value = selectedPhotoFilter
+        _pendingSaveLocationBox.value = saveLocation
         
         // Update orientation based on current physical position
         updateCaptureOrientation()

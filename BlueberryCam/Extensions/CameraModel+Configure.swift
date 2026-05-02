@@ -128,6 +128,13 @@ extension CameraModel {
         }
         self.selectedPhotoFilter = defaultPhotoFilter
         
+        if let location = defaults.string(forKey: SaveLocation.storageKey),
+           let saveLocation = SaveLocation(rawValue: location) {
+            self.saveLocation = saveLocation
+        }
+        self.refreshFileSaveLocationDisplay()
+        self.validateFilesSaveLocation()
+        
         if let histSmall = defaults.string(forKey: "defaultHistogramSmall"), let hMode = HistogramMode(rawValue: histSmall) {
             self.defaultHistogramSmall = hMode
         }
@@ -153,6 +160,7 @@ extension CameraModel {
             "defaultFileFormat",
             "defaultResolution",
             "defaultPhotoFilter",
+            SaveLocation.storageKey,
             "defaultHistogramSmall",
             "defaultHistogramLarge",
             "shouldGeotagLocation",
@@ -169,6 +177,8 @@ extension CameraModel {
         defaultFileFormat = .raw
         defaultResolution = .max
         defaultPhotoFilter = .off
+        saveLocation = .photos
+        resetFileSaveLocationToDefault()
         defaultHistogramSmall = .none
         defaultHistogramLarge = .none
         shouldGeotagLocation = false

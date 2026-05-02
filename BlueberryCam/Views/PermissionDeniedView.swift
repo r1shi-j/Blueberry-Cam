@@ -3,6 +3,7 @@ import SwiftUI
 struct PermissionDeniedView: View {
     let cameraGranted: Bool
     let photosGranted: Bool
+    let requiresPhotos: Bool
     
     var body: some View {
         ZStack {
@@ -25,11 +26,13 @@ struct PermissionDeniedView: View {
                         description: "Required to take photos",
                         isGranted: cameraGranted
                     )
-                    PermissionRow(
-                        title: "Photos",
-                        description: "Required to save photos",
-                        isGranted: photosGranted
-                    )
+                    if requiresPhotos {
+                        PermissionRow(
+                            title: "Photos",
+                            description: "Required to save photos",
+                            isGranted: photosGranted
+                        )
+                    }
                 }
                 .padding(.horizontal)
                 

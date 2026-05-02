@@ -18,6 +18,7 @@ extension CameraModel: AVCapturePhotoCaptureDelegate {
         let context = self._captureContextStore.context(for: uniqueID) ?? PhotoCaptureContext(
             captureMode: self._pendingCaptureModeBox.value,
             photoFilter: self._pendingPhotoFilterBox.value,
+            saveLocation: self._pendingSaveLocationBox.value,
             isBurst: false,
             burstSessionID: nil
         )
@@ -45,7 +46,12 @@ extension CameraModel: AVCapturePhotoCaptureDelegate {
                 isRaw: photo.isRawPhoto,
                 isHEIF: isHeif
             ) ?? data
-            self.saveToPhotos(data: filteredData, location: loc, isDNG: photo.isRawPhoto, isHEIF: isHeif, context: context)
+            switch context.saveLocation {
+                case .photos:
+                    self.saveToPhotos(data: filteredData, location: loc, isDNG: photo.isRawPhoto, isHEIF: isHeif, context: context)
+                case .files:
+                    self.saveToFiles(data: filteredData, location: loc, isDNG: photo.isRawPhoto, isHEIF: isHeif, context: context)
+            }
             self._burstCaptureTracker.completeProcessing(uniqueID: uniqueID, success: true)
         }
     }
@@ -57,6 +63,7 @@ extension CameraModel: AVCapturePhotoCaptureDelegate {
         let context = self._captureContextStore.context(for: uniqueID) ?? PhotoCaptureContext(
             captureMode: self._pendingCaptureModeBox.value,
             photoFilter: self._pendingPhotoFilterBox.value,
+            saveLocation: self._pendingSaveLocationBox.value,
             isBurst: false,
             burstSessionID: nil
         )
@@ -87,6 +94,22 @@ extension CameraModel: AVCapturePhotoCaptureDelegate {
         }
         
         performSave(data: data, location: location, isDNG: isDNG, isHEIF: isHEIF, context: context)
+    }
+    
+    private nonisolated func saveToFiles(data: Data,
+                                         location: CLLocation?,
+                                         isDNG: Bool,
+                                         isHEIF: Bool,
+                                         context: PhotoCaptureContext) {
+        do {
+            let destination = try FileSaveLocationStore.makeDestinationURL(isDNG: isDNG, isHEIF: isHEIF)
+            defer { destination.stopAccessing() }
+            let outputData = dataWithLocationMetadataIfNeeded(data, location: location, isDNG: isDNG)
+            try outputData.write(to: destination.url, options: .atomic)
+            reportSaveSuccess(context: context)
+        } catch {
+            reportFileSaveFailure(error, context: context)
+        }
     }
     
     private nonisolated func performSave(data: Data,
@@ -184,6 +207,15 @@ extension CameraModel: AVCapturePhotoCaptureDelegate {
         reportSaveFailure(diagnostics, context: context)
     }
     
+    private nonisolated func reportFileSaveFailure(_ error: Error, context: PhotoCaptureContext) {
+        Task { @MainActor in
+            self.recoverFromFileSaveLocationFailure(error)
+            if context.isBurst {
+                self.recordBurstSaveFailure(context: context)
+            }
+        }
+    }
+    
     private nonisolated func reportSaveFailure(_ message: String, context: PhotoCaptureContext) {
         Task { @MainActor in
             if context.isBurst {
@@ -193,6 +225,45 @@ extension CameraModel: AVCapturePhotoCaptureDelegate {
                 self.showError = true
             }
         }
+    }
+    
+    private nonisolated func dataWithLocationMetadataIfNeeded(_ data: Data,
+                                                              location: CLLocation?,
+                                                              isDNG: Bool) -> Data {
+        guard let location,
+              !isDNG,
+              CLLocationCoordinate2DIsValid(location.coordinate),
+              let source = CGImageSourceCreateWithData(data as CFData, nil),
+              let sourceType = CGImageSourceGetType(source) else {
+            return data
+        }
+        
+        var metadata = (CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any]) ?? [:]
+        var gpsMetadata: [CFString: Any] = [
+            kCGImagePropertyGPSLatitude: abs(location.coordinate.latitude),
+            kCGImagePropertyGPSLatitudeRef: location.coordinate.latitude >= 0 ? "N" : "S",
+            kCGImagePropertyGPSLongitude: abs(location.coordinate.longitude),
+            kCGImagePropertyGPSLongitudeRef: location.coordinate.longitude >= 0 ? "E" : "W"
+        ]
+        
+        if location.altitude != 0 {
+            gpsMetadata[kCGImagePropertyGPSAltitude] = abs(location.altitude)
+            gpsMetadata[kCGImagePropertyGPSAltitudeRef] = location.altitude < 0 ? 1 : 0
+        }
+        
+        metadata[kCGImagePropertyGPSDictionary] = gpsMetadata
+        
+        let outputData = NSMutableData()
+        guard let destination = CGImageDestinationCreateWithData(outputData, sourceType, 1, nil) else {
+            return data
+        }
+        
+        CGImageDestinationAddImageFromSource(destination, source, 0, metadata as CFDictionary)
+        guard CGImageDestinationFinalize(destination) else {
+            return data
+        }
+        
+        return outputData as Data
     }
     
     private nonisolated func filteredPhotoDataIfNeeded(from data: Data,
