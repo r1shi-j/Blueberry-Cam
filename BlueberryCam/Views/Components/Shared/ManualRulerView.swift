@@ -8,6 +8,29 @@ struct ManualRulerView: View {
     let axis: RulerAxis
     let majorTickStride: Int
     let accessibilityLabel: String
+    let tickColor: Color
+    let centerTickColor: Color
+    let centerTickShadowColor: Color
+    
+    init(value: Binding<Float>,
+         range: ClosedRange<Float>,
+         step: Float,
+         axis: RulerAxis,
+         majorTickStride: Int,
+         accessibilityLabel: String,
+         tickColor: Color = .white,
+         centerTickColor: Color? = nil,
+         centerTickShadowColor: Color = .black.opacity(0.35)) {
+        self._value = value
+        self.range = range
+        self.step = step
+        self.axis = axis
+        self.majorTickStride = majorTickStride
+        self.accessibilityLabel = accessibilityLabel
+        self.tickColor = tickColor
+        self.centerTickColor = centerTickColor ?? tickColor
+        self.centerTickShadowColor = centerTickShadowColor
+    }
     
     @State private var dragStartValue: Float?
     @State private var displayedValue: Float?
@@ -32,10 +55,11 @@ struct ManualRulerView: View {
             step: step,
             axis: axis,
             tickSpacing: tickSpacing,
-            majorTickStride: majorTickStride
+            majorTickStride: majorTickStride,
+            tickColor: tickColor
         )
         .overlay(alignment: axis == .vertical ? .trailing : .top) {
-            CenterTickMarker(axis: axis)
+            CenterTickMarker(axis: axis, color: centerTickColor, shadowColor: centerTickShadowColor)
         }
         .contentShape(.rect)
         .gesture(dragGesture)
@@ -208,6 +232,7 @@ private struct RulerTicksView: View, Animatable {
     let axis: RulerAxis
     let tickSpacing: CGFloat
     let majorTickStride: Int
+    let tickColor: Color
     
     var animatableData: Double {
         get { Double(value) }
@@ -264,7 +289,7 @@ private struct RulerTicksView: View, Animatable {
             
             context.stroke(
                 path,
-                with: .color(.white.opacity(opacity)),
+                with: .color(tickColor.opacity(opacity)),
                 style: StrokeStyle(lineWidth: lineWidth, lineCap: .round)
             )
         }
@@ -273,12 +298,14 @@ private struct RulerTicksView: View, Animatable {
 
 private struct CenterTickMarker: View {
     let axis: RulerAxis
+    let color: Color
+    let shadowColor: Color
     
     var body: some View {
         Rectangle()
-            .fill(.white)
+            .fill(color)
             .frame(width: axis == .vertical ? 66 : 3, height: axis == .vertical ? 3 : 66)
             .clipShape(.capsule)
-            .shadow(color: .black.opacity(0.35), radius: 4)
+            .shadow(color: shadowColor, radius: 4)
     }
 }

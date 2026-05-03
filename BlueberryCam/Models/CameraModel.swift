@@ -175,6 +175,12 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
     var liveFocus: String = ""
     
     // MARK: - Manual controls
+    var isViewfinderBright = false {
+        didSet { isViewfinderBrightForAnalysis = isViewfinderBright }
+    }
+    @ObservationIgnored
+    nonisolated(unsafe) private(set) var isViewfinderBrightForAnalysis = false
+    
     static let minEV: Float = -4
     static let maxEV: Float = 4
     var isAutoExposure: Bool = true {

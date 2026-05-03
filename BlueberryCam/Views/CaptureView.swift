@@ -187,6 +187,18 @@ extension CaptureView {
             case .wb: .cyan.opacity(0.85)
         }
     }
+    
+    private var manualRulerTickColor: Color {
+        cameraModel.isViewfinderBright ? .black.opacity(0.72) : .white.opacity(0.92)
+    }
+    
+    private var manualRulerCenterTickColor: Color {
+        cameraModel.isViewfinderBright ? .black : .white
+    }
+    
+    private var manualRulerCenterTickShadowColor: Color {
+        cameraModel.isViewfinderBright ? .white.opacity(0.28) : .black.opacity(0.35)
+    }
 }
 
 // MARK: Subviews
@@ -536,7 +548,10 @@ extension CaptureView {
                 step: 1,
                 axis: .horizontal,
                 majorTickStride: 4,
-                accessibilityLabel: "ISO"
+                accessibilityLabel: "ISO",
+                tickColor: manualRulerTickColor,
+                centerTickColor: manualRulerCenterTickColor,
+                centerTickShadowColor: manualRulerCenterTickShadowColor
             )
             .frame(width: previewRect.width * 0.78, height: 70)
             
@@ -582,7 +597,10 @@ extension CaptureView {
                 step: step,
                 axis: .vertical,
                 majorTickStride: majorTickStride,
-                accessibilityLabel: accessibilityLabel
+                accessibilityLabel: accessibilityLabel,
+                tickColor: manualRulerTickColor,
+                centerTickColor: manualRulerCenterTickColor,
+                centerTickShadowColor: manualRulerCenterTickShadowColor
             )
             .frame(width: 70, height: previewRect.height * 0.72)
         }
