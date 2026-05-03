@@ -231,15 +231,8 @@ extension CameraModel {
         // Update EV slider value (EV bounds are fixed -4...4 so this never crashes)
         syncEVToHardware()
         
-        // For ISO and Shutter, we skip setting their .value here because their min/max
-        // bounds depend on the active device. switchLens() calls setupCameraControls()
-        // right after this, which rebuilds the sliders with the correct bounds and seeds
-        // their values safely. Setting them here on stale bounds causes crashes.
-        
-        // If controls weren't set up yet (e.g. at launch), try again now
-        if lensControl == nil || evControl == nil || isoControl == nil || ssControl == nil {
-            setupCameraControls()
-        }
+        // ISO and shutter control values are seeded when setupCameraControls() rebuilds
+        // controls after launch or lens switches. Setting them here can use stale bounds.
     }
     
     private func generateShutterStops(for device: AVCaptureDevice) -> [(denominator: Int, duration: CMTime)] {

@@ -5,11 +5,7 @@ extension CameraModel {
     func configure() {
         loadSettings()
         toggleLocationGeotag()
-        
-        Task.detached(priority: .userInitiated) { @MainActor in
-            self.setupSession()
-            self.startSession()
-        }
+        setupSession()
     }
     
     func startSession() {
@@ -37,76 +33,86 @@ extension CameraModel {
     }
     
     private func setupSession() {
-        session.beginConfiguration()
-        session.sessionPreset = .photo
+        let initialLens = activeLens
+        let metadataTypes = supportedMetadataTypes
+        let isMetadataEnabled = recognizeBarcodes && !isTimerCountingDown && !isBurstCapturing
         
-        guard let cam = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back),
-              let input = try? AVCaptureDeviceInput(device: cam),
-              session.canAddInput(input) else {
-            session.commitConfiguration()
-            return
-        }
-        session.addInput(input)
-        
-        session.setControlsDelegate(self, queue: DispatchQueue.main)
-        setupCameraControls()
-        
-        if session.canAddOutput(photoOutput) {
-            session.addOutput(photoOutput)
-        }
-        
-        videoOutput.alwaysDiscardsLateVideoFrames = true
-        videoOutput.videoSettings = [
-            kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA
-        ]
-        if session.canAddOutput(videoOutput) {
-            session.addOutput(videoOutput)
-        }
-        
-        if session.canAddOutput(metadataOutput) {
-            session.addOutput(metadataOutput)
-            metadataOutput.setMetadataObjectsDelegate(self, queue: .main)
-            let available = metadataOutput.availableMetadataObjectTypes
-            let toSet = supportedMetadataTypes.filter { available.contains($0) }
-            if !toSet.isEmpty {
-                metadataOutput.metadataObjectTypes = toSet
+        sessionQueue.async { [weak self] in
+            guard let self else { return }
+            
+            self.session.beginConfiguration()
+            self.session.sessionPreset = .photo
+            
+            guard let cam = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back),
+                  let input = try? AVCaptureDeviceInput(device: cam),
+                  self.session.canAddInput(input) else {
+                self.session.commitConfiguration()
+                return
+            }
+            self.session.addInput(input)
+            
+            if self.session.canAddOutput(self.photoOutput) {
+                self.session.addOutput(self.photoOutput)
+            }
+            
+            self.videoOutput.alwaysDiscardsLateVideoFrames = true
+            self.videoOutput.videoSettings = [
+                kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA
+            ]
+            if self.session.canAddOutput(self.videoOutput) {
+                self.session.addOutput(self.videoOutput)
+            }
+            
+            if self.session.canAddOutput(self.metadataOutput) {
+                self.session.addOutput(self.metadataOutput)
+                self.metadataOutput.setMetadataObjectsDelegate(self, queue: .main)
+                let available = self.metadataOutput.availableMetadataObjectTypes
+                let toSet = metadataTypes.filter { available.contains($0) }
+                self.metadataOutput.metadataObjectTypes = isMetadataEnabled ? toSet : []
+            }
+            
+            self.enableLensSmudgeDetectionIfSupported(on: cam)
+            
+            // Keep analysis output orientation aligned with preview from first launch.
+            let isFront = initialLens.isFront
+            let rotationAngle: CGFloat = isFront ? 0 : 90
+            for conn in [self.photoOutput.connection(with: .video),
+                         self.videoOutput.connection(with: .video)].compactMap({ $0 }) {
+                if conn.isVideoRotationAngleSupported(rotationAngle) {
+                    conn.videoRotationAngle = rotationAngle
+                }
+                conn.isVideoMirrored = isFront
+            }
+            
+            self.session.commitConfiguration()
+            
+            let analysisQueue = DispatchQueue(label: "\(BundleIDs.appID).analysisQueue")
+            self.videoOutput.setSampleBufferDelegate(self, queue: analysisQueue)
+            
+            if let largest = cam.activeFormat.supportedMaxPhotoDimensions.max(by: {
+                Int($0.width) * Int($0.height) < Int($1.width) * Int($1.height)
+            }) {
+                self.photoOutput.maxPhotoDimensions = largest
+            }
+            
+            Task { @MainActor in
+                self.session.setControlsDelegate(self, queue: DispatchQueue.main)
+                
+                // Match initial flip to lens
+                self.flipRotation = initialLens.isFront ? 180 : 0
+                
+                // Restoration of hardware defaults and state
+                self.device = cam
+                self.configureLensSmudgeDetection(for: cam)
+                self.configureSubjectAreaMonitoring(for: cam)
+                self.buildAvailableFormats()
+                self.updateDeviceRanges()
+                self.normalizeFlashModeForCurrentDevice()
+                self.enforceExposureModeConstraints()
+                self.setupCameraControls()
+                self.startSession()
             }
         }
-        
-        enableLensSmudgeDetectionIfSupported(on: cam)
-        configureSubjectAreaMonitoring(for: cam)
-        
-        // Keep analysis output orientation aligned with preview from first launch.
-        let isFront = activeLens.isFront
-        let rotationAngle: CGFloat = isFront ? 0 : 90
-        for conn in [photoOutput.connection(with: .video),
-                     videoOutput.connection(with: .video)].compactMap({ $0 }) {
-            if conn.isVideoRotationAngleSupported(rotationAngle) {
-                conn.videoRotationAngle = rotationAngle
-            }
-            conn.isVideoMirrored = isFront
-        }
-        
-        session.commitConfiguration()
-        
-        // Match initial flip to lens
-        self.flipRotation = activeLens.isFront ? 180 : 0
-        
-        let analysisQueue = DispatchQueue(label: "\(BundleIDs.appID).analysisQueue")
-        videoOutput.setSampleBufferDelegate(self, queue: analysisQueue)
-        
-        // Restoration of hardware defaults and state
-        self.device = cam
-        self.configureLensSmudgeDetection(for: cam)
-        if let largest = cam.activeFormat.supportedMaxPhotoDimensions.max(by: {
-            Int($0.width) * Int($0.height) < Int($1.width) * Int($1.height)
-        }) {
-            self.photoOutput.maxPhotoDimensions = largest
-        }
-        self.buildAvailableFormats()
-        self.updateDeviceRanges()
-        self.normalizeFlashModeForCurrentDevice()
-        self.enforceExposureModeConstraints()
     }
     
     private func loadSettings() {
