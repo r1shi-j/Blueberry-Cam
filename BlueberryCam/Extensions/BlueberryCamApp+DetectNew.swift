@@ -80,8 +80,8 @@ extension BlueberryCamApp {
             return false
         }
         
-        let assets = await fetchAssets(withOriginalFilenames: Set(content.filenames))
-        guard assets.count == content.filenames.count else {
+        let assets = await fetchAssets(matching: content.captureRecords)
+        guard assets.count == content.captureRecords.count else {
             // The PhotoKit save may still be in flight, or the extension may have been suspended
             // before PhotoKit wrote the asset. Keep this session around for a later retry.
             return false
@@ -132,7 +132,7 @@ extension BlueberryCamApp {
         
         return LockedCaptureSessionContent(
             assetIdentifiers: readLines(from: manifestURL),
-            filenames: readLines(from: capturesURL)
+            captureRecords: readCaptureRecords(from: capturesURL)
         )
     }
     
@@ -141,6 +141,10 @@ extension BlueberryCamApp {
             .components(separatedBy: "\n")
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
+    }
+    
+    private func readCaptureRecords(from url: URL) -> [LockedCaptureRecord] {
+        readLines(from: url).compactMap(LockedCaptureRecord.init(line:))
     }
     
     private func addAssetsToBlueberryAlbum(_ assets: [PHAsset]) async {
@@ -179,39 +183,43 @@ extension BlueberryCamApp {
         await addAssetsToBlueberryAlbum(assetArray)
     }
     
-    private func fetchAssets(withOriginalFilenames filenames: Set<String>,
+    private func fetchAssets(matching records: [LockedCaptureRecord],
                              maxAttempts: Int = 10,
                              delay: Duration = .milliseconds(500)) async -> [PHAsset] {
-        guard !filenames.isEmpty else { return [] }
+        guard !records.isEmpty else { return [] }
         
-        var matched: [String: PHAsset] = [:]
+        var matched: [LockedCaptureRecord: PHAsset] = [:]
         
         for attempt in 1...maxAttempts {
-            matched = fetchRecentAssets(withOriginalFilenames: filenames)
-            if matched.count == filenames.count {
-                return filenames.compactMap { matched[$0] }
+            matched = fetchRecentAssets(matching: records)
+            if matched.count == records.count {
+                return records.compactMap { matched[$0] }
             }
             
             guard attempt < maxAttempts else { break }
             try? await Task.sleep(for: delay)
         }
         
-        return filenames.compactMap { matched[$0] }
+        return records.compactMap { matched[$0] }
     }
     
-    private func fetchRecentAssets(withOriginalFilenames filenames: Set<String>) -> [String: PHAsset] {
+    private func fetchRecentAssets(matching records: [LockedCaptureRecord]) -> [LockedCaptureRecord: PHAsset] {
         let options = PHFetchOptions()
         options.fetchLimit = 250
         options.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]
         options.predicate = NSPredicate(format: "mediaType == %d", PHAssetMediaType.image.rawValue)
         
+        let recordsByFilename = Dictionary(grouping: records, by: \.filename)
         let result = PHAsset.fetchAssets(with: options)
-        var matches: [String: PHAsset] = [:]
+        var matches: [LockedCaptureRecord: PHAsset] = [:]
         result.enumerateObjects { asset, _, stop in
             let resources = PHAssetResource.assetResources(for: asset)
-            for resource in resources where filenames.contains(resource.originalFilename) {
-                matches[resource.originalFilename] = asset
-                if matches.count == filenames.count {
+            for resource in resources {
+                let candidates = (recordsByFilename[resource.originalFilename] ?? [])
+                    .filter { matches[$0] == nil }
+                guard let record = bestRecord(for: asset, candidates: candidates) else { continue }
+                matches[record] = asset
+                if matches.count == records.count {
                     stop.pointee = true
                 }
                 return
@@ -219,6 +227,18 @@ extension BlueberryCamApp {
         }
         
         return matches
+    }
+    
+    private func bestRecord(for asset: PHAsset, candidates: [LockedCaptureRecord]) -> LockedCaptureRecord? {
+        guard let creationDate = asset.creationDate else {
+            return candidates.first
+        }
+        
+        return candidates.min { lhs, rhs in
+            let lhsDistance = lhs.captureDate.map { abs($0.timeIntervalSince(creationDate)) } ?? .greatestFiniteMagnitude
+            let rhsDistance = rhs.captureDate.map { abs($0.timeIntervalSince(creationDate)) } ?? .greatestFiniteMagnitude
+            return lhsDistance < rhsDistance
+        }
     }
     
     // MARK: - Retry helper
@@ -264,14 +284,31 @@ final class ProcessedURLSet: @unchecked Sendable {
 
 private struct LockedCaptureSessionContent: Equatable {
     let assetIdentifiers: [String]
-    let filenames: [String]
+    let captureRecords: [LockedCaptureRecord]
     
     var hasContent: Bool {
-        !assetIdentifiers.isEmpty || !filenames.isEmpty
+        !assetIdentifiers.isEmpty || !captureRecords.isEmpty
     }
     
     var isReadyToProcess: Bool {
         guard !assetIdentifiers.isEmpty else { return false }
-        return filenames.isEmpty || assetIdentifiers.count >= filenames.count
+        return captureRecords.isEmpty || assetIdentifiers.count >= captureRecords.count
+    }
+}
+
+private struct LockedCaptureRecord: Equatable, Hashable, Sendable {
+    let filename: String
+    let captureDate: Date?
+    
+    nonisolated init?(line: String) {
+        let parts = line.split(separator: "|", maxSplits: 1).map(String.init)
+        guard let filename = parts.first, !filename.isEmpty else { return nil }
+        
+        self.filename = filename
+        if parts.count > 1, let milliseconds = Double(parts[1]) {
+            self.captureDate = Date(timeIntervalSince1970: milliseconds / 1000)
+        } else {
+            self.captureDate = nil
+        }
     }
 }

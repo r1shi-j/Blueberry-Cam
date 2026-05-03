@@ -25,14 +25,13 @@ extension LockedCameraModel: AVCapturePhotoCaptureDelegate {
             return
         }
         
-        let ext = isDNG ? "dng" : (isHEIF ? "heic" : "jpg")
-        let milliseconds = Int(Date().timeIntervalSince1970 * 1000)
-        let filename = "IMG_\(milliseconds)_\(UUID().uuidString.prefix(8)).\(ext)"
+        let captureDate = Date()
+        let filename = Self.nextLockedCaptureFilename(sessionURL: sessionURL, isDNG: isDNG, isHEIF: isHEIF)
         let fileURL = sessionURL.appendingPathComponent(filename)
         
         do {
             try data.write(to: fileURL)
-            Self.appendToCaptureList(filename: filename, sessionURL: sessionURL)
+            Self.appendToCaptureList(filename: filename, captureDate: captureDate, sessionURL: sessionURL)
         } catch {
             Task { @MainActor in self.errorMessage = error.localizedDescription; self.showError = true }
             // Still attempt to save directly to Photos even if the session file write fails.
@@ -92,8 +91,9 @@ extension LockedCameraModel: AVCapturePhotoCaptureDelegate {
     }
     
     /// Appends a captured filename to a lightweight recovery list before PhotoKit finishes.
-    private nonisolated static func appendToCaptureList(filename: String, sessionURL: URL) {
-        appendLine(filename, to: "captures.txt", sessionURL: sessionURL)
+    private nonisolated static func appendToCaptureList(filename: String, captureDate: Date, sessionURL: URL) {
+        let milliseconds = Int(captureDate.timeIntervalSince1970 * 1000)
+        appendLine("\(filename)|\(milliseconds)", to: "captures.txt", sessionURL: sessionURL)
     }
     
     private nonisolated static func appendLine(_ line: String, to fileName: String, sessionURL: URL) {
@@ -128,6 +128,105 @@ extension LockedCameraModel: AVCapturePhotoCaptureDelegate {
     // MARK: - Static storage for per-session manifest queues
     // Using a simple Lock wrapper to avoid importing Synchronization on older toolchains.
     private nonisolated static let manifestQueues = ManifestQueueRegistry()
+    private nonisolated static let lockedFilenameLock = NSLock()
+    private nonisolated static let lockedFilenameCounterKey = "lockedCaptureFilenameCounter"
+    private nonisolated static let lockedFilenameExtensions = ["jpg", "jpeg", "heic", "dng"]
+    
+    private nonisolated static func nextLockedCaptureFilename(sessionURL: URL, isDNG: Bool, isHEIF: Bool) -> String {
+        lockedFilenameLock.lock()
+        defer { lockedFilenameLock.unlock() }
+        
+        let defaults = UserDefaults.standard
+        let storedCounter = defaults.object(forKey: lockedFilenameCounterKey) as? Int ?? 0
+        var counter = max(
+            storedCounter,
+            nextCounterAfterExistingLockedCaptures(in: sessionURL),
+            nextCounterAfterRecentPhotoLibraryAssets()
+        )
+        
+        while true {
+            let stem = lockedFileStem(for: counter)
+            if !lockedFileStemExists(stem, in: sessionURL) {
+                defaults.set(counter + 1, forKey: lockedFilenameCounterKey)
+                return "\(stem).\(fileExtension(isDNG: isDNG, isHEIF: isHEIF))"
+            }
+            counter += 1
+        }
+    }
+    
+    private nonisolated static func nextCounterAfterExistingLockedCaptures(in sessionURL: URL) -> Int {
+        let urls = (try? FileManager.default.contentsOfDirectory(
+            at: sessionURL,
+            includingPropertiesForKeys: nil,
+            options: [.skipsHiddenFiles]
+        )) ?? []
+        
+        let highestCounter = urls.compactMap(lockedCounter).max()
+        return highestCounter.map { $0 + 1 } ?? 0
+    }
+    
+    private nonisolated static func nextCounterAfterRecentPhotoLibraryAssets() -> Int {
+        let status = PHPhotoLibrary.authorizationStatus(for: .readWrite)
+        guard status == .authorized || status == .limited else { return 0 }
+        
+        let options = PHFetchOptions()
+        options.fetchLimit = 1_000
+        options.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]
+        options.predicate = NSPredicate(format: "mediaType == %d", PHAssetMediaType.image.rawValue)
+        
+        let assets = PHAsset.fetchAssets(with: options)
+        var highestCounter: Int?
+        assets.enumerateObjects { asset, _, _ in
+            for resource in PHAssetResource.assetResources(for: asset) {
+                guard let counter = lockedCounter(fromFilename: resource.originalFilename) else { continue }
+                highestCounter = max(highestCounter ?? counter, counter)
+            }
+        }
+        
+        return highestCounter.map { $0 + 1 } ?? 0
+    }
+    
+    private nonisolated static func lockedCounter(for url: URL) -> Int? {
+        guard lockedFilenameExtensions.contains(url.pathExtension.lowercased()) else { return nil }
+        return lockedCounter(fromFilename: url.lastPathComponent)
+    }
+    
+    private nonisolated static func lockedCounter(fromFilename filename: String) -> Int? {
+        let url = URL(fileURLWithPath: filename)
+        guard lockedFilenameExtensions.contains(url.pathExtension.lowercased()) else { return nil }
+        
+        var stem = url.deletingPathExtension().lastPathComponent
+        if stem.hasSuffix("_LC") {
+            stem.removeLast(3)
+        }
+        guard stem.hasPrefix("IMG_") else { return nil }
+        
+        let suffix = stem.dropFirst(4)
+        guard !suffix.isEmpty, suffix.allSatisfy(\.isNumber) else { return nil }
+        return Int(suffix)
+    }
+    
+    private nonisolated static func lockedFileStemExists(_ stem: String, in sessionURL: URL) -> Bool {
+        lockedFilenameExtensions.contains { fileExtension in
+            FileManager.default.fileExists(atPath: sessionURL.appendingPathComponent("\(stem).\(fileExtension)").path)
+        }
+    }
+    
+    private nonisolated static func lockedFileStem(for counter: Int) -> String {
+        let digits = String(max(0, counter))
+        let padding = String(repeating: "0", count: max(0, 4 - digits.count))
+        return "IMG_\(padding)\(digits)_LC"
+    }
+    
+    private nonisolated static func fileExtension(isDNG: Bool, isHEIF: Bool) -> String {
+        if isDNG {
+            return "dng"
+        } else if isHEIF {
+            return "heic"
+        } else {
+            return "jpg"
+        }
+    }
 }
 
 // MARK: - Thread-safe dictionary for manifest serial queues

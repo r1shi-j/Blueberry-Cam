@@ -11,5 +11,7 @@
 	<array>
 		<string>com.jansari.rishi.blueberrycam.opencamera</string>
 	</array>
+	<key>PHPhotoLibraryPreventAutomaticLimitedAccessAlert</key>
+	<true/>
 </dict>
 </plist>
