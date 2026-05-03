@@ -49,6 +49,7 @@ struct BlueberryCamApp: App {
 // Localise for all iPhones iOS 26+
 // Add tips, welcome screen and tutorials
 
+// Implement 3rd row on TopBarView: Macro, ***dual cam***, (raw) burst, flash, timer buttons
 // ProRaw
 // Live filter preview
 // View outside frame
@@ -60,7 +61,5 @@ struct BlueberryCamApp: App {
 // photos on locked camera have xlong file name
 
 // MARK: - Next Steps
-// Implement 3rd row on TopBarView: Macro, ***dual cam***, (raw) burst, flash, timer buttons
-
 // Finalise Main app cleanup
 // update locked camera

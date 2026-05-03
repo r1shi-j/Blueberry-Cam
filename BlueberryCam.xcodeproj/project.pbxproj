@@ -72,7 +72,7 @@
 		5B152EA62F6941640057691D /* Exceptions for "BlueberryCam" folder in "BlueberryCamWidgetExtension" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
-				Models/SharedIDs.swift,
+				Models/Shared/BundleIDs.swift,
 			);
 			target = 5B5FC8502F64B32E00532B15 /* BlueberryCamWidgetExtension */;
 		};
@@ -86,9 +86,18 @@
 		5B5FC8432F64A9D700532B15 /* Exceptions for "BlueberryCam" folder in "BlueberryCamCapture" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
-				Models/SharedIDs.swift,
-				Models/SharedTypes.swift,
+				Models/Shared/BundleIDs.swift,
+				Models/Shared/CaptureMode.swift,
+				Models/Shared/Constants.swift,
+				Models/Shared/FloatExtension.swift,
+				Models/Shared/Lens.swift,
+				Models/Shared/ManualControl.swift,
+				Models/Shared/ResolutionOption.swift,
+				Models/Shared/ThreadSafe.swift,
+				Models/Shared/TimerMode.swift,
 				Views/Components/CameraPreviewView.swift,
+				Views/Components/Shared/ManualRulerView.swift,
+				Views/Components/Shared/ShutterButton.swift,
 				Views/Overlays/FocusReticleView.swift,
 			);
 			target = 5B5FC82B2F648F8E00532B15 /* BlueberryCamCapture */;
@@ -503,15 +512,15 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "BlueberryCam-Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = "Blueberry Cam";
-				INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace = YES;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.photography";
+				INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace = YES;
 				INFOPLIST_KEY_NSCameraUsageDescription = "Blueberry Cam needs access to your camera to capture photos.";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Your location is used to add GPS coordinates to photos you take.";
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "Blueberry Cam will save photos directly to your photo library.";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Blueberry Cam needs access to your photo library to save photos to your Blueberry Cam album.";
 				INFOPLIST_KEY_PHPhotoLibraryPreventAutomaticLimitedAccessAlert = YES;
-				INFOPLIST_KEY_UIFileSharingEnabled = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UIFileSharingEnabled = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
@@ -547,15 +556,15 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "BlueberryCam-Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = "Blueberry Cam";
-				INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace = YES;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.photography";
+				INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace = YES;
 				INFOPLIST_KEY_NSCameraUsageDescription = "Blueberry Cam needs access to your camera to capture photos.";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Your location is used to add GPS coordinates to photos you take.";
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "Blueberry Cam will save photos directly to your photo library.";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Blueberry Cam needs access to your photo library to save photos to your Blueberry Cam album.";
 				INFOPLIST_KEY_PHPhotoLibraryPreventAutomaticLimitedAccessAlert = YES;
-				INFOPLIST_KEY_UIFileSharingEnabled = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UIFileSharingEnabled = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
