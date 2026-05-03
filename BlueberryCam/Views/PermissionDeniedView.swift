@@ -1,6 +1,8 @@
 import SwiftUI
 
 struct PermissionDeniedView: View {
+    @Environment(\.openURL) private var openURL
+    
     let cameraGranted: Bool
     let photosGranted: Bool
     let requiresPhotos: Bool
@@ -38,7 +40,7 @@ struct PermissionDeniedView: View {
                 
                 Button {
                     guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
-                    UIApplication.shared.open(url)
+                    openURL(url)
                 } label: {
                     Text("Open Settings")
                         .font(.system(size: 16, weight: .bold))

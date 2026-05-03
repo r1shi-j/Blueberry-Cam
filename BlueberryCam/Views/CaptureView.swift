@@ -384,7 +384,7 @@ extension CaptureView {
                         .padding(8)
                         .glassEffect()
                     Button {
-                        UIApplication.shared.open(url)
+                        openURL(url)
                         cameraModel.ignoreCurrentCode()
                     } label: {
                         HStack(spacing: 8) {
@@ -848,6 +848,7 @@ extension CaptureView {
 
 struct CaptureView: View {
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.openURL) private var openURL
     
     @Binding var appBackgroundColorIndex: Int
     @Binding var shutterCount: Int
@@ -1066,7 +1067,7 @@ extension CaptureView {
     private func handleOnRecieveShake(_: Notification) {
         guard !cameraModel.isBurstCapturing else { return }
         if let url = cameraModel.detectedCodeURL {
-            UIApplication.shared.open(url)
+            openURL(url)
             cameraModel.ignoreCurrentCode()
         }
     }

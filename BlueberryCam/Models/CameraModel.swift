@@ -1,7 +1,6 @@
 internal import AVFoundation
 internal import CoreLocation
 internal import Photos
-import UIKit
 
 @MainActor @Observable
 class CameraModel: NSObject, AVCaptureSessionControlsDelegate {

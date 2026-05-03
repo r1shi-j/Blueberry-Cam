@@ -4,6 +4,8 @@ import UniformTypeIdentifiers
 
 struct SettingsView: View {
     @Environment(\.dismiss) var dismiss
+    @Environment(\.openURL) private var openURL
+    
     @Bindable var cameraModel: CameraModel
     @Binding var appBackgroundColorIndex: Int
     @Binding var shutterCount: Int
@@ -409,7 +411,7 @@ struct SettingsView: View {
         let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "?"
         let build = Bundle.main.object(forInfoDictionaryKey: kCFBundleVersionKey as String) as? String ?? "?"
         let model = UIDevice.current.model
-        let os = "\(UIDevice.current.systemName) \(UIDevice.current.systemVersion)"
+        let os = "\(ProcessInfo.processInfo.operatingSystemVersionString)"
         
         let body = """
     ————————————————————————
@@ -424,7 +426,7 @@ struct SettingsView: View {
             .addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
         
         if let url = URL(string: "mailto:rishi_j@icloud.com?subject=\(encodedSubject)&body=\(encodedBody)") {
-            UIApplication.shared.open(url)
+            openURL(url)
         }
     }
 }
