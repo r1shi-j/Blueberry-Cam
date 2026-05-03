@@ -1,10 +1,8 @@
 import LockedCameraCapture
-internal import Photos
 import SwiftUI
 
+// MARK: - Functions
 extension LockedCaptureView {
-    private var errorString: String { "Error" }
-    private var okButtonString: String { "OK" }
     private var tapHoldDuration: TimeInterval { 0.7 }
     private var tapMoveTolerance: CGFloat { 18 }
     private var focusReticleSliderXTolerance: CGFloat { 24 }
@@ -129,6 +127,263 @@ extension LockedCaptureView {
         }
     }
     
+    private func manualControlColor(for control: ManualControl) -> Color {
+        switch control {
+            case .ev: .orange.opacity(0.85)
+            case .iso: .yellow.opacity(0.85)
+            case .ss: .white.opacity(0.85)
+            case .f: .green.opacity(0.85)
+            case .wb: .cyan.opacity(0.85)
+        }
+    }
+    
+    private var manualRulerTickColor: Color {
+        cameraModel.isViewfinderBright ? .black.opacity(0.72) : .white.opacity(0.92)
+    }
+    
+    private var manualRulerCenterTickColor: Color {
+        cameraModel.isViewfinderBright ? .black : .white
+    }
+    
+    private var manualRulerCenterTickShadowColor: Color {
+        cameraModel.isViewfinderBright ? .white.opacity(0.28) : .black.opacity(0.35)
+    }
+}
+
+// MARK: Subviews
+extension LockedCaptureView {
+    // MARK: - Background Color
+    private func backgroundColor() -> some View {
+        Color.black.ignoresSafeArea()
+    }
+    
+    // MARK: - Viewfinder
+    private func viewFinder(_ previewRect: CGRect) -> some View {
+        CameraPreviewView(session: cameraModel.session, onCapture: {
+            cameraModel.capturePhoto {
+                triggerShutterFeedback()
+                withAnimation { cameraModel.changeCapturingState(to: true) }
+                Task { @MainActor in
+                    try? await Task.sleep(for: Durations.shutter)
+                    withAnimation { cameraModel.changeCapturingState(to: false) }
+                }
+            }
+        }, proxy: previewProxy)
+        .scaleEffect(visualZoomScale)
+        .blur(radius: visualBlur)
+        .opacity(visualOpacity)
+        .frame(width: previewRect.width, height: previewRect.height)
+        .position(x: previewRect.midX, y: previewRect.midY)
+        .allowsHitTesting(!cameraModel.isTimerCountingDown)
+        .gesture(
+            DragGesture(minimumDistance: 0)
+                .onChanged { value in
+                    if previewInteractionStartPoint == nil {
+                        beginPreviewInteraction(at: value.startLocation)
+                    }
+                    updatePreviewInteraction(at: value.location)
+                }
+                .onEnded { value in
+                    endPreviewInteraction(at: value.location)
+                }
+        )
+    }
+    
+    // MARK: - Tap to focus overlay
+    @ViewBuilder
+    private func focusBox() -> some View {
+        if cameraModel.isTapFocusIndicatorVisible, let indicatorPoint = cameraModel.tapFocusIndicatorPoint {
+            FocusReticleView(
+                lockLabel: cameraModel.tapFocusLockLabel,
+                exposureOffset: cameraModel.tapFocusIndicatorOffset,
+                showsExposureHandle: cameraModel.canAdjustTapPointExposureBias,
+                isDimmed: cameraModel.isTapFocusIndicatorDimmed
+            )
+            .position(indicatorPoint)
+            .transition(.opacity)
+        }
+    }
+    
+    // MARK: - Focus lock overlay
+    @ViewBuilder
+    private func focusLock(_ previewRect: CGRect) -> some View {
+        ZStack {
+            if let lockLabel = cameraModel.tapFocusLockLabel {
+                Text(lockLabel)
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(.yellow)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(.black.opacity(0.55), in: .capsule)
+                    .position(x: previewRect.midX, y: previewRect.midY - previewRect.height / 2 + 20)
+                    .transition(.opacity)
+            }
+        }
+        .animation(Animations.bouncy, value: cameraModel.tapFocusLockLabel)
+    }
+    
+    // MARK: - Manual control rulers
+    @ViewBuilder
+    private func manualControlOverlays(in previewRect: CGRect) -> some View {
+        ZStack {
+            if !cameraModel.showSimpleView, let selectedControl {
+                if selectedControl == .iso || selectedControl == .ss {
+                    manualISOOverlay(in: previewRect)
+                }
+                
+                switch selectedControl {
+                    case .ev:
+                        manualTrailingOverlay(
+                            title: "EV",
+                            color: manualControlColor(for: .ev),
+                            value: Binding(
+                                get: { cameraModel.exposureBias },
+                                set: { cameraModel.setExposureBias($0) }
+                            ),
+                            range: -LockedCameraModel.minEV...LockedCameraModel.maxEV,
+                            step: 0.1,
+                            majorTickStride: 5,
+                            accessibilityLabel: "Exposure value",
+                            previewRect: previewRect
+                        )
+                    case .f:
+                        manualTrailingOverlay(
+                            title: "F",
+                            color: manualControlColor(for: .f),
+                            value: Binding(
+                                get: { cameraModel.lensPosition },
+                                set: { cameraModel.setManualFocusPosition($0) }
+                            ),
+                            range: 0...1,
+                            step: 0.01,
+                            majorTickStride: 10,
+                            accessibilityLabel: "Focus",
+                            previewRect: previewRect
+                        )
+                    case .wb:
+                        manualTrailingOverlay(
+                            title: "WB",
+                            color: manualControlColor(for: .wb),
+                            value: Binding(
+                                get: { cameraModel.whiteBalanceTargetKelvin },
+                                set: { cameraModel.setWhiteBalanceTargetKelvin($0) }
+                            ),
+                            range: LockedCameraModel.minWhiteBalance...LockedCameraModel.maxWhiteBalance,
+                            step: 100,
+                            majorTickStride: 5,
+                            accessibilityLabel: "White balance",
+                            previewRect: previewRect
+                        )
+                    case .iso, .ss:
+                        manualTrailingOverlay(
+                            title: "SS",
+                            color: manualControlColor(for: .ss),
+                            value: Binding(
+                                get: { Float(cameraModel.shutterIndex) },
+                                set: { cameraModel.setManualShutterIndex($0) }
+                            ),
+                            range: 0...cameraModel.maxShutterIndex,
+                            step: 1,
+                            majorTickStride: 4,
+                            accessibilityLabel: "Shutter speed",
+                            previewRect: previewRect
+                        )
+                }
+            }
+        }
+        .animation(Animations.manualControlShown, value: selectedControl)
+    }
+    
+    private func manualISOOverlay(in previewRect: CGRect) -> some View {
+        VStack(spacing: 4) {
+            ManualRulerView(
+                value: Binding(
+                    get: { cameraModel.isoStopIndex },
+                    set: { cameraModel.setManualISOStopIndex($0) }
+                ),
+                range: 0...cameraModel.maxISOStopIndex,
+                step: 1,
+                axis: .horizontal,
+                majorTickStride: 4,
+                accessibilityLabel: "ISO",
+                tickColor: manualRulerTickColor,
+                centerTickColor: manualRulerCenterTickColor,
+                centerTickShadowColor: manualRulerCenterTickShadowColor
+            )
+            .frame(width: previewRect.width * 0.78, height: 70)
+            
+            Text("ISO")
+                .font(Fonts.manualLabel)
+                .foregroundStyle(manualControlColor(for: .iso))
+                .tracking(2)
+        }
+        .frame(width: previewRect.width, height: previewRect.height, alignment: .top)
+        .padding(.top, 14)
+        .position(x: previewRect.midX, y: previewRect.midY)
+        .transition(
+            .asymmetric(
+                insertion: .scale(scale: 0.72, anchor: .top)
+                    .combined(with: .opacity)
+                    .animation(.smooth(duration: 0.42)),
+                removal: .scale(scale: 0.72, anchor: .top)
+                    .combined(with: .opacity)
+                    .animation(.smooth(duration: 0.38))
+            )
+        )
+    }
+    
+    private func manualTrailingOverlay(
+        title: String,
+        color: Color,
+        value: Binding<Float>,
+        range: ClosedRange<Float>,
+        step: Float,
+        majorTickStride: Int,
+        accessibilityLabel: String,
+        previewRect: CGRect
+    ) -> some View {
+        HStack(spacing: 10) {
+            Text(title)
+                .font(Fonts.manualLabel)
+                .foregroundStyle(color)
+                .tracking(2)
+            
+            ManualRulerView(
+                value: value,
+                range: range,
+                step: step,
+                axis: .vertical,
+                majorTickStride: majorTickStride,
+                accessibilityLabel: accessibilityLabel,
+                tickColor: manualRulerTickColor,
+                centerTickColor: manualRulerCenterTickColor,
+                centerTickShadowColor: manualRulerCenterTickShadowColor
+            )
+            .frame(width: 70, height: previewRect.height * 0.72)
+        }
+        .frame(width: previewRect.width, height: previewRect.height, alignment: .trailing)
+        .padding(.trailing, 14)
+        .position(x: previewRect.midX, y: previewRect.midY)
+        .transition(.move(edge: .trailing).combined(with: .opacity))
+    }
+    
+    // MARK: - Top Bar View
+    private func topBarView() -> some View {
+        LockedTopBarView(cameraModel: cameraModel, selectedControl: $selectedControl)
+            .offset(y:-2)
+    }
+    
+    // MARK: - Bottom Bar View
+    private func bottomBarView() -> some View {
+        LockedBottomBarView(
+            cameraModel: cameraModel,
+            lockedSession: lockedSession,
+            onShutterFeedback: triggerShutterFeedback
+        )
+        .padding(.bottom, 30)
+    }
+    
+    // MARK: - Timer countdown
     @ViewBuilder
     private func timerCountdownOverlay(in previewRect: CGRect) -> some View {
         if cameraModel.isTimerCountingDown {
@@ -145,21 +400,92 @@ extension LockedCaptureView {
                         .transition(countdownTextTransition)
                 }
             }
-            .animation(.spring(response: 0.45, dampingFraction: 0.8), value: cameraModel.isTimerCountingDown)
-            .animation(.easeInOut(duration: 0.12), value: cameraModel.timerCountdownValue)
+            .animation(Animations.timerShown, value: cameraModel.isTimerCountingDown)
+            .animation(Animations.timerCountdown, value: cameraModel.timerCountdownValue)
+        }
+    }
+    
+    // MARK: - Capture flash
+    @ViewBuilder
+    private func captureFlash(_ previewRect: CGRect) -> some View {
+        if cameraModel.isCapturing {
+            Color.white.opacity(0.3)
+                .frame(width: previewRect.width, height: previewRect.height)
+                .position(x: previewRect.midX, y: previewRect.midY)
+                .animation(Animations.captureFlash, value: cameraModel.isCapturing)
+        }
+    }
+    
+    // MARK: - Camera Content
+    private func cameraContent() -> some View {
+        GeometryReader { geo in
+            let previewRect = makePreviewRect(in: geo)
+            
+            ZStack {
+                backgroundColor()
+                
+                ZStack {
+                    viewFinder(previewRect)
+                    
+                    if !cameraModel.showSimpleView {
+                        focusBox()
+                        focusLock(previewRect)
+                    }
+                    
+                    manualControlOverlays(in: previewRect)
+                }
+                
+                VStack(spacing: 0) {
+                    if !cameraModel.showSimpleView {
+                        topBarView()
+                            .transition(.opacity)
+                    }
+                    Spacer()
+                    
+                    bottomBarView()
+                }
+                
+                .allowsHitTesting(!cameraModel.isTimerCountingDown)
+                .animation(Animations.easeInOut, value: cameraModel.showSimpleView)
+                
+                timerCountdownOverlay(in: previewRect)
+                captureFlash(previewRect)
+            }
+        }
+    }
+    
+    // MARK: - App Content
+    private func appContent() -> some View {
+        ZStack {
+            cameraContent()
+                .disabled(!cameraModel.hasPhotosAccess)
+            
+            // MARK: - Photos Permission Denied Overlay
+            if !cameraModel.hasPhotosAccess {
+                LockedPermissionDeniedView {
+                    Task {
+                        let activity = NSUserActivity(activityType: "\(BundleIDs.fullBundleID).opencamera")
+                        try? await lockedSession.openApplication(for: activity)
+                    }
+                }
+            }
         }
     }
 }
 
 struct LockedCaptureView: View {
+    @Environment(\.scenePhase) private var scenePhase
+    
     let lockedSession: LockedCameraCaptureSession
     
     @State private var cameraModel = LockedCameraModel()
     @State private var levelModel = LockedLevelMotionModel()
     @State private var selectedControl: ManualControl?
+    @State private var hasConfiguredCamera = false
     
     // Haptics
     @State private var hapticTrigger = 0
+    @State private var countdownHapticTrigger = 0
     
     // Preview focus
     @State private var previewProxy = PreviewViewProxy()
@@ -176,197 +502,95 @@ struct LockedCaptureView: View {
     @State private var visualOpacity: CGFloat = 1.0
     @State private var isAwaitingSameFacingLensCompletion = false
     
-    private var cameraContent: some View {
-        GeometryReader { geo in
-            let previewRect = makePreviewRect(in: geo)
-            
-            ZStack {
-                Color.black.ignoresSafeArea()
-                
-                // MARK: - Viewfinder
-                CameraPreviewView(session: cameraModel.session, onCapture: {
-                    cameraModel.capturePhoto {
-                        withAnimation { cameraModel.changeCapturingState(to: true) }
-                        Task { @MainActor in
-                            try? await Task.sleep(for: .milliseconds(150))
-                            withAnimation { cameraModel.changeCapturingState(to: false) }
-                        }
-                    }
-                }, proxy: previewProxy)
-                .scaleEffect(visualZoomScale)
-                .blur(radius: visualBlur)
-                .opacity(visualOpacity)
-                .frame(width: previewRect.width, height: previewRect.height)
-                .position(x: previewRect.midX, y: previewRect.midY)
-                .allowsHitTesting(!cameraModel.isTimerCountingDown)
-                .gesture(
-                    DragGesture(minimumDistance: 0)
-                        .onChanged { value in
-                            if previewInteractionStartPoint == nil {
-                                beginPreviewInteraction(at: value.startLocation)
-                            }
-                            updatePreviewInteraction(at: value.location)
-                        }
-                        .onEnded { value in
-                            endPreviewInteraction(at: value.location)
-                        }
-                )
-                
-                // MARK: - Tap to focus overlay
-                if cameraModel.isTapFocusIndicatorVisible, let indicatorPoint = cameraModel.tapFocusIndicatorPoint {
-                    FocusReticleView(
-                        lockLabel: cameraModel.tapFocusLockLabel,
-                        exposureOffset: cameraModel.tapFocusIndicatorOffset,
-                        showsExposureHandle: cameraModel.canAdjustTapPointExposureBias,
-                        isDimmed: cameraModel.isTapFocusIndicatorDimmed
-                    )
-                    .position(indicatorPoint)
-                    .transition(.opacity)
-                }
-                
-                // MARK: - Focus lock overlay
-                ZStack {
-                    if let lockLabel = cameraModel.tapFocusLockLabel {
-                        Text(lockLabel)
-                            .font(.system(size: 12, weight: .bold))
-                            .foregroundStyle(.yellow)
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 6)
-                            .background(.black.opacity(0.55), in: .capsule)
-                            .position(x: previewRect.midX, y: previewRect.midY - previewRect.height / 2 + 20)
-                            .transition(.opacity)
-                    }
-                }
-                .animation(.bouncy, value: cameraModel.tapFocusLockLabel)
-                
-                // MARK: - UI Overlays
-                VStack(spacing: 0) {
-                    if !cameraModel.showSimpleView {
-                        VStack(spacing: 0) {
-                            LockedTopBarView(cameraModel: cameraModel, selectedControl: $selectedControl)
-                                .offset(y:-2)
-                            
-                            Spacer()
-                            
-                            if let selectedControl {
-                                LockedManualControlsView(cameraModel: cameraModel, control: selectedControl)
-                                    .padding(.bottom, 30)
-                            }
-                            
-                            LockedBottomBarView(cameraModel: cameraModel, lockedSession: lockedSession)
-                                .padding(.bottom, 30)
-                        }
-                        .transition(.opacity)
-                    }
-                }
-                .allowsHitTesting(!cameraModel.isTimerCountingDown)
-                .animation(.easeInOut(duration: 0.2), value: cameraModel.showSimpleView)
-                
-                // MARK: - Timer countdown
-                timerCountdownOverlay(in: previewRect)
-                
-                // MARK: - Capture flash
-                if cameraModel.isCapturing {
-                    Color.white.opacity(0.3)
-                        .frame(width: previewRect.width, height: previewRect.height)
-                        .position(x: previewRect.midX, y: previewRect.midY)
-                        .animation(.easeOut(duration: 0.15), value: cameraModel.isCapturing)
-                }
+    var body: some View {
+        appContent()
+            .sensoryFeedback(.impact, trigger: hapticTrigger)
+            .sensoryFeedback(.selection, trigger: countdownHapticTrigger)
+            .sensoryFeedback(.impact(flexibility: .soft), trigger: cameraModel.tap​Focus​Lock​Haptic​Trigger)
+            .onAppear(perform: handleOnAppear)
+            .onDisappear(perform: handleOnDisappear)
+            .onChange(of: scenePhase, handleOnChangeOfScenePhase)
+            .onChange(of: cameraModel.activeLens, handleOnChangeOfActiveLens)
+            .onChange(of: cameraModel.lensSwitchCompletionCount, handleOnChangeOfLensSwitchCount)
+            .alert(Alerts.error, isPresented: $cameraModel.showError) {
+                Button(Alerts.ok, role: .cancel) {}
+            } message: {
+                Text(cameraModel.errorMessage)
+            }
+    }
+}
+
+// MARK: - On Change functions
+extension LockedCaptureView {
+    private func triggerShutterFeedback() {
+        hapticTrigger += 1
+    }
+    
+    private func triggerCountdownFeedback() {
+        countdownHapticTrigger += 1
+    }
+    
+    private func handleOnAppear() {
+        cameraModel.onTimerCountdownSecond = triggerCountdownFeedback
+        configureCameraIfPermitted()
+        levelModel.startUpdates()
+        
+        levelModel.onGravityUpdate = { gx, gy, gz in
+            cameraModel.lastGravity = (gx, gy, gz)
+        }
+    }
+    
+    private func handleOnDisappear() {
+        cameraModel.cancelTimerCountdown()
+        cameraModel.onTimerCountdownSecond = nil
+        levelModel.stopUpdates()
+        cameraModel.stopSession()
+        cameraModel.clearTapPointInteraction(resetDeviceState: false)
+    }
+    
+    private func configureCameraIfPermitted() {
+        guard cameraModel.hasPhotosAccess else { return }
+        
+        if hasConfiguredCamera {
+            cameraModel.startSession()
+        } else {
+            hasConfiguredCamera = true
+            cameraModel.configure(with: lockedSession)
+        }
+    }
+    
+    private func handleOnChangeOfScenePhase(_ oldPhase: ScenePhase, _ newPhase: ScenePhase) {
+        guard newPhase == .active else { return }
+        
+        configureCameraIfPermitted()
+    }
+    
+    private func handleOnChangeOfActiveLens(_ oldLens: Lens, _ newLens: Lens) {
+        cameraModel.clearTapPointInteraction(resetDeviceState: false)
+        // Handle visual "zoom" bump to mask lens hardware switch
+        if oldLens.isFront == newLens.isFront {
+            // Use a light zoom/blur mask for same-facing lens changes.
+            isAwaitingSameFacingLensCompletion = true
+            let oldValue = Double(oldLens.label) ?? 1.0
+            let newValue = Double(newLens.label) ?? 1.0
+            let isZoomIn = newValue > oldValue
+            let targetScale: CGFloat = isZoomIn ? 1.035 : 0.965
+            withAnimation(.easeIn(duration: 0.15)) {
+                visualZoomScale = targetScale
+                visualOpacity = 0.62
+                visualBlur = 6
             }
         }
     }
     
-    var body: some View {
-        ZStack {
-            cameraContent
-                .disabled(!cameraModel.hasPhotosAccess)
-            
-            // MARK: - Photos Permission Denied Overlay
-            if !cameraModel.hasPhotosAccess {
-                ZStack {
-                    Color.black.opacity(0.85).ignoresSafeArea()
-                    
-                    VStack(spacing: 20) {
-                        Image(systemName: "photo.badge.exclamationmark")
-                            .font(.system(size: 48))
-                            .foregroundStyle(.white)
-                        
-                        Text("Photos Access Required")
-                            .font(.system(size: 18, weight: .bold))
-                            .foregroundStyle(.white)
-                        
-                        Text("Blueberry Cam needs permission to save photos.")
-                            .font(.system(size: 14))
-                            .foregroundStyle(.white.opacity(0.7))
-                            .multilineTextAlignment(.center)
-                            .padding(.horizontal, 32)
-                        
-                        Button {
-                            Task {
-                                let activity = NSUserActivity(activityType: "\(BundleIDs.fullBundleID).opencamera")
-                                try? await lockedSession.openApplication(for: activity)
-                            }
-                        } label: {
-                            Text("Open App to Grant Access")
-                                .font(.system(size: 15, weight: .semibold))
-                                .foregroundStyle(.black)
-                                .padding(.horizontal, 24)
-                                .padding(.vertical, 12)
-                                .background(.white)
-                                .clipShape(.capsule)
-                        }
-                    }
-                }
-                .transition(.opacity)
+    private func handleOnChangeOfLensSwitchCount() {
+        if isAwaitingSameFacingLensCompletion {
+            isAwaitingSameFacingLensCompletion = false
+            withAnimation(.easeOut(duration: 0.22)) {
+                visualZoomScale = 1.0
+                visualBlur = 0
+                visualOpacity = 1.0
             }
-        }
-        .environment(\.scenePhase, .active)
-        .sensoryFeedback(.impact, trigger: hapticTrigger)
-        .sensoryFeedback(.impact(flexibility: .soft), trigger: cameraModel.tap​Focus​Lock​Haptic​Trigger)
-        .onAppear {
-            cameraModel.configure(with: lockedSession)
-            levelModel.startUpdates()
-            
-            // Pass gravity updates to camera model
-            levelModel.onGravityUpdate = { gx, gy, gz in
-                cameraModel.lastGravity = (gx, gy, gz)
-            }
-        }
-        .onDisappear {
-            levelModel.stopUpdates()
-            cameraModel.clearTapPointInteraction(resetDeviceState: false)
-        }
-        .onChange(of: cameraModel.activeLens) { oldLens, newLens in
-            cameraModel.clearTapPointInteraction(resetDeviceState: false)
-            // Handle visual "zoom" bump to mask lens hardware switch
-            if oldLens.isFront == newLens.isFront {
-                // Use a light zoom/blur mask for same-facing lens changes.
-                isAwaitingSameFacingLensCompletion = true
-                let oldValue = Double(oldLens.label) ?? 1.0
-                let newValue = Double(newLens.label) ?? 1.0
-                let isZoomIn = newValue > oldValue
-                let targetScale: CGFloat = isZoomIn ? 1.035 : 0.965
-                withAnimation(.easeIn(duration: 0.14)) {
-                    visualZoomScale = targetScale
-                    visualOpacity = 0.72
-                    visualBlur = 6
-                }
-            }
-        }
-        .onChange(of: cameraModel.lensSwitchCompletionCount) {
-            if isAwaitingSameFacingLensCompletion {
-                isAwaitingSameFacingLensCompletion = false
-                withAnimation(.easeOut(duration: 0.22)) {
-                    visualZoomScale = 1.0
-                    visualBlur = 0
-                    visualOpacity = 1.0
-                }
-            }
-        }
-        .alert(errorString, isPresented: $cameraModel.showError) {
-            Button(okButtonString, role: .cancel) {}
-        } message: {
-            Text(cameraModel.errorMessage)
         }
     }
 }

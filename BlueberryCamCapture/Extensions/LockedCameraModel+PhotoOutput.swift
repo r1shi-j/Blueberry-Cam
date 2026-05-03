@@ -4,8 +4,23 @@ internal import Photos
 
 extension LockedCameraModel: AVCapturePhotoCaptureDelegate {
     nonisolated func photoOutput(_ output: AVCapturePhotoOutput,
+                                 willCapturePhotoFor resolvedSettings: AVCaptureResolvedPhotoSettings) {
+        guard let onCapture = _captureContextStore.context(for: resolvedSettings.uniqueID)?.onCapture else { return }
+        
+        Task { @MainActor in
+            onCapture()
+        }
+    }
+    
+    nonisolated func photoOutput(_ output: AVCapturePhotoOutput,
                                  didFinishProcessingPhoto photo: AVCapturePhoto,
                                  error: Error?) {
+        let uniqueID = photo.resolvedSettings.uniqueID
+        let context = _captureContextStore.removeContext(for: uniqueID) ?? LockedPhotoCaptureContext(
+            captureMode: _pendingCaptureModeBox.value,
+            onCapture: nil
+        )
+        
         if let error {
             Task { @MainActor in self.errorMessage = error.localizedDescription; self.showError = true }
             return
@@ -14,9 +29,23 @@ extension LockedCameraModel: AVCapturePhotoCaptureDelegate {
             Task { @MainActor in self.errorMessage = "Failed to get photo data."; self.showError = true }
             return
         }
-        let isHeif = !photo.isRawPhoto && _pendingCaptureModeBox.value == .heif
+        let isHeif = !photo.isRawPhoto && context.captureMode == .heif
         let url = _sessionContentURLBox.value
-        saveToSessionDirectory(data: data, isDNG: photo.isRawPhoto, isHEIF: isHeif, sessionURL: url)
+        Task {
+            saveToSessionDirectory(data: data, isDNG: photo.isRawPhoto, isHEIF: isHeif, sessionURL: url)
+        }
+    }
+    
+    nonisolated func photoOutput(_ output: AVCapturePhotoOutput,
+                                 didFinishCaptureFor resolvedSettings: AVCaptureResolvedPhotoSettings,
+                                 error: Error?) {
+        guard let error,
+              _captureContextStore.removeContext(for: resolvedSettings.uniqueID) != nil else { return }
+        
+        Task { @MainActor in
+            self.errorMessage = error.localizedDescription
+            self.showError = true
+        }
     }
     
     private nonisolated func saveToSessionDirectory(data: Data, isDNG: Bool, isHEIF: Bool, sessionURL: URL?) {

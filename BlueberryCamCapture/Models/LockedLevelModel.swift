@@ -1,5 +1,4 @@
 import CoreMotion
-import UIKit
 
 @MainActor @Observable
 final class LockedLevelMotionModel {
@@ -12,7 +11,6 @@ final class LockedLevelMotionModel {
     // MARK: - Lifecycle
     func startUpdates() {
         guard motionManager.isDeviceMotionAvailable else { return }
-        UIDevice.current.beginGeneratingDeviceOrientationNotifications()
         motionManager.deviceMotionUpdateInterval = updateInterval
         motionManager.startDeviceMotionUpdates(to: .main) { [weak self] motion, _ in
             guard let self, let motion else { return }
@@ -22,7 +20,6 @@ final class LockedLevelMotionModel {
     
     func stopUpdates() {
         motionManager.stopDeviceMotionUpdates()
-        UIDevice.current.endGeneratingDeviceOrientationNotifications()
     }
     
     // MARK: - Motion Processing

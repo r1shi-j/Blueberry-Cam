@@ -6,6 +6,7 @@ struct PhotoCaptureContext: Sendable {
     let saveLocation: SaveLocation
     let isBurst: Bool
     let burstSessionID: Int?
+    let onCapture: (@MainActor @Sendable () -> Void)?
 }
 
 struct BurstSaveStats {
@@ -209,4 +210,3 @@ final class BurstCaptureTracker: @unchecked Sendable {
         }
     }
 }
-

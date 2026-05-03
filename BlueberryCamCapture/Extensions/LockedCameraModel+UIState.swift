@@ -1,121 +1,10 @@
 internal import AVFoundation
+internal import CoreLocation
 import Foundation
 
 extension LockedCameraModel {
-    // MARK: - UI Controls
-    func switchLens(to lens: Lens) {
-        let lens = switchableLens(for: lens)
-        guard lens != activeLens, !lens.isFront else { return }
-        guard let previewCamera = AVCaptureDevice.default(lens.deviceType, for: .video, position: .back) else { return }
-        
-        // 1. Instant UI update to trigger animations and selection state
-        self.activeLens = lens
-        self.primeResolutionOptions(for: lens, device: previewCamera)
-        
-        // 2. Heavy hardware reconfiguration in background
-        sessionQueue.async { [weak self] in
-            guard let self else { return }
-            
-            self.session.beginConfiguration()
-            for input in self.session.inputs { self.session.removeInput(input) }
-            
-            guard let cam = AVCaptureDevice.default(lens.deviceType, for: .video, position: .back),
-                  let input = try? AVCaptureDeviceInput(device: cam),
-                  self.session.canAddInput(input) else {
-                self.session.commitConfiguration()
-                return
-            }
-            self.session.addInput(input)
-            
-            // Internal state that is non-observable can be set here
-            // But 'device' and others are @Observable, so move to MainActor Task
-            
-            // Zoom Factor (Hardware)
-            if lens.zoomFactor > 1.0 {
-                try? cam.lockForConfiguration()
-                cam.videoZoomFactor = lens.zoomFactor
-                cam.unlockForConfiguration()
-            }
-            
-            // Connection properties (Hardware)
-            for conn in [self.photoOutput.connection(with: .video),
-                         self.videoOutput.connection(with: .video)].compactMap({ $0 }) {
-                if conn.isVideoRotationAngleSupported(90) {
-                    conn.videoRotationAngle = 90
-                }
-            }
-            
-            self.session.commitConfiguration()
-            
-            // 3. Final synchronization back to UI state
-            Task { @MainActor in
-                self.device = cam
-                self.rotationCoordinator = AVCaptureDevice.RotationCoordinator(device: cam, previewLayer: nil)
-                self.configureSubjectAreaMonitoring(for: cam)
-                
-                if let largest = cam.activeFormat.supportedMaxPhotoDimensions.max(by: {
-                    Int($0.width) * Int($0.height) < Int($1.width) * Int($1.height)
-                }) {
-                    self.photoOutput.maxPhotoDimensions = largest
-                }
-                
-                self.buildAvailableFormats()
-                let previousShutterDuration: CMTime? = (!self.isAutoExposure && self.shutterSpeeds.indices.contains(self.shutterIndex)) ? self.shutterSpeeds[self.shutterIndex] : nil
-                self.updateDeviceRanges()
-                self.normalizeFlashModeForCurrentDevice()
-                self.enforceExposureModeConstraints()
-                
-                if self.isMacroEnabled && lens != .ultraWide {
-                    self.isMacroEnabled = false
-                }
-                if self.isMacroEnabled && lens == .ultraWide {
-                    self.applyMacroMode()
-                }
-                
-                self.reapplyManualSettingsAfterLensSwitch(previousShutterDuration: previousShutterDuration)
-                
-                if !cam.isLockingFocusWithCustomLensPositionSupported {
-                    self.isAutoFocus = true
-                }
-                self.applyPendingCaptureModeAfterLensSwitch()
-                self.lensSwitchCompletionCount += 1
-            }
-        }
-    }
-    
-    private func reapplyManualSettingsAfterLensSwitch(previousShutterDuration: CMTime?) {
-        if !isAutoExposure {
-            if let prevDuration = previousShutterDuration, !shutterSpeeds.isEmpty {
-                let prevSecs = CMTimeGetSeconds(prevDuration)
-                shutterIndex = shutterSpeeds.indices.min { a, b in
-                    abs(CMTimeGetSeconds(shutterSpeeds[a]) - prevSecs) < abs(CMTimeGetSeconds(shutterSpeeds[b]) - prevSecs)
-                } ?? 0
-            }
-            applyManualExposure()
-        } else {
-            setAutoExposure()
-        }
-        
-        if !isAutoFocus {
-            applyManualFocus()
-        } else {
-            setAutoFocus()
-        }
-        
-        if !isAutoWhiteBalance {
-            applyManualWhiteBalance()
-        } else {
-            setAutoWhiteBalance()
-        }
-    }
-    
-    func resetEV() {
-        exposureBias = 0.0
-    }
-    
-    func setCustomShutter(to val: Int) {
-        manualShutterDenominator = 0
-        shutterIndex = val
+    var showSimpleView: Bool {
+        isTimerCountingDown && shouldHideUIWhileCountingDown
     }
     
     func resetControl(for control: ManualControl) {
@@ -156,36 +45,6 @@ extension LockedCameraModel {
         }
         
         captureMode = mode
-    }
-    
-    func switchToRawCaptureMode() {
-        guard canSelectRawCaptureMode else { return }
-        
-        if !activeLens.preservesRawCaptureMode {
-            pendingCaptureModeAfterLensSwitch = .raw
-            switchLens(to: activeLens.rawFallbackLens)
-            return
-        }
-        captureMode = .raw
-    }
-    
-    private func applyPendingCaptureModeAfterLensSwitch() {
-        guard let pendingMode = pendingCaptureModeAfterLensSwitch else { return }
-        pendingCaptureModeAfterLensSwitch = nil
-        guard isFormatEnabled(pendingMode) else { return }
-        captureMode = pendingMode
-    }
-    
-    private func switchableLens(for lens: Lens) -> Lens {
-        if captureMode == .raw {
-            return lens.rawFallbackLens
-        }
-        
-        if isHighResolutionSelected {
-            return lens.highResolutionFallbackLens
-        }
-        
-        return lens
     }
     
     func cycleFlashMode() {
@@ -234,6 +93,39 @@ extension LockedCameraModel {
                 timerMode = .tenSeconds
             case .tenSeconds:
                 timerMode = .off
+        }
+    }
+    
+    func syncAutoRulerValues(
+        iso liveISO: Float,
+        exposureDuration: CMTime,
+        whiteBalanceTemperature: Float,
+        lensPosition liveLensPosition: Float
+    ) {
+        if isAutoExposure {
+            let nextISO = nearestISOStop(to: liveISO)
+            if abs(iso - nextISO) > 0.1 {
+                iso = nextISO
+            }
+            
+            if let nextShutterIndex = nearestShutterIndex(to: exposureDuration),
+               shutterIndex != nextShutterIndex {
+                shutterIndex = nextShutterIndex
+            }
+        }
+        
+        if isAutoWhiteBalance {
+            let nextWhiteBalance = snappedWhiteBalanceKelvin(whiteBalanceTemperature)
+            if abs(whiteBalanceTargetKelvin - nextWhiteBalance) >= 50 {
+                whiteBalanceTargetKelvin = nextWhiteBalance
+            }
+        }
+        
+        if isAutoFocus {
+            let nextLensPosition = snappedFocusPosition(liveLensPosition)
+            if abs(lensPosition - nextLensPosition) >= 0.005 {
+                lensPosition = nextLensPosition
+            }
         }
     }
 }

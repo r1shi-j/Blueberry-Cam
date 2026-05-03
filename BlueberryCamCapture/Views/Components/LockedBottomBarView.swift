@@ -1,13 +1,13 @@
 import LockedCameraCapture
 import SwiftUI
 
-extension LockedCameraModel {
-    fileprivate var shutterTint: Color {
-        captureMode == .raw ? .blue.mix(with: .mint, by: 0.5).opacity(0.4) : .white.opacity(0.2)
-    }
-}
-
 extension LockedBottomBarView {
+    // MARK: - Constants
+    private enum Style {
+        static let buttonHeight: CGFloat = 82
+    }
+    
+    // MARK: - Properties
     private var openString: String {
         "Open"
     }
@@ -18,65 +18,77 @@ extension LockedBottomBarView {
             try? await lockedSession.openApplication(for: activity)
         }
     }
+    
+    private var shutterTint: Color {
+        cameraModel.captureMode == .raw ? .blue.mix(with: .mint, by: 0.5).opacity(0.4) : .white.opacity(0.2)
+    }
+    
+    // MARK: Subviews
+    // MARK: - Main app shortcut
+    private func mainAppShortcut() -> some View {
+        Button(action: openMainApp) {
+            Image(BundleIDs.appSymbolName)
+                .font(.system(size: 20))
+                .symbolRenderingMode(.palette)
+                .foregroundStyle(.black, .blue, .green)
+                .padding()
+                .clipShape(.circle)
+                .glassEffect(.regular.interactive().tint(.white.mix(with: .teal, by: 0.4)), in: .circle)
+        }
+        .frame(height: 82)
+        .frame(maxWidth: .infinity)
+        .overlay {
+            Text(openString.uppercased())
+                .font(.caption)
+                .fontWidth(.expanded)
+                .foregroundStyle(.white.opacity(0.6))
+                .offset(y: 41)
+        }
+    }
+    
+    // MARK: - Shutter button
+    private func shutterButton() -> some View {
+        ShutterButton(tint: shutterTint, height: Style.buttonHeight) {
+            cameraModel.capturePhoto {
+                onShutterFeedback()
+                withAnimation { cameraModel.changeCapturingState(to: true) }
+                Task { @MainActor in
+                    try? await Task.sleep(for: Durations.shutter)
+                    withAnimation { cameraModel.changeCapturingState(to: false) }
+                }
+            }
+        }
+    }
+    
+    // MARK: - Lens picker
+    private func lensPicker() -> some View {
+        LockedLensSelectorView(cameraModel: cameraModel, height: Style.buttonHeight)
+            .frame(height: Style.buttonHeight)
+            .frame(maxWidth: .infinity)
+            .transition(.opacity)
+    }
 }
 
+// MARK: - View
 struct LockedBottomBarView: View {
     @Bindable var cameraModel: LockedCameraModel
     let lockedSession: LockedCameraCaptureSession
-    @State private var hapticTrigger = 0
+    let onShutterFeedback: () -> Void
     
     var body: some View {
-        VStack() {
+        VStack {
             HStack(alignment: .center, spacing: 0) {
-                // MARK: - Main app shortcut
-                Button(action: openMainApp) {
-                    Image(BundleIDs.appSymbolName)
-                        .font(.system(size: 20))
-                        .symbolRenderingMode(.palette)
-                        .foregroundStyle(.black, .blue, .green)
-                        .padding()
-                        .clipShape(.circle)
-                        .glassEffect(.regular.interactive().tint(.white.mix(with: .teal, by: 0.4)), in: .circle)
+                if !cameraModel.showSimpleView {
+                    mainAppShortcut()
                 }
-                .frame(height: 82)
-                .frame(maxWidth: .infinity)
-                .overlay {
-                    Text(openString.uppercased())
-                        .font(.caption)
-                        .fontWidth(.expanded)
-                        .foregroundStyle(.white.opacity(0.6))
-                        .offset(y: 41)
+                if !(cameraModel.isTimerCountingDown && cameraModel.shouldHideUIWhileCountingDown) {
+                    shutterButton()
                 }
-                
-                // MARK: - Shutter button
-                ZStack {
-                    Circle()
-                        .frame(width: 82, height: 82)
-                        .glassEffect(.regular.tint(cameraModel.shutterTint).interactive())
-                    Button {
-                        cameraModel.capturePhoto {
-                            withAnimation { cameraModel.changeCapturingState(to: true) }
-                            Task { @MainActor in
-                                try? await Task.sleep(for: .milliseconds(150))
-                                withAnimation { cameraModel.changeCapturingState(to: false) }
-                            }
-                        }
-                        hapticTrigger += 1
-                    } label: {
-                        Circle()
-                            .fill(.white)
-                            .frame(width: 69, height: 69)
-                    }
-                    .glassEffect(.regular.interactive())
-                    .sensoryFeedback(.selection, trigger: hapticTrigger)
+                if !cameraModel.showSimpleView {
+                    lensPicker()
                 }
-                .frame(maxWidth: .infinity)
-                
-                // MARK: - Lens picker
-                LockedLensSelectorView(cameraModel: cameraModel)
-                .frame(height: 82)
-                .frame(maxWidth: .infinity)
             }
         }
+        .animation(Animations.easeInOut, value: cameraModel.showSimpleView)
     }
 }

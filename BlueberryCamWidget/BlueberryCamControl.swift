@@ -19,6 +19,6 @@ struct BlueberryCamControl: ControlWidget {
             }
         }
         .displayName("Blueberry Cam")
-        .description("Open Blueberry Cam to capture RAW photos.")
+        .description("Open Blueberry Cam to capture photos.")
     }
 }

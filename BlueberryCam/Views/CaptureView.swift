@@ -212,8 +212,8 @@ extension CaptureView {
     // MARK: - Viewfinder
     private func viewFinder(_ previewRect: CGRect) -> some View {
         CameraPreviewView(session: cameraModel.session, onCapture: {
-            triggerShutterFeedback()
             cameraModel.handleShutterButton {
+                triggerShutterFeedback()
                 withAnimation { cameraModel.changeCapturingState(to: true) }
                 Task { @MainActor in
                     try? await Task.sleep(for: Durations.shutter)

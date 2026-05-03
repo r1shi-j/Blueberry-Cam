@@ -4,7 +4,7 @@ import LockedCameraCapture
 #endif
 
 struct BlueberryCamContext: Codable, Sendable {
-    var captureMode: String = "raw"
+    var captureMode: String = "heif"
     
     nonisolated func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
@@ -16,7 +16,7 @@ struct BlueberryCamContext: Codable, Sendable {
         captureMode = try container.decode(String.self, forKey: .captureMode)
     }
     
-    init(captureMode: String = "raw") {
+    init(captureMode: String = "heif") {
         self.captureMode = captureMode
     }
     
@@ -27,7 +27,7 @@ struct BlueberryCamContext: Codable, Sendable {
 
 struct BlueberryCamCaptureIntent: CameraCaptureIntent {
     static let title: LocalizedStringResource = "Blueberry Cam"
-    static let description = IntentDescription("Capture RAW photos with Blueberry Cam.")
+    static let description = IntentDescription("Capture photos with Blueberry Cam.")
     typealias AppContext = BlueberryCamContext
     
     func perform() async throws -> some IntentResult {

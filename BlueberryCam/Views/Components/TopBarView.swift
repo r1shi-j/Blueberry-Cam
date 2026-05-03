@@ -130,6 +130,24 @@ extension TopBarView {
         cameraModel.timerMode != .off || cameraModel.isTimerCountingDown
     }
     
+    private var parsedBurstInterval: Double? {
+        Double(burstIntervalInput)
+    }
+    
+    private var parsedBurstFrameLimit: Int? {
+        Int(burstFrameLimitInput)
+    }
+    
+    private var isBurstIntervalInputValid: Bool {
+        guard let parsedBurstInterval else { return false }
+        return parsedBurstInterval >= CameraModel.burstIntervalMin && parsedBurstInterval <= CameraModel.burstIntervalMax
+    }
+    
+    private var isBurstFrameLimitInputValid: Bool {
+        guard let parsedBurstFrameLimit else { return false }
+        return parsedBurstFrameLimit >= CameraModel.burstFrameLimitMin && parsedBurstFrameLimit <= CameraModel.burstFrameLimitMax
+    }
+    
     // MARK: - Timer properties
     private var timerButtonSymbol: String {
         "timer"
@@ -185,25 +203,7 @@ extension TopBarView {
         cameraModel.showFocusLoupe || cameraModel.showFocusPeaking ? .green : Colors.buttonBackground
     }
     
-    
-    private var parsedBurstInterval: Double? {
-        Double(burstIntervalInput)
-    }
-    
-    private var parsedBurstFrameLimit: Int? {
-        Int(burstFrameLimitInput)
-    }
-    
-    private var isBurstIntervalInputValid: Bool {
-        guard let parsedBurstInterval else { return false }
-        return parsedBurstInterval >= CameraModel.burstIntervalMin && parsedBurstInterval <= CameraModel.burstIntervalMax
-    }
-    
-    private var isBurstFrameLimitInputValid: Bool {
-        guard let parsedBurstFrameLimit else { return false }
-        return parsedBurstFrameLimit >= CameraModel.burstFrameLimitMin && parsedBurstFrameLimit <= CameraModel.burstFrameLimitMax
-    }
-    
+    // MARK: - General Readout properties
     private func readoutColor(for control: ManualControl) -> Color {
         guard !isReadoutDisabled(for: control) else {
             return Colors.buttonText.opacity(Style.disabledOpacity)

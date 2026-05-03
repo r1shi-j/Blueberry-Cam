@@ -7,6 +7,15 @@ import UniformTypeIdentifiers
 
 extension CameraModel: AVCapturePhotoCaptureDelegate {
     nonisolated func photoOutput(_ output: AVCapturePhotoOutput,
+                                 willCapturePhotoFor resolvedSettings: AVCaptureResolvedPhotoSettings) {
+        guard let onCapture = self._captureContextStore.context(for: resolvedSettings.uniqueID)?.onCapture else { return }
+        
+        Task { @MainActor in
+            onCapture()
+        }
+    }
+    
+    nonisolated func photoOutput(_ output: AVCapturePhotoOutput,
                                  didCapturePhotoFor resolvedSettings: AVCaptureResolvedPhotoSettings) {
         self._burstCaptureTracker.completeSensorCapture(uniqueID: resolvedSettings.uniqueID, success: true)
     }
@@ -20,7 +29,8 @@ extension CameraModel: AVCapturePhotoCaptureDelegate {
             photoFilter: self._pendingPhotoFilterBox.value,
             saveLocation: self._pendingSaveLocationBox.value,
             isBurst: false,
-            burstSessionID: nil
+            burstSessionID: nil,
+            onCapture: nil
         )
         if let error {
             self._burstCaptureTracker.completeProcessing(uniqueID: uniqueID, success: false)
@@ -65,7 +75,8 @@ extension CameraModel: AVCapturePhotoCaptureDelegate {
             photoFilter: self._pendingPhotoFilterBox.value,
             saveLocation: self._pendingSaveLocationBox.value,
             isBurst: false,
-            burstSessionID: nil
+            burstSessionID: nil,
+            onCapture: nil
         )
         guard let error else {
             _ = self._captureContextStore.removeContext(for: uniqueID)

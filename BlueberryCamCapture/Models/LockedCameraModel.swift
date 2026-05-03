@@ -1,13 +1,18 @@
 internal import AVFoundation
-import LockedCameraCapture
 internal import Photos
-import UIKit
 
 @MainActor @Observable
 class LockedCameraModel: NSObject {
     // MARK: - Session
+    var device: AVCaptureDevice?
     nonisolated let session = AVCaptureSession()
-    private var lockedSession: LockedCameraCaptureSession?
+    nonisolated let photoOutput = AVCapturePhotoOutput()
+    nonisolated let videoOutput = AVCaptureVideoDataOutput()
+    nonisolated let sessionQueue = DispatchQueue(label: "\(BundleIDs.appID).locked.sessionQueue")
+    nonisolated let frameCounter = FrameCounter()
+    let _pendingCaptureModeBox = CaptureModeBox()
+    nonisolated let _captureContextStore = LockedPhotoCaptureContextStore()
+    nonisolated let _sessionContentURLBox = SessionURLBox()
     
     /// Whether the extension has sufficient Photos access to save captures.
     /// Checks both `.addOnly` and `.readWrite` — if either is granted, we can save.
@@ -18,12 +23,11 @@ class LockedCameraModel: NSObject {
         || readWrite == .authorized || readWrite == .limited
     }
     
-    var device: AVCaptureDevice?
-    nonisolated let photoOutput = AVCapturePhotoOutput()
-    nonisolated let videoOutput = AVCaptureVideoDataOutput()
-    nonisolated let sessionQueue = DispatchQueue(label: "\(BundleIDs.appID).locked.sessionQueue")
-    let _pendingCaptureModeBox = CaptureModeBox()
-    nonisolated let _sessionContentURLBox = SessionURLBox()
+    // MARK: - Defaults (for settings)
+    let defaultFileFormat: CaptureMode = .heif
+    let defaultResolution: ResolutionPreference = .efficient
+    let detailedCountdownTimer = false
+    let shouldHideUIWhileCountingDown = true
     
     // MARK: - Capture format
     var captureMode: CaptureMode = .heif {
@@ -33,46 +37,44 @@ class LockedCameraModel: NSObject {
             }
         }
     }
-    private(set) var availableFormats: [CaptureMode] = []
-    private(set) var enabledFormats: [CaptureMode] = []
-    private(set) var availableResolutions: [ResolutionOption] = []
-    private(set) var enabledResolutions: [ResolutionOption] = []
+    var availableFormats: [CaptureMode] = []
+    var enabledFormats: [CaptureMode] = []
     var selectedResolution: ResolutionOption? = nil
+    var availableResolutions: [ResolutionOption] = []
+    var enabledResolutions: [ResolutionOption] = []
     var pendingCaptureModeAfterLensSwitch: CaptureMode?
     var activeLens: Lens = .wide
-    var timerMode: TimerMode = .off
-    var flashMode: AVCaptureDevice.FlashMode = .off
-    var isMacroEnabled: Bool = false {
-        didSet {
-            if oldValue != isMacroEnabled {
-                applyMacroMode()
-                buildAvailableFormats()
-            }
-        }
-    }
-    @ObservationIgnored
-    var timerCountdownTask: Task<Void, Never>?
-    var isTimerCountingDown = false {
-        didSet {
-            guard oldValue != isTimerCountingDown else { return }
-        }
-    }
-    var timerCountdownValue: Double? = nil
+    var isSwitchingLens = false
+    
+    // MARK: - UI State
+    var isCapturing: Bool = false
+    var showError: Bool = false
+    var errorMessage: String = ""
     @ObservationIgnored
     nonisolated(unsafe) var lastGravity: (x: Double, y: Double, z: Double) = (0, -1, 0)
-    @ObservationIgnored
-    var rotationCoordinator: AVCaptureDevice.RotationCoordinator?
     
+    // MARK: - Live readouts
+    var liveISO: Float = 0
+    var liveShutter: String = ""
+    var liveWB: String = ""
+    var liveFocus: String = ""
     
     // MARK: - Manual controls
+    var isViewfinderBright = false {
+        didSet { isViewfinderBrightForAnalysis = isViewfinderBright }
+    }
+    @ObservationIgnored
+    nonisolated(unsafe) private(set) var isViewfinderBrightForAnalysis = false
+    
+    static let minEV: Float = -4
+    static let maxEV: Float = 4
     var isAutoExposure: Bool = true {
         didSet {
             if oldValue != isAutoExposure {
                 if !isAutoExposure, let d = device {
                     let currentISO = d.iso
                     let currentDur = d.exposureDuration
-                    let snappedISO = round(currentISO / 50.0) * 50.0
-                    self.iso = max(minISO, min(maxISO, snappedISO))
+                    self.iso = nearestISOStop(to: currentISO)
                     if let closestIdx = shutterSpeeds.indices.min(by: {
                         abs(CMTimeGetSeconds(shutterSpeeds[$0]) - CMTimeGetSeconds(currentDur)) <
                             abs(CMTimeGetSeconds(shutterSpeeds[$1]) - CMTimeGetSeconds(currentDur))
@@ -86,28 +88,42 @@ class LockedCameraModel: NSObject {
         }
     }
     var iso: Float = 100
-    private(set) var minISO: Float = 25
-    private(set) var maxISO: Float = 6400
-    private(set) var shutterSpeeds: [CMTime] = []
+    var minISO: Float = 25
+    var maxISO: Float = 6400
+    let preferredISOStops: [Float] = [
+        25, 50, 64, 75, 100, 125, 150, 175, 200,
+        250, 300, 350, 400,
+        500, 600, 700, 800,
+        1000, 1200, 1400, 1600,
+        2000, 2400, 2800, 3200,
+        4000, 4800, 5600, 6400,
+        8000, 9600, 11200, 12000
+    ]
+    var isoStops: [Float] = []
+    var shutterSpeeds: [CMTime] = []
+    let preferredShutterDenominators: [Int] = [
+        1, 2, 3, 4, 5, 6, 8, 10, 13, 15, 20, 25, 30, 40, 50, 60, 80, 100, 125,
+        160, 200, 250, 320, 400, 500, 640, 800, 1000, 1250, 1600, 2000, 2500,
+        3200, 4000, 5000, 6000, 7000, 8000, 9000, 10000, 12500, 15000, 17500,
+        20000, 25000, 30000, 40000, 50000, 62500
+    ]
     var shutterIndex: Int = 0
-    /// Denominator for in-app shutter slider (1 = 1s, 500 = 1/500s). 0 means use shutterIndex instead.
-    var manualShutterDenominator: Int = 0
     var exposureBias: Float = 0.0
-    private(set) var minExposureBias: Float = -8.0
-    private(set) var maxExposureBias: Float = 8.0
+    var minExposureBias: Float = -8.0
+    var maxExposureBias: Float = 8.0
     var exposureDebounceTask: Task<Void, Never>?
-    
-    var isAdjustingManualFocus: Bool = false
     var isAutoFocus: Bool = true {
         didSet {
-            if oldValue != isAutoFocus, !isAutoFocus, let d = device {
-                self.lensPosition = d.lensPosition
+            if oldValue != isAutoFocus {
+                if !isAutoFocus, let d = device {
+                    self.lensPosition = d.lensPosition
+                }
             }
         }
     }
     var lensPosition: Float = 1.0
-    var focusPeakingHoldTask: Task<Void, Never>?
-    
+    static let minWhiteBalance: Float = 2000
+    static let maxWhiteBalance: Float = 10000
     var isAutoWhiteBalance: Bool = true {
         didSet {
             if oldValue != isAutoWhiteBalance {
@@ -133,15 +149,31 @@ class LockedCameraModel: NSObject {
         }
     }
     
-    // MARK: - UI State
-    private(set) var isCapturing: Bool = false
-    var showError: Bool = false
-    var errorMessage: String = ""
-    var liveISO: Float = 0
-    var liveShutter: String = ""
-    var liveWB: String = ""
-    var liveFocus: String = ""
+    // MARK: - Flash
+    var flashMode: AVCaptureDevice.FlashMode = .off
+    
+    // MARK: - Macro
+    var isMacroEnabled: Bool = false {
+        didSet {
+            if oldValue != isMacroEnabled {
+                applyMacroMode()
+                buildAvailableFormats()
+            }
+        }
+    }
+    
+    // MARK: - Timer
+    var timerMode: TimerMode = .off
+    var timerCountdownTask: Task<Void, Never>?
+    var isTimerCountingDown = false
+    var timerCountdownValue: Double? = nil
+    @ObservationIgnored
+    var onTimerCountdownSecond: (() -> Void)?
+    
+    // MARK: - Lens switching
     var lensSwitchCompletionCount: Int = 0
+    
+    // MARK: - Focus
     var tapFocusIndicatorPoint: CGPoint? = nil
     var isTapFocusIndicatorVisible = false
     var isTapFocusIndicatorDimmed = false
@@ -165,114 +197,14 @@ class LockedCameraModel: NSObject {
     @ObservationIgnored
     var ignoredTapFocusAdjustmentDeadline: Date?
     @ObservationIgnored
+    var tapFocusRetakeProtectionUntil: Date?
+    @ObservationIgnored
     var tapFocusLensPositionBaseline: Float?
     @ObservationIgnored
     var tapFocusLensPositionMonitorTask: Task<Void, Never>?
-    var detailedCountdownTimer = false
-    var shouldHideUIWhileCountingDown = true
     
-    // MARK: - Computed properties
+    // MARK: - Other properties / methods
     var captureAspectRatio: CGFloat { 3.0 / 4.0 }
-    
-    func isFormatEnabled(_ mode: CaptureMode) -> Bool {
-        if mode == .raw {
-            return canSelectRawCaptureMode
-        }
-        
-        return enabledFormats.contains(mode)
-    }
-    
-    var canSelectRawCaptureMode: Bool {
-        guard availableFormats.contains(.raw) else { return false }
-        guard !isHighResolutionSelected else { return false }
-        guard isAutoExposure, !isMacroEnabled else { return enabledFormats.contains(.raw) }
-        return hasRawCapableLens
-    }
-    
-    private var hasRawCapableLens: Bool {
-        Lens.allCases.contains { lens in
-            !lens.isFront &&
-            lens.preservesRawCaptureMode &&
-            AVCaptureDevice.default(lens.deviceType, for: .video, position: .back) != nil
-        }
-    }
-    
-    func isResolutionEnabled(_ option: ResolutionOption) -> Bool {
-        if isHighResolutionOption(option) {
-            return canSelectHighResolution
-        }
-        
-        return enabledResolutions.contains(where: { $0.id == option.id })
-    }
-    
-    var isHighResolutionSelected: Bool {
-        guard let selectedResolution else { return false }
-        return isHighResolutionOption(selectedResolution)
-    }
-    
-    var canSelectHighResolution: Bool {
-        guard captureMode != .raw,
-              !isMacroEnabled,
-              highResolutionOption != nil else { return false }
-        return hasHighResolutionCapableLens
-    }
-    
-    private var highResolutionOption: ResolutionOption? {
-        guard availableResolutions.count > 1 else { return nil }
-        return availableResolutions.last
-    }
-    
-    func isHighResolutionOption(_ option: ResolutionOption) -> Bool {
-        highResolutionOption?.id == option.id
-    }
-    
-    private var hasHighResolutionCapableLens: Bool {
-        Lens.allCases.contains { lens in
-            !lens.isFront &&
-            lens.preservesHighResolutionCapture &&
-            AVCaptureDevice.default(lens.deviceType, for: .video, position: .back) != nil
-        }
-    }
-    
-    var supportsManualFocus: Bool {
-        device?.isLockingFocusWithCustomLensPositionSupported ?? false
-    }
-    
-    var supportsMacro: Bool {
-        // Macro is typically supported on Pro models with AF on Ultra Wide.
-        // We look for a back camera that can focus closer than 15cm (150mm).
-        let discovery = AVCaptureDevice.DiscoverySession(
-            deviceTypes: [.builtInUltraWideCamera, .builtInWideAngleCamera],
-            mediaType: .video,
-            position: .back
-        )
-        return discovery.devices.contains { $0.minimumFocusDistance > 0 && $0.minimumFocusDistance <= 150 }
-    }
-    
-    var supportsFlash: Bool {
-        guard device?.hasFlash == true else { return false }
-        return !photoOutput.supportedFlashModes.isEmpty
-    }
-    
-    var flashLabel: String {
-        switch flashMode {
-            case .off, .on: "bolt.fill"
-            case .auto: "bolt.badge.automatic.fill"
-            @unknown default: "bolt.badge.xmark.fill"
-        }
-    }
-    
-    var showSimpleView: Bool {
-        isTimerCountingDown && shouldHideUIWhileCountingDown
-    }
-    
-    // MARK: - Configure
-    func configure(with lockedSession: LockedCameraCaptureSession) {
-        self.lockedSession = lockedSession
-        _sessionContentURLBox.value = lockedSession.sessionContentURL
-        
-        sessionQueue.async { Task { @MainActor in self.setupPipeline() } }
-    }
     
     deinit {
         if let subjectAreaChangeObserver {
@@ -280,489 +212,5 @@ class LockedCameraModel: NSObject {
         }
         focusAdjustmentObservation?.invalidate()
         lensPositionObservation?.invalidate()
-    }
-    
-    private func setupPipeline() {
-        session.beginConfiguration()
-        session.sessionPreset = .photo
-        
-        guard let cam = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back),
-              let input = try? AVCaptureDeviceInput(device: cam),
-              session.canAddInput(input) else {
-            session.commitConfiguration()
-            return
-        }
-        session.addInput(input)
-        
-        if session.canAddOutput(photoOutput) {
-            session.addOutput(photoOutput)
-        }
-        
-        videoOutput.setSampleBufferDelegate(self, queue: DispatchQueue(label: "\(BundleIDs.appID).locked.videoQueue"))
-        videoOutput.alwaysDiscardsLateVideoFrames = true
-        if session.canAddOutput(videoOutput) {
-            session.addOutput(videoOutput)
-        }
-        
-        configureSubjectAreaMonitoring(for: cam)
-        
-        for conn in [photoOutput.connection(with: .video),
-                     videoOutput.connection(with: .video)].compactMap({ $0 }) {
-            if conn.isVideoRotationAngleSupported(90) {
-                conn.videoRotationAngle = 90
-            }
-        }
-        
-        session.commitConfiguration()
-        
-        // Setup rotation coordinator
-        self.rotationCoordinator = AVCaptureDevice.RotationCoordinator(device: cam, previewLayer: nil)
-        
-        Task.detached(priority: .userInitiated) {
-            self.session.startRunning()
-            Task { @MainActor in
-                self.device = cam
-                if let largest = cam.activeFormat.supportedMaxPhotoDimensions.max(by: {
-                    Int($0.width) * Int($0.height) < Int($1.width) * Int($1.height)
-                }) {
-                    self.photoOutput.maxPhotoDimensions = largest
-                }
-                self.buildAvailableFormats()
-                self.updateDeviceRanges()
-                self.normalizeFlashModeForCurrentDevice()
-                self.enforceExposureModeConstraints()
-            }
-        }
-    }
-    
-    // MARK: - Formats & ranges
-    func buildAvailableFormats() {
-        // We only enforce this logic if the device is ready.
-        guard device != nil else { return }
-        
-        let zoomBlocksRAW = (device?.videoZoomFactor ?? 1.0) > 1.0
-        
-        var visibleModes: [CaptureMode] = []
-        if photoOutput.availablePhotoCodecTypes.contains(.hevc) {
-            visibleModes.append(.heif)
-        }
-        visibleModes.append(.jpeg)
-        if !photoOutput.availableRawPhotoPixelFormatTypes.isEmpty {
-            visibleModes.append(.raw)
-        }
-        if availableFormats != visibleModes {
-            availableFormats = visibleModes
-        }
-        
-        let modes: [CaptureMode]
-        if isAutoExposure {
-            modes = visibleModes.filter { mode in
-                switch mode {
-                    case .jpeg, .heif:
-                        return true
-                    case .raw:
-                        return !zoomBlocksRAW && !isMacroEnabled
-                }
-            }
-        } else {
-            modes = visibleModes.filter { $0 == .raw }
-        }
-        if enabledFormats != modes {
-            enabledFormats = modes
-        }
-        
-        // SMART SWITCH: Keep the current selection if valid, else fallback to preference, else base fallback.
-        let targetMode: CaptureMode
-        if modes.contains(captureMode) {
-            targetMode = captureMode
-        } else {
-            targetMode = modes.contains(.heif) ? .heif : .jpeg
-        }
-        
-        if captureMode != targetMode {
-            captureMode = targetMode
-        }
-        
-        let isCropLens = activeLens == .tele2x || activeLens == .tele8x
-        
-        let visibleOptions: [ResolutionOption]
-        
-        let outputMax = photoOutput.maxPhotoDimensions
-        let allDims = (device?.activeFormat.supportedMaxPhotoDimensions ?? [])
-            .filter { $0.width <= outputMax.width && $0.height <= outputMax.height }
-            .sorted { Int($0.width) * Int($0.height) < Int($1.width) * Int($1.height) }
-        
-        var deduped: [ResolutionOption] = []
-        for dim in allDims {
-            let opt = ResolutionOption(width: dim.width, height: dim.height)
-            if !deduped.contains(where: { abs($0.id - opt.id) < 2_000_000 }) {
-                deduped.append(opt)
-            }
-        }
-        // Always show 12MP + 48MP for back optical lenses
-        let smallest = deduped.first
-        let largest = deduped.last
-        if let s = smallest, let l = largest, s.id != l.id {
-            visibleOptions = [s, l]
-        } else {
-            visibleOptions = deduped
-        }
-        
-        let enabledOptions: [ResolutionOption]
-        if isCropLens || isMacroEnabled || captureMode == .raw {
-            enabledOptions = visibleOptions.first.map { [$0] } ?? []
-        } else {
-            enabledOptions = visibleOptions
-        }
-        
-        let sameVisibleOptions = availableResolutions.count == visibleOptions.count &&
-        zip(availableResolutions, visibleOptions).allSatisfy { $0.id == $1.id }
-        if !sameVisibleOptions {
-            availableResolutions = visibleOptions
-        }
-        
-        let sameEnabledOptions = enabledResolutions.count == enabledOptions.count &&
-        zip(enabledResolutions, enabledOptions).allSatisfy { $0.id == $1.id }
-        if !sameEnabledOptions {
-            enabledResolutions = enabledOptions
-        }
-        
-        if enabledOptions.isEmpty {
-            selectedResolution = nil
-        } else if let cur = selectedResolution, enabledOptions.contains(where: { $0.id == cur.id }) {
-            
-        } else {
-            selectedResolution = enabledOptions.first
-        }
-    }
-    
-    func primeResolutionOptions(for lens: Lens, device: AVCaptureDevice) {
-        let outputMax = device.activeFormat.supportedMaxPhotoDimensions.max(by: {
-            Int($0.width) * Int($0.height) < Int($1.width) * Int($1.height)
-        }) ?? photoOutput.maxPhotoDimensions
-        let allDims = device.activeFormat.supportedMaxPhotoDimensions
-            .filter { $0.width <= outputMax.width && $0.height <= outputMax.height }
-            .sorted { Int($0.width) * Int($0.height) < Int($1.width) * Int($1.height) }
-        
-        var deduped: [ResolutionOption] = []
-        for dim in allDims {
-            let opt = ResolutionOption(width: dim.width, height: dim.height)
-            if !deduped.contains(where: { abs($0.id - opt.id) < 2_000_000 }) {
-                deduped.append(opt)
-            }
-        }
-        
-        let smallest = deduped.first
-        let largest = deduped.last
-        let visibleOptions: [ResolutionOption]
-        if let s = smallest, let l = largest, s.id != l.id {
-            visibleOptions = [s, l]
-        } else {
-            visibleOptions = deduped
-        }
-        
-        let isCropLens = lens == .tele2x || lens == .tele8x
-        let enabledOptions: [ResolutionOption]
-        if isCropLens || isMacroEnabled || captureMode == .raw {
-            enabledOptions = visibleOptions.first.map { [$0] } ?? []
-        } else {
-            enabledOptions = visibleOptions
-        }
-        
-        availableResolutions = visibleOptions
-        enabledResolutions = enabledOptions
-        
-        if enabledOptions.isEmpty {
-            selectedResolution = nil
-        } else if let current = selectedResolution, enabledOptions.contains(where: { $0.id == current.id }) {
-            return
-        } else {
-            selectedResolution = enabledOptions.first
-        }
-    }
-    
-    func normalizeFlashModeForCurrentDevice() {
-        guard supportsFlash else {
-            flashMode = .off
-            return
-        }
-        if !photoOutput.supportedFlashModes.contains(flashMode) {
-            flashMode = photoOutput.supportedFlashModes.contains(.auto) ? .auto : .off
-        }
-        if !isAutoExposure {
-            flashMode = .off
-        }
-    }
-    
-    func enforceExposureModeConstraints() {
-        if !isAutoExposure {
-            flashMode = .off
-            if isMacroEnabled {
-                isMacroEnabled = false
-            }
-            if captureMode != .raw {
-                captureMode = .raw
-            }
-        }
-    }
-    
-    func updateDeviceRanges() {
-        guard let d = device else { return }
-        minISO = d.activeFormat.minISO
-        maxISO = d.activeFormat.maxISO
-        
-        let stops = generateShutterStops(for: d)
-        shutterSpeeds = stops
-        shutterIndex = stops.indices.min(by: {
-            abs(CMTimeGetSeconds(stops[$0]) - 1.0/60.0) <
-                abs(CMTimeGetSeconds(stops[$1]) - 1.0/60.0)
-        }) ?? 0
-        
-        liveISO = d.iso
-        liveShutter = Self.formatShutter(d.exposureDuration)
-        minExposureBias = d.minExposureTargetBias
-        maxExposureBias = d.maxExposureTargetBias
-        
-        // Always clamp iso to the new device's valid range (handles lens switches where minISO changes)
-        let newISO = max(minISO, min(maxISO, iso))
-        if newISO != iso { iso = newISO }
-    }
-    
-    private func generateShutterStops(for device: AVCaptureDevice) -> [CMTime] {
-        let fmt = device.activeFormat
-        let minSecs = CMTimeGetSeconds(fmt.minExposureDuration)
-        let maxSecs = CMTimeGetSeconds(fmt.maxExposureDuration)
-        let timescale = fmt.minExposureDuration.timescale
-        
-        let allStops: [Double] = [
-            1/100000, 1/80000, 1/60000, 1/50000, 1/40000, 1/32000,
-            1/25000,  1/20000, 1/16000, 1/12500, 1/10000, 1/8000,
-            1/6400,   1/5000,  1/4000,  1/3200,  1/2500,  1/2000,
-            1/1600,   1/1250,  1/1000,  1/800,   1/640,   1/500,
-            1/400,    1/320,   1/250,   1/200,   1/160,   1/125,
-            1/100,    1/80,    1/60,    1/50,    1/40,    1/30,
-            1/25,     1/20,    1/15,    1/13,    1/10,    1/8,
-            1/6,      1/5,     1/4,     1/3,     1/2.5,   1/2,
-            1/1.6,    1/1.3
-        ]
-        
-        return allStops
-            .filter { $0 >= minSecs - 1e-9 && $0 <= maxSecs + 1e-9 }
-            .map { CMTimeMakeWithSeconds($0, preferredTimescale: timescale) }
-    }
-    
-    static func formatShutter(_ time: CMTime) -> String {
-        let secs = CMTimeGetSeconds(time)
-        guard secs.isFinite && secs > 0 else { return "—" }
-        if secs >= 1.0 { return "\(secs.formatted(.number.precision(.fractionLength(1))))s" }
-        return "1/\(Int(round(1.0 / secs)))"
-    }
-    
-    // MARK: - Capture
-    func changeCapturingState(to new: Bool) {
-        isCapturing = new
-    }
-    
-    func capturePhoto(onCapture: @escaping @MainActor @Sendable () -> Void) {
-        guard timerCountdownTask == nil else { return }
-        
-        if let totalSeconds = timerMode.seconds {
-            isTimerCountingDown = true
-            timerCountdownValue = Double(totalSeconds)
-            timerCountdownTask = Task { @MainActor [weak self] in
-                guard let self else { return }
-                let usesDetailedCountdown = self.detailedCountdownTimer
-                
-                defer {
-                    self.isTimerCountingDown = false
-                    self.timerCountdownValue = nil
-                    self.timerCountdownTask = nil
-                }
-                
-                let endDate = Date().addingTimeInterval(TimeInterval(totalSeconds))
-                let updateInterval: Duration = usesDetailedCountdown ? .milliseconds(16) : .milliseconds(100)
-                
-                while true {
-                    let remaining = endDate.timeIntervalSinceNow
-                    guard remaining > 0 else { break }
-                    
-                    self.timerCountdownValue = remaining
-                    do {
-                        try await Task.sleep(for: updateInterval)
-                    } catch {
-                        return
-                    }
-                }
-                
-                self.performPhotoCapture(onCapture: onCapture)
-            }
-            return
-        }
-        
-        performPhotoCapture(onCapture: onCapture)
-    }
-    
-    
-    private func performPhotoCapture(onCapture: @escaping @MainActor @Sendable () -> Void) {
-        onCapture()
-        
-        exposureDebounceTask?.cancel()
-        _pendingCaptureModeBox.value = captureMode
-        
-        // Update orientation based on current physical position
-        updateCaptureOrientation()
-        
-        // For manual exposure, wait for hardware to confirm values are applied before firing.
-        // setExposureModeCustom is async — the completionHandler fires once the sensor has
-        // actually settled on the requested ISO/shutter, then we fire the shutter.
-        if !isAutoExposure, let d = device {
-            // Use manualShutterDenominator if set (in-app slider), else fall back to shutterIndex stop
-            let duration: CMTime
-            if manualShutterDenominator > 0 {
-                duration = CMTimeMake(value: 1, timescale: CMTimeScale(manualShutterDenominator))
-            } else if shutterSpeeds.indices.contains(shutterIndex) {
-                duration = shutterSpeeds[shutterIndex]
-            } else {
-                return  // no valid shutter duration available, skip
-            }
-            let isoValue = max(d.activeFormat.minISO, min(d.activeFormat.maxISO, iso))
-            try? d.lockForConfiguration()
-            d.setExposureModeCustom(duration: duration, iso: isoValue) { [weak self] _ in
-                guard let self else { return }
-                Task { @MainActor in
-                    self.photoOutput.capturePhoto(with: self.buildPhotoSettings(), delegate: self)
-                }
-            }
-            d.unlockForConfiguration()
-        } else {
-            photoOutput.capturePhoto(with: buildPhotoSettings(), delegate: self)
-        }
-    }
-    
-    private func buildPhotoSettings() -> AVCapturePhotoSettings {
-        let zoomBlocksRAW = (device?.videoZoomFactor ?? 1.0) > 1.0
-        let dims = captureDimensions()
-        
-        switch captureMode {
-            case .raw:
-                if !zoomBlocksRAW,
-                   let fmt = photoOutput.availableRawPhotoPixelFormatTypes.first(where: {
-                       !AVCapturePhotoOutput.isAppleProRAWPixelFormat($0)
-                   }) ?? photoOutput.availableRawPhotoPixelFormatTypes.first {
-                    let s = AVCapturePhotoSettings(rawPixelFormatType: fmt)
-                    s.maxPhotoDimensions = dims
-                    applyFlashModeIfSupported(to: s)
-                    return s
-                }
-                fallthrough
-            case .heif:
-                if photoOutput.availablePhotoCodecTypes.contains(.hevc) {
-                    let s = AVCapturePhotoSettings(format: [AVVideoCodecKey: AVVideoCodecType.hevc])
-                    s.maxPhotoDimensions = dims
-                    applyFlashModeIfSupported(to: s)
-                    return s
-                }
-                fallthrough
-            case .jpeg:
-                let s = AVCapturePhotoSettings()
-                s.maxPhotoDimensions = dims
-                applyFlashModeIfSupported(to: s)
-                return s
-        }
-    }
-    
-    private func updateCaptureOrientation() {
-        guard session.isRunning, let photoConnection = photoOutput.connection(with: .video), photoConnection.isActive else { return }
-        
-        let (gx, gy, gz) = lastGravity
-        
-        // Determine rotation based on gravity
-        let degrees: CGFloat
-        
-        if abs(gz) > 0.75 {
-            // Device is flat - keep current
-            return
-        }
-        
-        if abs(gy) > abs(gx) {
-            // Portrait orientation
-            if gy < 0 {
-                // Normal portrait
-                degrees = 90
-            } else {
-                // Upside down portrait
-                degrees = 270
-            }
-        } else {
-            // Landscape orientation
-            if gx > 0 {
-                // Landscape right (home button on right)
-                degrees = 180
-            } else {
-                // Landscape left (home button on left)
-                degrees = 0
-            }
-        }
-        
-        // Update the photo connection rotation
-        photoConnection.videoRotationAngle = degrees
-    }
-    
-    private func applyFlashModeIfSupported(to settings: AVCapturePhotoSettings) {
-        guard isAutoExposure, supportsFlash else {
-            settings.flashMode = .off
-            return
-        }
-        if photoOutput.supportedFlashModes.contains(flashMode) {
-            settings.flashMode = flashMode
-        } else {
-            settings.flashMode = .off
-        }
-    }
-    
-    private func captureDimensions() -> CMVideoDimensions {
-        if let selected = selectedResolution { return selected.dimensions }
-        guard let d = device else { return photoOutput.maxPhotoDimensions }
-        let outputMax = photoOutput.maxPhotoDimensions
-        return d.activeFormat.supportedMaxPhotoDimensions
-            .filter { $0.width <= outputMax.width && $0.height <= outputMax.height }
-            .max { Int($0.width) * Int($0.height) < Int($1.width) * Int($1.height) }
-        ?? outputMax
-    }
-    
-    func applyMacroMode() {
-        if isMacroEnabled {
-            // 1. Switch to Ultra Wide if it's not already active
-            if activeLens != .ultraWide {
-                // We use the internal switchLens but skip the recursive applyMacroMode
-                // This will be handled by the UI toggle
-            }
-            
-            guard let d = device else { return }
-            try? d.lockForConfiguration()
-            
-            // 2. Apply "Macro" zoom (typically 2.0x on UW to match 1x FOV)
-            if activeLens == .ultraWide {
-                d.videoZoomFactor = 2.0
-            }
-            
-            // 3. Optimize focus for near objects if supported
-            if d.isAutoFocusRangeRestrictionSupported {
-                d.autoFocusRangeRestriction = .near
-            }
-            
-            d.unlockForConfiguration()
-        } else {
-            guard let d = device else { return }
-            try? d.lockForConfiguration()
-            if d.isAutoFocusRangeRestrictionSupported {
-                d.autoFocusRangeRestriction = .none
-            }
-            // Reset zoom if we were in the macro-zoom state
-            if activeLens == .ultraWide && d.videoZoomFactor == 2.0 {
-                d.videoZoomFactor = 1.0
-            }
-            d.unlockForConfiguration()
-        }
     }
 }

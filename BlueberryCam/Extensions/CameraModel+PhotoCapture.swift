@@ -27,7 +27,7 @@ extension CameraModel {
             if isBurstCapturing {
                 stopBurstCapture()
             } else {
-                startBurstCapture(onCapture: onCapture, onBurstPhotoCaptured: onBurstPhotoCaptured)
+                startBurstCapture(onBurstPhotoCaptured: onBurstPhotoCaptured)
             }
             return
         }
@@ -35,8 +35,7 @@ extension CameraModel {
         capturePhoto(onCapture: onCapture)
     }
     
-    private func startBurstCapture(onCapture: @escaping @MainActor @Sendable () -> Void,
-                                   onBurstPhotoCaptured: @escaping @MainActor @Sendable () -> Void) {
+    private func startBurstCapture(onBurstPhotoCaptured: @escaping @MainActor @Sendable () -> Void) {
         guard burstCaptureTask == nil else { return }
         guard canStartBurstCapture else {
             if !isAutoExposure && !manualExposureIsFastEnoughForBurst {
@@ -58,7 +57,6 @@ extension CameraModel {
         activeBurstSessionID = burstSessionID
         burstSaveStatsBySession[burstSessionID] = BurstSaveStats(captureMode: captureMode, frameLimit: burstFrameLimit)
         isBurstCapturing = true
-        onCapture()
         
         let startDate = Date()
         burstCaptureTask = Task { @MainActor [weak self] in
@@ -266,14 +264,18 @@ extension CameraModel {
         confettiCannonTrigger += 1
     }
     
-    private func registerCaptureContext(for settings: AVCapturePhotoSettings, isBurst: Bool, burstSessionID: Int? = nil) {
+    private func registerCaptureContext(for settings: AVCapturePhotoSettings,
+                                        isBurst: Bool,
+                                        burstSessionID: Int? = nil,
+                                        onCapture: (@MainActor @Sendable () -> Void)? = nil) {
         _captureContextStore.set(
             PhotoCaptureContext(
                 captureMode: captureMode,
                 photoFilter: selectedPhotoFilter,
                 saveLocation: saveLocation,
                 isBurst: isBurst,
-                burstSessionID: burstSessionID
+                burstSessionID: burstSessionID,
+                onCapture: onCapture
             ),
             for: settings.uniqueID
         )
@@ -397,6 +399,7 @@ extension CameraModel {
         if let totalSeconds = timerMode.seconds {
             isTimerCountingDown = true
             timerCountdownValue = Double(totalSeconds)
+            onTimerCountdownSecond?()
             timerCountdownTask = Task { @MainActor [weak self] in
                 guard let self else { return }
                 let usesDetailedCountdown = self.detailedCountdownTimer
@@ -439,8 +442,6 @@ extension CameraModel {
     
     private func performPhotoCapture(onCapture: @escaping @MainActor @Sendable () -> Void,
                                      requestsConfettiAfterCapture: Bool = false) {
-        onCapture()
-        
         exposureDebounceTask?.cancel()
         _pendingCaptureModeBox.value = captureMode
         _pendingPhotoFilterBox.value = selectedPhotoFilter
@@ -465,7 +466,7 @@ extension CameraModel {
                 guard let self else { return }
                 Task { @MainActor in
                     let settings = self.buildPhotoSettings()
-                    self.registerCaptureContext(for: settings, isBurst: false)
+                    self.registerCaptureContext(for: settings, isBurst: false, onCapture: onCapture)
                     self.photoOutput.capturePhoto(with: settings, delegate: self)
                     if requestsConfettiAfterCapture {
                         self.requestConfettiCannons()
@@ -475,7 +476,7 @@ extension CameraModel {
             d.unlockForConfiguration()
         } else {
             let settings = buildPhotoSettings()
-            registerCaptureContext(for: settings, isBurst: false)
+            registerCaptureContext(for: settings, isBurst: false, onCapture: onCapture)
             photoOutput.capturePhoto(with: settings, delegate: self)
             if requestsConfettiAfterCapture {
                 requestConfettiCannons()

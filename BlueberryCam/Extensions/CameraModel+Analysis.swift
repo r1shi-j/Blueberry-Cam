@@ -1,5 +1,4 @@
 internal import AVFoundation
-import CoreMedia
 import Foundation
 
 extension CameraModel: AVCaptureVideoDataOutputSampleBufferDelegate {

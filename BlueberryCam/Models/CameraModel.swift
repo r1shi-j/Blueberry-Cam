@@ -380,7 +380,7 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
     @ObservationIgnored
     var burstFeedbackTask: Task<Void, Never>?
     
-    // MARK: - Selfie switch
+    // MARK: - Lens switching
     var flipRotation: Double = 0
     var lensSwitchCompletionCount: Int = 0
     
