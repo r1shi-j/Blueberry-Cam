@@ -527,11 +527,6 @@ extension CaptureView {
     
     private func manualISOOverlay(in previewRect: CGRect) -> some View {
         VStack(spacing: 4) {
-            Text("ISO")
-                .font(Fonts.manualLabel)
-                .foregroundStyle(manualControlColor(for: .iso))
-                .tracking(2)
-            
             ManualRulerView(
                 value: Binding(
                     get: { cameraModel.isoStopIndex },
@@ -544,9 +539,14 @@ extension CaptureView {
                 accessibilityLabel: "ISO"
             )
             .frame(width: previewRect.width * 0.78, height: 70)
+            
+            Text("ISO")
+                .font(Fonts.manualLabel)
+                .foregroundStyle(manualControlColor(for: .iso))
+                .tracking(2)
         }
         .frame(width: previewRect.width, height: previewRect.height, alignment: .top)
-        .padding(.top, 20)
+        .padding(.top, 14)
         .position(x: previewRect.midX, y: previewRect.midY)
         .transition(
             .asymmetric(
@@ -584,7 +584,7 @@ extension CaptureView {
                 majorTickStride: majorTickStride,
                 accessibilityLabel: accessibilityLabel
             )
-            .frame(width: 78, height: previewRect.height * 0.72)
+            .frame(width: 70, height: previewRect.height * 0.72)
         }
         .frame(width: previewRect.width, height: previewRect.height, alignment: .trailing)
         .padding(.trailing, 14)
