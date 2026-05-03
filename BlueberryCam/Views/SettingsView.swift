@@ -159,7 +159,7 @@ struct SettingsView: View {
                 
                 NavigationLink {
                     Form {
-                        Text("Locked Capture opens Blueberry Cam from system surfaces like Control Centre and the Lock Screen. Some full-app features are unavailable there, including bursts, capture celebrations, overlays such as historgrams, zebras, highlight clipping, focus peaking, focus loupe, level and grid, as well as selfie cameras, geotagging location, recognising barcodes. Settings, clean UI and filters will also not be available. Any settings above which you have changed will not be read and so the defaults the app shipped with will be used. Photos captured will be saved to photos not files. The background color will be black.")
+                        Text("Locked Capture opens Blueberry Cam from system surfaces like Control Centre and the Lock Screen. Some full-app features are unavailable there, including bursts, capture celebrations, overlays such as histograms, zebras, highlight clipping, focus peaking, focus loupe, level and grid, as well as selfie cameras, geotagging location, recognising barcodes. Settings, clean UI and filters will also not be available. Any settings above which you have changed will not be read and so the defaults the app shipped with will be used. Photos captured will be saved to photos not files. The background color will be black.")
                         Text("You can open the full app from the locked session by clicking the icon in the bottom left.")
                         Text("Photos library usage is only required to search for the album to save photos taken with this app, you can set it to limited access and select no photos, the app still work.")
                         
