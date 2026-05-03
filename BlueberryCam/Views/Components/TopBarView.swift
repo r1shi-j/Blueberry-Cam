@@ -285,6 +285,10 @@ extension TopBarView {
                 .font(.system(size: Fonts.readoutSize, weight: isReadoutSelected(control) && !isReadoutDisabled(for: control) ? .black : .regular, design: .monospaced))
                 .underline(isReadoutUnderlined(for: control))
                 .foregroundStyle(readoutColor(for: control))
+                .animation(Animations.readoutShown, value: isReadoutDisabled(for: control))
+                .onTapGesture {
+                    toggleReadout(control)
+                }
                 .onTapGesture(count: 2) {
                     resetReadout(control)
                 }
@@ -292,9 +296,6 @@ extension TopBarView {
                     resetReadout(control)
                 }
                 .disabled(isReadoutDisabled(for: control))
-                .onTapGesture {
-                    toggleReadout(control)
-                }
         }
     }
     

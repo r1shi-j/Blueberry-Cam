@@ -59,7 +59,6 @@ struct BlueberryCamApp: App {
 // Customisable accent colours (shutter color per state, top bar pickers)
 
 // MARK: - FIXME
-// top bar readouts slow to click
 
 // MARK: - Next Steps
 // Finalise Main app cleanup
