@@ -61,5 +61,4 @@ struct BlueberryCamApp: App {
 // MARK: - FIXME
 
 // MARK: - Next Steps
-// Finalise Main app cleanup
-// update locked camera
+// Test on Mac and iPad
