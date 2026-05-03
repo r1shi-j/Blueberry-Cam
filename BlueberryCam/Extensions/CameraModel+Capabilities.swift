@@ -200,8 +200,8 @@ extension CameraModel {
             if isMacroEnabled {
                 isMacroEnabled = false
             }
-            if captureMode != .raw {
-                captureMode = .raw
+            if captureMode != .raw || !activeLens.preservesRawCaptureMode {
+                switchToRawCaptureMode()
             }
         }
     }
@@ -277,6 +277,9 @@ extension CameraModel {
     var canSelectRawCaptureMode: Bool {
         guard availableFormats.contains(.raw) else { return false }
         guard !isHighResolutionSelected else { return false }
+        if !isAutoExposure {
+            return hasRawCapableLensForCurrentFacing
+        }
         guard isAutoExposure, !isMacroEnabled else { return enabledFormats.contains(.raw) }
         return hasRawCapableLensForCurrentFacing
     }

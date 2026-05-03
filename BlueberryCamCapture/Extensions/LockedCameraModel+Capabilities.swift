@@ -47,9 +47,7 @@ extension LockedCameraModel {
                 mode != .raw || (!zoomBlocksRAW && !isMacroEnabled)
             }
         } else {
-            modes = visibleModes.filter { mode in
-                mode == .raw && !zoomBlocksRAW && !isMacroEnabled
-            }
+            modes = visibleModes.filter { $0 == .raw }
         }
         if enabledFormats != modes {
             enabledFormats = modes
@@ -197,8 +195,8 @@ extension LockedCameraModel {
             if isMacroEnabled {
                 isMacroEnabled = false
             }
-            if captureMode != .raw {
-                captureMode = .raw
+            if captureMode != .raw || !activeLens.preservesRawCaptureMode {
+                switchToRawCaptureMode()
             }
         }
     }
@@ -261,6 +259,9 @@ extension LockedCameraModel {
     var canSelectRawCaptureMode: Bool {
         guard availableFormats.contains(.raw) else { return false }
         guard !isHighResolutionSelected else { return false }
+        if !isAutoExposure {
+            return hasRawCapableLensForCurrentFacing
+        }
         guard isAutoExposure, !isMacroEnabled else { return enabledFormats.contains(.raw) }
         return hasRawCapableLensForCurrentFacing
     }

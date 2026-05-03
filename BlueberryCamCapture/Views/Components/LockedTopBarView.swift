@@ -253,7 +253,8 @@ extension LockedTopBarView {
         }
         .clipShape(.rect(cornerRadius: Style.pickerCornerRadius))
         .overlay(RoundedRectangle(cornerRadius: Style.pickerCornerRadius).stroke(.white.opacity(0.2), lineWidth: 1))
-        .animation(Animations.bouncy, value: cameraModel.availableResolutions)
+        .animation(Animations.bouncy, value: cameraModel.enabledFormats)
+        .animation(Animations.bouncy, value: cameraModel.captureMode)
         
     }
     
