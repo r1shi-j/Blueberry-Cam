@@ -71,7 +71,7 @@ extension BlueberryCamApp {
             
             // Increment and invalidate — we confirmed the photos exist (or we have add-only access
             // and trust the manifest).
-            await MainActor.run { self.shutterCount += photoCount }
+            await recordLockedCaptures(photoCount)
             try? await LockedCameraCaptureManager.shared.invalidateSessionContent(at: sessionURL)
             return true
         }
@@ -88,9 +88,18 @@ extension BlueberryCamApp {
         }
         
         await addAssetsToBlueberryAlbum(assets)
-        await MainActor.run { self.shutterCount += assets.count }
+        await recordLockedCaptures(assets.count)
         try? await LockedCameraCaptureManager.shared.invalidateSessionContent(at: sessionURL)
         return true
+    }
+    
+    private func recordLockedCaptures(_ count: Int) async {
+        guard count > 0 else { return }
+        
+        await MainActor.run {
+            self.shutterCount += count
+            self.lockedCaptureHapticTrigger += 1
+        }
     }
     
     private func waitForSessionContent(at sessionURL: URL,

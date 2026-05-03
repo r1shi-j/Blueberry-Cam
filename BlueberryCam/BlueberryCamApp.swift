@@ -14,6 +14,7 @@ struct BlueberryCamApp: App {
     @AppStorage("shutterCount") var shutterCount = 0
     @AppStorage("shutterCountBurst") var shutterCountBurst = 0
     @State var permissionModel = PermissionModel()
+    @State var lockedCaptureHapticTrigger = 0
     
     var body: some Scene {
         WindowGroup {
@@ -23,6 +24,7 @@ struct BlueberryCamApp: App {
                 shutterCountBurst: $shutterCountBurst,
                 permissionModel: permissionModel
             )
+            .sensoryFeedback(.impact, trigger: lockedCaptureHapticTrigger)
             .task {
                 await permissionModel.checkAndRequest()
                 await scanExistingSessions()
@@ -58,7 +60,6 @@ struct BlueberryCamApp: App {
 
 // MARK: - FIXME
 // top bar readouts slow to click
-// photos on locked camera have xlong file name
 
 // MARK: - Next Steps
 // Finalise Main app cleanup
