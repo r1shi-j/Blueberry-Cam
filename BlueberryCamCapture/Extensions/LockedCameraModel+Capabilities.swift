@@ -8,18 +8,27 @@ extension LockedCameraModel {
     }
     
     var supportsMacro: Bool {
-        // Macro is typically supported on Pro models with AF on Ultra Wide.
-        // We look for a back camera that can focus closer than 15cm (150mm).
-        let discovery = AVCaptureDevice.DiscoverySession(
-            deviceTypes: [.builtInUltraWideCamera, .builtInWideAngleCamera],
-            mediaType: .video,
-            position: .back
-        )
-        return discovery.devices.contains { $0.minimumFocusDistance > 0 && $0.minimumFocusDistance <= 150 }
+        guard let ultraWide = Lens.ultraWide.captureDevice() else { return false }
+        return ultraWide.minimumFocusDistance > 0 && ultraWide.minimumFocusDistance <= 150
     }
     
     var supportsManualFocus: Bool {
         device?.isLockingFocusWithCustomLensPositionSupported ?? false
+    }
+    
+    var availableLensOptions: [Lens] {
+        let hardwareLenses = [Lens.ultraWide, .wide, .tele2x, .tele4x, .tele8x]
+            .filter { $0 == activeLens || $0.captureDevice() != nil }
+        
+        if captureMode == .raw {
+            return hardwareLenses.filter(\.preservesRawCaptureMode)
+        }
+        
+        if isHighResolutionSelected, !activeLens.isFront {
+            return hardwareLenses.filter(\.preservesHighResolutionCapture)
+        }
+        
+        return hardwareLenses
     }
     
     func buildAvailableFormats() {
@@ -270,7 +279,7 @@ extension LockedCameraModel {
         Lens.allCases.contains { lens in
             lens.isFront == activeLens.isFront &&
             lens.preservesRawCaptureMode &&
-            AVCaptureDevice.default(lens.deviceType, for: .video, position: lens.position) != nil
+            lens.captureDevice() != nil
         }
     }
     
@@ -308,7 +317,7 @@ extension LockedCameraModel {
         Lens.allCases.contains { lens in
             !lens.isFront &&
             lens.preservesHighResolutionCapture &&
-            AVCaptureDevice.default(lens.deviceType, for: .video, position: .back) != nil
+            lens.captureDevice() != nil
         }
     }
 }

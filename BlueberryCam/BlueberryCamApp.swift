@@ -49,6 +49,7 @@ struct BlueberryCamApp: App {
 
 // MARK: - TODO
 // Localise for all iPhones iOS 26+
+// Improve iPad/Mac Support
 // Add tips, welcome screen and tutorials
 
 // Implement 3rd row on TopBarView: Macro, ***dual cam***, (raw) burst, flash, timer buttons
@@ -61,4 +62,3 @@ struct BlueberryCamApp: App {
 // MARK: - FIXME
 
 // MARK: - Next Steps
-// Test on Mac and iPad

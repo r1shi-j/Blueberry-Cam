@@ -33,7 +33,6 @@ extension CameraModel {
     }
     
     private func setupSession() {
-        let initialLens = activeLens
         let metadataTypes = supportedMetadataTypes
         let isMetadataEnabled = recognizeBarcodes && !isTimerCountingDown && !isBurstCapturing
         
@@ -43,12 +42,19 @@ extension CameraModel {
             self.session.beginConfiguration()
             self.session.sessionPreset = .photo
             
-            guard let cam = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back),
-                  let input = try? AVCaptureDeviceInput(device: cam),
+            guard let initialCamera = Lens.initialCaptureDevice(),
+                  let input = try? AVCaptureDeviceInput(device: initialCamera.device),
                   self.session.canAddInput(input) else {
                 self.session.commitConfiguration()
+                Task { @MainActor in
+                    self.errorMessage = "No available camera was found."
+                    self.showError = true
+                }
                 return
             }
+            
+            let initialLens = initialCamera.lens
+            let cam = initialCamera.device
             self.session.addInput(input)
             
             if self.session.canAddOutput(self.photoOutput) {
@@ -74,14 +80,14 @@ extension CameraModel {
             self.enableLensSmudgeDetectionIfSupported(on: cam)
             
             // Keep analysis output orientation aligned with preview from first launch.
-            let isFront = initialLens.isFront
-            let rotationAngle: CGFloat = isFront ? 0 : 90
+            let rotationAngle = Lens.rotationAngle(for: cam, lens: initialLens)
+            let isMirrored = Lens.isMirrored(cam, lens: initialLens)
             for conn in [self.photoOutput.connection(with: .video),
                          self.videoOutput.connection(with: .video)].compactMap({ $0 }) {
                 if conn.isVideoRotationAngleSupported(rotationAngle) {
                     conn.videoRotationAngle = rotationAngle
                 }
-                conn.isVideoMirrored = isFront
+                conn.isVideoMirrored = isMirrored
             }
             
             self.session.commitConfiguration()
@@ -96,9 +102,12 @@ extension CameraModel {
             }
             
             Task { @MainActor in
-                self.session.setControlsDelegate(self, queue: DispatchQueue.main)
+                if self.session.supportsControls {
+                    self.session.setControlsDelegate(self, queue: DispatchQueue.main)
+                }
                 
                 // Match initial flip to lens
+                self.activeLens = initialLens
                 self.flipRotation = initialLens.isFront ? 180 : 0
                 
                 // Restoration of hardware defaults and state

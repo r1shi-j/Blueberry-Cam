@@ -574,7 +574,12 @@ extension CameraModel {
         }
         
         // Update the photo connection rotation
-        photoConnection.videoRotationAngle = degrees
+        if photoConnection.isVideoRotationAngleSupported(degrees) {
+            photoConnection.videoRotationAngle = degrees
+        }
+        if let device, photoConnection.isVideoMirroringSupported {
+            photoConnection.isVideoMirrored = Lens.isMirrored(device, lens: activeLens)
+        }
     }
     
     private func applyFlashModeIfSupported(to settings: AVCapturePhotoSettings) {

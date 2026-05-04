@@ -8,18 +8,48 @@ extension CameraModel {
     }
     
     var supportsMacro: Bool {
-        // Macro is typically supported on Pro models with AF on Ultra Wide.
-        // We look for a back camera that can focus closer than 15cm (150mm).
-        let discovery = AVCaptureDevice.DiscoverySession(
-            deviceTypes: [.builtInUltraWideCamera, .builtInWideAngleCamera],
-            mediaType: .video,
-            position: .back
-        )
-        return discovery.devices.contains { $0.minimumFocusDistance > 0 && $0.minimumFocusDistance <= 150 }
+        guard let ultraWide = Lens.ultraWide.captureDevice() else { return false }
+        return ultraWide.minimumFocusDistance > 0 && ultraWide.minimumFocusDistance <= 150
     }
     
     var supportsManualFocus: Bool {
         device?.isLockingFocusWithCustomLensPositionSupported ?? false
+    }
+    
+    var shouldShowResolutionPicker: Bool {
+        !activeLens.isFront && availableResolutions.count > 1
+    }
+    
+    var canToggleSelfie: Bool {
+        guard !ProcessInfo.processInfo.isiOSAppOnMac else { return false }
+        guard Lens.supportsAlternateFacing(from: activeLens) else { return false }
+        
+        let targetLens: Lens = activeLens.isFront ? .wide : (captureMode == .raw ? .frontUltraWide : .front)
+        guard let currentDevice = device, let targetDevice = targetLens.captureDevice() else { return false }
+        
+        return currentDevice.uniqueID != targetDevice.uniqueID
+    }
+    
+    var availableLensOptions: [Lens] {
+        let baseLenses = activeLens.isFront
+        ? [Lens.frontUltraWide, .front]
+        : [.ultraWide, .wide, .tele2x, .tele4x, .tele8x]
+        
+        let hardwareLenses = baseLenses.filter { $0 == activeLens || $0.captureDevice() != nil }
+        
+        if captureMode == .raw {
+            return hardwareLenses.filter(\.preservesRawCaptureMode)
+        }
+        
+        if isHighResolutionSelected, !activeLens.isFront {
+            return hardwareLenses.filter(\.preservesHighResolutionCapture)
+        }
+        
+        return hardwareLenses
+    }
+    
+    var hasSwitchableLenses: Bool {
+        availableLensOptions.contains { $0 != activeLens }
     }
     
     func buildAvailableFormats() {
@@ -288,7 +318,7 @@ extension CameraModel {
         Lens.allCases.contains { lens in
             lens.isFront == activeLens.isFront &&
             lens.preservesRawCaptureMode &&
-            AVCaptureDevice.default(lens.deviceType, for: .video, position: lens.position) != nil
+            lens.captureDevice() != nil
         }
     }
     
@@ -326,7 +356,7 @@ extension CameraModel {
         Lens.allCases.contains { lens in
             !lens.isFront &&
             lens.preservesHighResolutionCapture &&
-            AVCaptureDevice.default(lens.deviceType, for: .video, position: .back) != nil
+            lens.captureDevice() != nil
         }
     }
 }

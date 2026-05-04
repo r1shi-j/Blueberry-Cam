@@ -32,12 +32,15 @@ extension LockedCameraModel {
             self.session.beginConfiguration()
             self.session.sessionPreset = .photo
             
-            guard let cam = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back),
-                  let input = try? AVCaptureDeviceInput(device: cam),
+            guard let initialCamera = Lens.initialCaptureDevice(),
+                  let input = try? AVCaptureDeviceInput(device: initialCamera.device),
                   self.session.canAddInput(input) else {
                 self.session.commitConfiguration()
                 return
             }
+            
+            let initialLens = initialCamera.lens
+            let cam = initialCamera.device
             self.session.addInput(input)
             
             if self.session.canAddOutput(self.photoOutput) {
@@ -51,11 +54,14 @@ extension LockedCameraModel {
             }
             
             // Keep analysis output orientation aligned with preview from first launch.
+            let rotationAngle = Lens.rotationAngle(for: cam, lens: initialLens)
+            let isMirrored = Lens.isMirrored(cam, lens: initialLens)
             for conn in [photoOutput.connection(with: .video),
                          videoOutput.connection(with: .video)].compactMap({ $0 }) {
-                if conn.isVideoRotationAngleSupported(90) {
-                    conn.videoRotationAngle = 90
+                if conn.isVideoRotationAngleSupported(rotationAngle) {
+                    conn.videoRotationAngle = rotationAngle
                 }
+                conn.isVideoMirrored = isMirrored
             }
             
             self.session.commitConfiguration()
@@ -67,6 +73,7 @@ extension LockedCameraModel {
             }
             
             Task { @MainActor in
+                self.activeLens = initialLens
                 self.device = cam
                 self.configureSubjectAreaMonitoring(for: cam)
                 self.buildAvailableFormats()

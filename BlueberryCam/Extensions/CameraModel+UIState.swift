@@ -12,6 +12,7 @@ extension CameraModel {
     }
     
     func toggleSelfie() {
+        guard canToggleSelfie else { return }
         let target: Lens = activeLens.isFront ? .wide : (captureMode == .raw ? .frontUltraWide : .front)
         switchLens(to: target)
     }

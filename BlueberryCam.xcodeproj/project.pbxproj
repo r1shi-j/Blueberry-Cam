@@ -515,6 +515,8 @@
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.photography";
 				INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace = YES;
 				INFOPLIST_KEY_NSCameraUsageDescription = "Blueberry Cam needs access to your camera to capture photos.";
+				INFOPLIST_KEY_NSCameraUseContinuityCameraDeviceType = YES;
+				INFOPLIST_KEY_NSCameraUseExternalDeviceType = YES;
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Your location is used to add GPS coordinates to photos you take.";
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "Blueberry Cam will save photos directly to your photo library.";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Blueberry Cam needs access to your photo library to save photos to your Blueberry Cam album.";
@@ -559,6 +561,8 @@
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.photography";
 				INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace = YES;
 				INFOPLIST_KEY_NSCameraUsageDescription = "Blueberry Cam needs access to your camera to capture photos.";
+				INFOPLIST_KEY_NSCameraUseContinuityCameraDeviceType = YES;
+				INFOPLIST_KEY_NSCameraUseExternalDeviceType = YES;
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Your location is used to add GPS coordinates to photos you take.";
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "Blueberry Cam will save photos directly to your photo library.";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Blueberry Cam needs access to your photo library to save photos to your Blueberry Cam album.";
@@ -598,6 +602,8 @@
 				INFOPLIST_FILE = BlueberryCamCapture/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = BlueberryCamCapture;
 				INFOPLIST_KEY_NSCameraUsageDescription = "Blueberry Cam needs camera access to capture photos.";
+				INFOPLIST_KEY_NSCameraUseContinuityCameraDeviceType = YES;
+				INFOPLIST_KEY_NSCameraUseExternalDeviceType = YES;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "Blueberry Cam will save photos directly to your photo library.";
 				INFOPLIST_KEY_PHPhotoLibraryPreventAutomaticLimitedAccessAlert = YES;
@@ -632,6 +638,8 @@
 				INFOPLIST_FILE = BlueberryCamCapture/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = BlueberryCamCapture;
 				INFOPLIST_KEY_NSCameraUsageDescription = "Blueberry Cam needs camera access to capture photos.";
+				INFOPLIST_KEY_NSCameraUseContinuityCameraDeviceType = YES;
+				INFOPLIST_KEY_NSCameraUseExternalDeviceType = YES;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "Blueberry Cam will save photos directly to your photo library.";
 				INFOPLIST_KEY_PHPhotoLibraryPreventAutomaticLimitedAccessAlert = YES;

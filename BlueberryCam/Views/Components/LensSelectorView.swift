@@ -15,17 +15,7 @@ extension LensSelectorView {
     
     // MARK: - Properties
     private var displayedLenses: [Lens] {
-        let lenses = cameraModel.activeLens.isFront ? frontLenses : backLenses
-        
-        if cameraModel.captureMode == .raw {
-            return lenses.filter(\.preservesRawCaptureMode)
-        }
-        
-        if cameraModel.isHighResolutionSelected, !cameraModel.activeLens.isFront {
-            return lenses.filter(\.preservesHighResolutionCapture)
-        }
-        
-        return lenses
+        cameraModel.availableLensOptions
     }
     
     private var alternateLenses: [Lens] {
@@ -172,9 +162,6 @@ struct LensSelectorView: View {
     
     @State private var isExpanded = false
     @State private var hapticTrigger = 0
-    
-    private let frontLenses: [Lens] = [.frontUltraWide, .front]
-    private let backLenses: [Lens] = [.ultraWide, .wide, .tele2x, .tele4x, .tele8x]
     
     var body: some View {
         GlassEffectContainer(spacing: 8) {

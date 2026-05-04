@@ -108,7 +108,7 @@ extension LockedCameraModel {
         clearTapPointInteraction(resetDeviceState: false)
         guard d.isLockingFocusWithCustomLensPositionSupported else {
             try? d.lockForConfiguration()
-            d.focusMode = .continuousAutoFocus
+            setPreferredAutoFocusMode(on: d)
             d.unlockForConfiguration()
             isAutoFocus = true
             return
@@ -122,7 +122,7 @@ extension LockedCameraModel {
         guard let d = device else { return }
         clearTapPointInteraction(resetDeviceState: false)
         try? d.lockForConfiguration()
-        d.focusMode = .continuousAutoFocus
+        setPreferredAutoFocusMode(on: d)
         d.unlockForConfiguration()
     }
     
@@ -193,8 +193,8 @@ extension LockedCameraModel {
         if isAutoFocus, d.isFocusPointOfInterestSupported {
             d.focusPointOfInterest = centerPoint
         }
-        if isAutoFocus, d.isFocusModeSupported(.continuousAutoFocus) {
-            d.focusMode = .continuousAutoFocus
+        if isAutoFocus {
+            setPreferredAutoFocusMode(on: d)
         }
         if isAutoExposure, d.isExposurePointOfInterestSupported {
             d.exposurePointOfInterest = centerPoint
@@ -275,11 +275,7 @@ extension LockedCameraModel {
         if d.isFocusPointOfInterestSupported {
             d.focusPointOfInterest = devicePoint
         }
-        if d.isFocusModeSupported(.continuousAutoFocus) {
-            d.focusMode = .continuousAutoFocus
-        } else if d.isFocusModeSupported(.autoFocus) {
-            d.focusMode = .autoFocus
-        }
+        setPreferredAutoFocusMode(on: d)
         if d.isExposurePointOfInterestSupported {
             d.exposurePointOfInterest = devicePoint
         }
@@ -296,12 +292,16 @@ extension LockedCameraModel {
         if d.isFocusPointOfInterestSupported {
             d.focusPointOfInterest = devicePoint
         }
-        if d.isFocusModeSupported(.continuousAutoFocus) {
-            d.focusMode = .continuousAutoFocus
-        } else if d.isFocusModeSupported(.autoFocus) {
-            d.focusMode = .autoFocus
-        }
+        setPreferredAutoFocusMode(on: d)
         d.unlockForConfiguration()
+    }
+    
+    private func setPreferredAutoFocusMode(on device: AVCaptureDevice) {
+        if device.isFocusModeSupported(.continuousAutoFocus) {
+            device.focusMode = .continuousAutoFocus
+        } else if device.isFocusModeSupported(.autoFocus) {
+            device.focusMode = .autoFocus
+        }
     }
     
     private func scheduleTapPointLock(focus: Bool, exposure: Bool) {

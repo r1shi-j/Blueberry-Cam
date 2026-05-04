@@ -1,20 +1,15 @@
 internal import AVFoundation
 import Foundation
+import UIKit
 
 extension CameraModel {
     func setupCameraControls() {
         // Surgical removal to prevent duplicates
-        if let c = cleanUIControl { session.removeControl(c); cleanUIControl = nil }
-        if let filter = filterControl { session.removeControl(filter); filterControl = nil }
-        if let l = lensControl { session.removeControl(l); lensControl = nil }
-        if let e = evControl { session.removeControl(e); evControl = nil }
-        if let i = isoControl { session.removeControl(i); isoControl = nil }
-        if let s = ssControl { session.removeControl(s); ssControl = nil }
-        if let f = focusControl { session.removeControl(f); focusControl = nil }
-        if let wb = wbControl { session.removeControl(wb); wbControl = nil }
+        removeCameraControls()
         
-        // Final wipe of any orphans just in case
-        session.controls.forEach { session.removeControl($0) }
+        guard supportsHardwareCameraControls else {
+            return
+        }
         
         // Early Exit: If settings sheet is active, we don't want any camera controls visible
         if self.appView == .settings {
@@ -29,8 +24,9 @@ extension CameraModel {
             self.appView = AppView.fromIndex(index)
         }
         picker.selectedIndex = self.appView.index
-        self.cleanUIControl = picker
-        session.addControl(picker)
+        if addCameraControl(picker) {
+            self.cleanUIControl = picker
+        }
         
         // Filter Picker
         let availableFilters = PhotoFilter.allCases
@@ -44,8 +40,9 @@ extension CameraModel {
         if let selectedIndex = availableFilters.firstIndex(of: selectedPhotoFilter) {
             filterPicker.selectedIndex = selectedIndex
         }
-        self.filterControl = filterPicker
-        session.addControl(filterPicker)
+        if addCameraControl(filterPicker) {
+            self.filterControl = filterPicker
+        }
         
         // Lens Picker
         //        let availableLenses = Lens.allCases.filter { len in
@@ -76,8 +73,9 @@ extension CameraModel {
             guard let self, !self.isUpdatingHardwareControl else { return }
             self.setExposureBias(value)
         }
-        self.evControl = ev
-        session.addControl(ev)
+        if addCameraControl(ev) {
+            self.evControl = ev
+        }
         
         // ISO Index Picker - mirrors the app ruler stops instead of exposing a long raw hardware range.
         let isoPickerStops = isoStops.isEmpty ? availableISOStops : isoStops
@@ -98,8 +96,9 @@ extension CameraModel {
                     self.applyManualExposure()
                 }
             }
-            self.isoControl = isoPicker
-            session.addControl(isoPicker)
+            if addCameraControl(isoPicker) {
+                self.isoControl = isoPicker
+            }
         }
         
         // Shutter Speed Index Picker - index 0 is slowest, max index is fastest.
@@ -121,8 +120,9 @@ extension CameraModel {
                     self.applyManualExposure()
                 }
             }
-            self.ssControl = ssPicker
-            session.addControl(ssPicker)
+            if addCameraControl(ssPicker) {
+                self.ssControl = ssPicker
+            }
         }
         
         let focus = AVCaptureSlider("Focus", symbolName: "scope", in: 0...1, step: 0.01)
@@ -135,8 +135,9 @@ extension CameraModel {
                 self.applyManualFocus()
             }
         }
-        self.focusControl = focus
-        session.addControl(focus)
+        if addCameraControl(focus) {
+            self.focusControl = focus
+        }
         
         // White Balance Slider
         let wb = AVCaptureSlider("White Balance", symbolName: "thermometer.sun.fill", in: CameraModel.minWhiteBalance...CameraModel.maxWhiteBalance, step: 100)
@@ -149,10 +150,54 @@ extension CameraModel {
                 // Setting whiteBalanceTargetKelvin triggers applyManualWhiteBalance() via didSet if manual WB
             }
         }
-        self.wbControl = wb
-        session.addControl(wb)
+        if addCameraControl(wb) {
+            self.wbControl = wb
+        }
         
         updateCameraControlsMode()
+    }
+    
+    private var supportsHardwareCameraControls: Bool {
+        UIDevice.current.userInterfaceIdiom == .phone && session.supportsControls
+    }
+    
+    @discardableResult
+    private func addCameraControl(_ control: AVCaptureControl) -> Bool {
+        guard supportsHardwareCameraControls, session.canAddControl(control) else {
+            return false
+        }
+        
+        session.addControl(control)
+        return true
+    }
+    
+    private func removeCameraControls() {
+        let controls = [
+            cleanUIControl,
+            filterControl,
+            lensControl,
+            evControl,
+            isoControl,
+            ssControl,
+            focusControl,
+            wbControl
+        ].compactMap { $0 }
+        
+        for control in controls where session.controls.contains(control) {
+            session.removeControl(control)
+        }
+        
+        // Final wipe of any orphans just in case.
+        session.controls.forEach { session.removeControl($0) }
+        
+        cleanUIControl = nil
+        filterControl = nil
+        lensControl = nil
+        evControl = nil
+        isoControl = nil
+        ssControl = nil
+        focusControl = nil
+        wbControl = nil
     }
     
     func updateCameraControlsMode() {

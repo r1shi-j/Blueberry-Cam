@@ -182,6 +182,10 @@ extension TopBarView {
         Colors.buttonBackground
     }
     
+    private var isSelfieButtonDisabled: Bool {
+        cameraModel.isSwitchingLens || !cameraModel.canToggleSelfie
+    }
+    
     // MARK: - Focus Assist properties
     private var focusAssistButtonSymbol: String {
         if cameraModel.showFocusLoupe {
@@ -302,7 +306,7 @@ extension TopBarView {
     // MARK: - Resolution picker
     @ViewBuilder
     private func resolutionPicker() -> some View {
-        if !cameraModel.activeLens.isFront {
+        if cameraModel.shouldShowResolutionPicker {
             HStack(spacing: 0) {
                 ForEach(cameraModel.availableResolutions) { opt in
                     let isSelected = cameraModel.selectedResolution?.id == opt.id
@@ -481,21 +485,23 @@ extension TopBarView {
     }
     
     // MARK: - Selfie switch
+    @ViewBuilder
     private func selfieButton() -> some View {
-        Button {
-            hapticTrigger += 1
-            withAnimation(Animations.selfieToggled) {
-                cameraModel.toggleSelfie()
+        if !isSelfieButtonDisabled {
+            Button {
+                hapticTrigger += 1
+                withAnimation(Animations.selfieToggled) {
+                    cameraModel.toggleSelfie()
+                }
+            } label: {
+                imageIcon(systemName: selfieButtonSymbol, foregroundStyle: selfieButtonForeground, background: selfieButtonBackground)
+                    .rotation3DEffect(
+                        .degrees(cameraModel.activeLens.isFront ? 180 : 0),
+                        axis: (x: 0, y: 1, z: 0),
+                        perspective: 0.1
+                    )
             }
-        } label: {
-            imageIcon(systemName: selfieButtonSymbol, foregroundStyle: selfieButtonForeground, background: selfieButtonBackground)
-                .rotation3DEffect(
-                    .degrees(cameraModel.activeLens.isFront ? 180 : 0),
-                    axis: (x: 0, y: 1, z: 0),
-                    perspective: 0.1
-                )
         }
-        .disabled(cameraModel.isSwitchingLens)
     }
     
     // MARK: - Focus helper

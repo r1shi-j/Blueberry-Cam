@@ -6,7 +6,7 @@ extension CameraModel {
         let lens = switchableLens(for: lens)
         guard !isSwitchingLens else { return }
         guard lens != activeLens else { return }
-        guard let previewCamera = AVCaptureDevice.default(lens.deviceType, for: .video, position: lens.position) else { return }
+        guard let previewCamera = lens.captureDevice() else { return }
         let previousLens = activeLens
         
         // 1. Instant UI update to trigger animations and selection state
@@ -16,10 +16,8 @@ extension CameraModel {
         self.primeResolutionOptions(for: lens, device: previewCamera)
         
         // 2. Capture lens properties before crossing isolation boundary
-        let lensDeviceType = lens.deviceType
-        let lensPosition = lens.position
+        let previewCameraUniqueID = previewCamera.uniqueID
         let lensZoomFactor = lens.zoomFactor
-        let lensIsFront = lens.isFront
         
         // 3. Heavy hardware reconfiguration in background
         sessionQueue.async { [weak self] in
@@ -28,7 +26,7 @@ extension CameraModel {
             self.session.beginConfiguration()
             for input in self.session.inputs { self.session.removeInput(input) }
             
-            guard let cam = AVCaptureDevice.default(lensDeviceType, for: .video, position: lensPosition),
+            guard let cam = Lens.captureDevice(uniqueID: previewCameraUniqueID) ?? lens.captureDevice(),
                   let input = try? AVCaptureDeviceInput(device: cam),
                   self.session.canAddInput(input) else {
                 self.session.commitConfiguration()
@@ -52,13 +50,14 @@ extension CameraModel {
             self.enableLensSmudgeDetectionIfSupported(on: cam)
             
             // Connection properties (Hardware)
-            let rotationAngle: CGFloat = lensIsFront ? 0 : 90
+            let rotationAngle = Lens.rotationAngle(for: cam, lens: lens)
+            let isMirrored = Lens.isMirrored(cam, lens: lens)
             for conn in [self.photoOutput.connection(with: .video),
                          self.videoOutput.connection(with: .video)].compactMap({ $0 }) {
                 if conn.isVideoRotationAngleSupported(rotationAngle) {
                     conn.videoRotationAngle = rotationAngle
                 }
-                conn.isVideoMirrored = lensIsFront
+                conn.isVideoMirrored = isMirrored
             }
             
             self.session.commitConfiguration()
