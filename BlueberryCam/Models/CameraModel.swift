@@ -463,6 +463,7 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
     nonisolated let metadataOutput = AVCaptureMetadataOutput()
     var detectedCodeURL: URL? = nil
     var detectedCodeString: String? = nil
+    var detectedCodes: [DetectedCode] = []
     var ignoredCodes: [String: Date] = [:]
     var barcodeResetTask: Task<Void, Never>?
     var supportedMetadataTypes: [AVMetadataObject.ObjectType] {
