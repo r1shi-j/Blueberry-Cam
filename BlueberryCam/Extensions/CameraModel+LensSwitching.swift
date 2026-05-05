@@ -71,6 +71,7 @@ extension CameraModel {
             // 4. Final synchronization back to UI state
             Task { @MainActor in
                 self.device = cam
+                self.captureRotationCoordinator = AVCaptureDevice.RotationCoordinator(device: cam, previewLayer: nil)
                 self.lensSwitchCompletionCount += 1
                 self.configureLensSmudgeDetection(for: cam)
                 self.configureSubjectAreaMonitoring(for: cam)

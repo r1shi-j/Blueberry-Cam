@@ -942,13 +942,7 @@ extension CaptureView {
         }
         cameraModel.onTimerCountdownSecond = triggerCountdownFeedback
         configureCameraIfPermitted()
-        levelModel.startUpdates()
-        levelModel.setLevelDisplayEnabled(cameraModel.shouldShowLevel && !cameraModel.showSimpleView)
-        
-        // Pass gravity updates to camera model
-        levelModel.onGravityUpdate = { gx, gy, gz in
-            cameraModel.lastGravity = (gx, gy, gz)
-        }
+        syncLevelMotionUpdates()
     }
     
     private func handleOnDisappear() {
@@ -956,6 +950,7 @@ extension CaptureView {
         cameraModel.onStandardPhotoSaved = nil
         cameraModel.onTimerCountdownSecond = nil
         burstFeedbackFadeTask?.cancel()
+        levelModel.setLevelDisplayEnabled(false)
         levelModel.stopUpdates()
         cameraModel.clearTapPointInteraction(resetDeviceState: false)
     }
@@ -974,13 +969,11 @@ extension CaptureView {
     private func handleOnChangeOfPermissionsGranted(_: Bool, new: Bool) {
         if new {
             configureCameraIfPermitted()
-            levelModel.startUpdates()
-            levelModel.setLevelDisplayEnabled(cameraModel.shouldShowLevel && !cameraModel.showSimpleView)
         } else {
             cameraModel.stopBurstCapture()
             cameraModel.stopSession()
-            levelModel.stopUpdates()
         }
+        syncLevelMotionUpdates()
     }
     
     private func handleOnChangeOfSaveLocation(_: SaveLocation, new: SaveLocation) {
@@ -988,28 +981,40 @@ extension CaptureView {
         Task { await permissionModel.checkAndRequest() }
     }
     
-    private func handleOnChangeOfShowingLevel(_: Bool, new: Bool) {
-        levelModel.setLevelDisplayEnabled(new && !cameraModel.showSimpleView)
+    private func handleOnChangeOfShowingLevel(_: Bool, _: Bool) {
+        syncLevelMotionUpdates()
     }
     
     private func handleOnChangeOfScenePhase(_: ScenePhase, newPhase: ScenePhase) {
         if newPhase == .active {
             cameraModel.validateFilesSaveLocation()
             configureCameraIfPermitted()
-            levelModel.startUpdates() // Always start
-            levelModel.setLevelDisplayEnabled(cameraModel.shouldShowLevel && !cameraModel.showSimpleView)
         } else {
             cameraModel.stopBurstCapture()
             cameraModel.stopSession()
-            levelModel.stopUpdates() // Only stop when backgrounded
             if newPhase == .background {
                 cameraModel.clearIgnoredCodes()
             }
         }
+        syncLevelMotionUpdates()
     }
     
-    private func handleOnChangeOfSimpleView(_: Bool, new: Bool) {
-        levelModel.setLevelDisplayEnabled(!new && cameraModel.shouldShowLevel)
+    private func handleOnChangeOfSimpleView(_: Bool, _: Bool) {
+        syncLevelMotionUpdates()
+    }
+    
+    private func syncLevelMotionUpdates() {
+        let shouldRunLevelMotion = permissionModel.allGranted
+        && scenePhase == .active
+        && cameraModel.shouldShowLevel
+        && !cameraModel.showSimpleView
+        
+        levelModel.setLevelDisplayEnabled(shouldRunLevelMotion)
+        if shouldRunLevelMotion {
+            levelModel.startUpdates()
+        } else {
+            levelModel.stopUpdates()
+        }
     }
     
     private func handleOnChangeOfActiveLens(_ oldLens: Lens, _ newLens: Lens) {

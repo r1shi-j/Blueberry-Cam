@@ -479,7 +479,6 @@ struct LockedCaptureView: View {
     let lockedSession: LockedCameraCaptureSession
     
     @State private var cameraModel = LockedCameraModel()
-    @State private var levelModel = LockedLevelMotionModel()
     @State private var selectedControl: ManualControl?
     @State private var hasConfiguredCamera = false
     
@@ -533,17 +532,11 @@ extension LockedCaptureView {
     private func handleOnAppear() {
         cameraModel.onTimerCountdownSecond = triggerCountdownFeedback
         configureCameraIfPermitted()
-        levelModel.startUpdates()
-        
-        levelModel.onGravityUpdate = { gx, gy, gz in
-            cameraModel.lastGravity = (gx, gy, gz)
-        }
     }
     
     private func handleOnDisappear() {
         cameraModel.cancelTimerCountdown()
         cameraModel.onTimerCountdownSecond = nil
-        levelModel.stopUpdates()
         cameraModel.stopSession()
         cameraModel.clearTapPointInteraction(resetDeviceState: false)
     }

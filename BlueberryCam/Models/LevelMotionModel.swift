@@ -9,8 +9,6 @@ enum LevelDisplayMode: Equatable {
 
 @MainActor @Observable
 final class LevelMotionModel {
-    var onGravityUpdate: ((Double, Double, Double) -> Void)?
-    
     // MARK: - Published state
     /// Angle (degrees) of gravity projected onto the screen plane.
     /// 0° = portrait level, ±90° = landscape level.
@@ -59,6 +57,7 @@ final class LevelMotionModel {
     // MARK: - Lifecycle
     func startUpdates() {
         guard motionManager.isDeviceMotionAvailable else { return }
+        guard !motionManager.isDeviceMotionActive else { return }
         UIDevice.current.beginGeneratingDeviceOrientationNotifications()
         impactGenerator = UIImpactFeedbackGenerator(style: .light)
         impactGenerator.prepare()
@@ -70,6 +69,7 @@ final class LevelMotionModel {
     }
     
     func stopUpdates() {
+        guard motionManager.isDeviceMotionActive else { return }
         motionManager.stopDeviceMotionUpdates()
         UIDevice.current.endGeneratingDeviceOrientationNotifications()
     }
@@ -79,9 +79,6 @@ final class LevelMotionModel {
         let gx = motion.gravity.x
         let gy = motion.gravity.y
         let gz = motion.gravity.z
-        
-        // Publish gravity for camera orientation
-        onGravityUpdate?(gx, gy, gz)
         
         // ONLY update level display if enabled
         guard isLevelDisplayEnabled else {

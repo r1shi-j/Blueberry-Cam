@@ -16,6 +16,8 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
     let _pendingSaveLocationBox = SaveLocationBox()
     let _captureContextStore = PhotoCaptureContextStore()
     let _burstCaptureTracker = BurstCaptureTracker()
+    @ObservationIgnored
+    var captureRotationCoordinator: AVCaptureDevice.RotationCoordinator?
     
     // MARK: - Camera Control
     var cleanUIControl: AVCaptureIndexPicker?
@@ -162,8 +164,6 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
     var confettiCannonTrigger = 0
     @ObservationIgnored
     var onStandardPhotoSaved: (() -> Void)?
-    @ObservationIgnored
-    nonisolated(unsafe) var lastGravity: (x: Double, y: Double, z: Double) = (0, -1, 0)
     @ObservationIgnored
     var analysisGridSize: CGSize = .zero
     

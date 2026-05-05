@@ -540,46 +540,51 @@ extension CameraModel {
     }
     
     private func updateCaptureOrientation() {
-        guard session.isRunning, let photoConnection = photoOutput.connection(with: .video), photoConnection.isActive else { return }
+        guard session.isRunning,
+              let device,
+              let photoConnection = photoOutput.connection(with: .video),
+              photoConnection.isActive else { return }
         
-        let (gx, gy, gz) = lastGravity
-        let isFront = activeLens.isFront
+        let coordinator = captureRotationCoordinator(for: device)
+        let preferredDegrees = coordinator.videoRotationAngleForHorizonLevelCapture
         
-        // Determine rotation based on gravity
-        let degrees: CGFloat
-        
-        if abs(gz) > 0.75 {
-            // Device is flat - keep current
-            return
+        if let coordinatorDegrees = supportedCaptureRotationAngle(preferredDegrees, for: photoConnection) {
+            photoConnection.videoRotationAngle = coordinatorDegrees
         }
-        
-        if abs(gy) > abs(gx) {
-            // Portrait orientation
-            if gy < 0 {
-                // Normal portrait
-                degrees = isFront ? 0 : 90
-            } else {
-                // Upside down portrait
-                degrees = isFront ? 180 : 270
-            }
-        } else {
-            // Landscape orientation
-            if gx > 0 {
-                // Landscape right (home button on right)
-                degrees = isFront ? 270 : 180
-            } else {
-                // Landscape left (home button on left)
-                degrees = isFront ? 90 : 0
-            }
-        }
-        
-        // Update the photo connection rotation
-        if photoConnection.isVideoRotationAngleSupported(degrees) {
-            photoConnection.videoRotationAngle = degrees
-        }
-        if let device, photoConnection.isVideoMirroringSupported {
+        if photoConnection.isVideoMirroringSupported {
             photoConnection.isVideoMirrored = Lens.isMirrored(device, lens: activeLens)
         }
+    }
+    
+    private func captureRotationCoordinator(for device: AVCaptureDevice) -> AVCaptureDevice.RotationCoordinator {
+        if let captureRotationCoordinator,
+           captureRotationCoordinator.device?.uniqueID == device.uniqueID {
+            return captureRotationCoordinator
+        }
+        
+        let coordinator = AVCaptureDevice.RotationCoordinator(device: device, previewLayer: nil)
+        captureRotationCoordinator = coordinator
+        return coordinator
+    }
+    
+    private func supportedCaptureRotationAngle(_ degrees: CGFloat,
+                                               for connection: AVCaptureConnection) -> CGFloat? {
+        let normalized = normalizedRotationAngle(degrees)
+        if connection.isVideoRotationAngleSupported(normalized) {
+            return normalized
+        }
+        
+        let nearestRightAngle = normalizedRotationAngle((normalized / 90).rounded() * 90)
+        if connection.isVideoRotationAngleSupported(nearestRightAngle) {
+            return nearestRightAngle
+        }
+        
+        return nil
+    }
+    
+    private func normalizedRotationAngle(_ degrees: CGFloat) -> CGFloat {
+        let remainder = degrees.truncatingRemainder(dividingBy: 360)
+        return remainder >= 0 ? remainder : remainder + 360
     }
     
     private func applyFlashModeIfSupported(to settings: AVCapturePhotoSettings) {

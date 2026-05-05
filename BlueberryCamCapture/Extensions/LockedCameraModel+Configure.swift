@@ -75,6 +75,7 @@ extension LockedCameraModel {
             Task { @MainActor in
                 self.activeLens = initialLens
                 self.device = cam
+                self.captureRotationCoordinator = AVCaptureDevice.RotationCoordinator(device: cam, previewLayer: nil)
                 self.configureSubjectAreaMonitoring(for: cam)
                 self.buildAvailableFormats()
                 self.updateDeviceRanges()

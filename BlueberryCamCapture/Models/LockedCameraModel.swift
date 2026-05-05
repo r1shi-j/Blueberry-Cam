@@ -13,6 +13,8 @@ class LockedCameraModel: NSObject {
     let _pendingCaptureModeBox = CaptureModeBox()
     nonisolated let _captureContextStore = LockedPhotoCaptureContextStore()
     nonisolated let _sessionContentURLBox = SessionURLBox()
+    @ObservationIgnored
+    var captureRotationCoordinator: AVCaptureDevice.RotationCoordinator?
     
     /// Whether the extension has sufficient Photos access to save captures.
     /// Checks both `.addOnly` and `.readWrite` — if either is granted, we can save.
@@ -50,8 +52,6 @@ class LockedCameraModel: NSObject {
     var isCapturing: Bool = false
     var showError: Bool = false
     var errorMessage: String = ""
-    @ObservationIgnored
-    nonisolated(unsafe) var lastGravity: (x: Double, y: Double, z: Double) = (0, -1, 0)
     
     // MARK: - Live readouts
     var liveISO: Float = 0
