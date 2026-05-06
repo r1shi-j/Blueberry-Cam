@@ -315,6 +315,12 @@ extension CameraModel: AVCapturePhotoCaptureDelegate {
                     inputImage: sourceImage
                 ) else { return nil }
                 filteredImage = output
+            case .sepia:
+                guard let output = processedImage(
+                    named: "CISepiaTone",
+                    inputImage: sourceImage
+                ) else { return nil }
+                filteredImage = output
             case .mono:
                 guard let output = processedImage(
                     named: "CIPhotoEffectMono",
@@ -334,16 +340,10 @@ extension CameraModel: AVCapturePhotoCaptureDelegate {
                 ) else { return nil }
                 filteredImage = output
             case .thermal:
-                guard let output = processedImage(
-                    named: "CIThermal",
-                    inputImage: sourceImage
-                ) else { return nil }
+                guard let output = thermalImage(from: sourceImage) else { return nil }
                 filteredImage = output
             case .xRay:
-                guard let output = processedImage(
-                    named: "CIXRay",
-                    inputImage: sourceImage
-                ) else { return nil }
+                guard let output = xRayImage(from: sourceImage) else { return nil }
                 filteredImage = output
                 
             case .comic:
@@ -533,6 +533,156 @@ extension CameraModel: AVCapturePhotoCaptureDelegate {
             filter.setValue(value, forKey: key)
         }
         return filter.outputImage
+    }
+    
+    private nonisolated func thermalImage(from sourceImage: CIImage) -> CIImage? {
+        guard let rangeExpandedImage = toneCurveImage(
+            sourceImage,
+            point0: CIVector(x: 0, y: 0),
+            point1: CIVector(x: 0.18, y: 0.34),
+            point2: CIVector(x: 0.45, y: 0.64),
+            point3: CIVector(x: 0.75, y: 0.88),
+            point4: CIVector(x: 1, y: 1)
+        ),
+              let primedImage = colorControlledImage(
+            rangeExpandedImage,
+            saturation: 1,
+            brightness: 0,
+            contrast: 1.08
+        ),
+              let invertedImage = processedImage(named: "CIColorInvert", inputImage: primedImage),
+              let thermalImage = processedImage(named: "CIThermal", inputImage: invertedImage),
+              let vibrantImage = vibranceImage(thermalImage, amount: 0.55),
+              let warmerImage = colorMatrixImage(
+                vibrantImage,
+                red: 1.18,
+                green: 1.04,
+                blue: 0.68,
+                redBias: 0.02,
+                blueBias: -0.015
+              ),
+              let punchedImage = colorControlledImage(
+                warmerImage,
+                saturation: 1.6,
+                brightness: 0.01,
+                contrast: 1.16
+              ) else { return nil }
+        
+        return sharpenedImage(punchedImage, sharpness: 0.18).map { croppedImage($0, to: sourceImage.extent) }
+    }
+    
+    private nonisolated func xRayImage(from sourceImage: CIImage) -> CIImage? {
+        guard let primedImage = colorControlledImage(
+            sourceImage,
+            saturation: 1,
+            brightness: -0.05,
+            contrast: 0.8
+        ),
+              let xRayImage = processedImage(named: "CIXRay", inputImage: primedImage),
+              let shapedImage = toneCurveImage(
+                xRayImage,
+                point0: CIVector(x: 0, y: 0),
+                point1: CIVector(x: 0.26, y: 0.06),
+                point2: CIVector(x: 0.55, y: 0.32),
+                point3: CIVector(x: 0.82, y: 0.54),
+                point4: CIVector(x: 1, y: 0.78)
+              ),
+              let darkenedImage = gammaAdjustedImage(shapedImage, power: 1.22),
+              let tintedImage = colorMatrixImage(
+                darkenedImage,
+                red: 0.64,
+                green: 0.88,
+                blue: 1.12,
+                redBias: -0.015,
+                greenBias: -0.02,
+                blueBias: 0.018
+              ),
+              let punchedImage = colorControlledImage(
+                tintedImage,
+                saturation: 1,
+                brightness: 0,
+                contrast: 1.18
+              ) else { return nil }
+        
+        return sharpenedImage(punchedImage, sharpness: 0.35).map { croppedImage($0, to: sourceImage.extent) }
+    }
+    
+    private nonisolated func colorControlledImage(_ inputImage: CIImage,
+                                                  saturation: CGFloat,
+                                                  brightness: CGFloat,
+                                                  contrast: CGFloat) -> CIImage? {
+        processedImage(
+            named: "CIColorControls",
+            inputImage: inputImage,
+            parameters: [
+                kCIInputSaturationKey: saturation,
+                kCIInputBrightnessKey: brightness,
+                kCIInputContrastKey: contrast
+            ]
+        )
+    }
+    
+    private nonisolated func gammaAdjustedImage(_ inputImage: CIImage, power: CGFloat) -> CIImage? {
+        processedImage(
+            named: "CIGammaAdjust",
+            inputImage: inputImage,
+            parameters: ["inputPower": power]
+        )
+    }
+    
+    private nonisolated func toneCurveImage(_ inputImage: CIImage,
+                                            point0: CIVector,
+                                            point1: CIVector,
+                                            point2: CIVector,
+                                            point3: CIVector,
+                                            point4: CIVector) -> CIImage? {
+        processedImage(
+            named: "CIToneCurve",
+            inputImage: inputImage,
+            parameters: [
+                "inputPoint0": point0,
+                "inputPoint1": point1,
+                "inputPoint2": point2,
+                "inputPoint3": point3,
+                "inputPoint4": point4
+            ]
+        )
+    }
+    
+    private nonisolated func vibranceImage(_ inputImage: CIImage, amount: CGFloat) -> CIImage? {
+        processedImage(
+            named: "CIVibrance",
+            inputImage: inputImage,
+            parameters: ["inputAmount": amount]
+        )
+    }
+    
+    private nonisolated func colorMatrixImage(_ inputImage: CIImage,
+                                              red: CGFloat,
+                                              green: CGFloat,
+                                              blue: CGFloat,
+                                              redBias: CGFloat,
+                                              greenBias: CGFloat = 0,
+                                              blueBias: CGFloat) -> CIImage? {
+        processedImage(
+            named: "CIColorMatrix",
+            inputImage: inputImage,
+            parameters: [
+                "inputRVector": CIVector(x: red, y: 0, z: 0, w: 0),
+                "inputGVector": CIVector(x: 0, y: green, z: 0, w: 0),
+                "inputBVector": CIVector(x: 0, y: 0, z: blue, w: 0),
+                "inputAVector": CIVector(x: 0, y: 0, z: 0, w: 1),
+                "inputBiasVector": CIVector(x: redBias, y: greenBias, z: blueBias, w: 0)
+            ]
+        )
+    }
+    
+    private nonisolated func sharpenedImage(_ inputImage: CIImage, sharpness: CGFloat) -> CIImage? {
+        processedImage(
+            named: "CISharpenLuminance",
+            inputImage: inputImage,
+            parameters: [kCIInputSharpnessKey: sharpness]
+        )
     }
     
     private nonisolated func croppedImage(_ image: CIImage, to extent: CGRect) -> CIImage {

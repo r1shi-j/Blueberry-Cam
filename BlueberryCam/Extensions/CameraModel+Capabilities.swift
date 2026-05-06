@@ -52,6 +52,14 @@ extension CameraModel {
         availableLensOptions.contains { $0 != activeLens }
     }
     
+    var preferredFilteredCaptureMode: CaptureMode {
+        if availableFormats.contains(.heif) {
+            return .heif
+        }
+        
+        return .jpeg
+    }
+    
     func buildAvailableFormats() {
         // We only enforce this logic if the device is ready.
         guard device != nil else { return }
@@ -72,7 +80,9 @@ extension CameraModel {
         }
         
         let modes: [CaptureMode]
-        if isAutoExposure {
+        if isFilterRestrictingCaptureOptions {
+            modes = visibleModes.filter { $0 != .raw }
+        } else if isAutoExposure {
             modes = visibleModes.filter { mode in
                 switch mode {
                     case .jpeg, .heif:
@@ -158,6 +168,8 @@ extension CameraModel {
             // Current selection became invalid
             selectedResolution = defaultResolution == .max ? enabledOptions.last : enabledOptions.first
         }
+        
+        updateLiveFilterPreviewReferenceSize()
     }
     
     func primeResolutionOptions(for lens: Lens, device: AVCaptureDevice) {
@@ -209,6 +221,8 @@ extension CameraModel {
         } else {
             selectedResolution = defaultResolution == .max ? enabledOptions.last : enabledOptions.first
         }
+        
+        updateLiveFilterPreviewReferenceSize()
     }
     
     func normalizeFlashModeForCurrentDevice() {
@@ -298,6 +312,7 @@ extension CameraModel {
     // MARK: - Capture Settings
     func isFormatEnabled(_ mode: CaptureMode) -> Bool {
         if mode == .raw {
+            guard !isFilterRestrictingCaptureOptions else { return false }
             return canSelectRawCaptureMode
         }
         
@@ -305,6 +320,7 @@ extension CameraModel {
     }
     
     var canSelectRawCaptureMode: Bool {
+        guard !isFilterRestrictingCaptureOptions else { return false }
         guard availableFormats.contains(.raw) else { return false }
         guard !isHighResolutionSelected else { return false }
         if !isAutoExposure {

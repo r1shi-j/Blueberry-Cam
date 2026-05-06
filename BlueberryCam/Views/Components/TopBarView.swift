@@ -241,7 +241,11 @@ extension TopBarView {
     }
     
     private func isReadoutDisabled(for control: ManualControl) -> Bool {
-        (control == ManualControl.ev && !cameraModel.isAutoExposure) ||
+        if cameraModel.isFilterRestrictingCaptureOptions && isExposurePairControl(control) {
+            return true
+        }
+        
+        return (control == ManualControl.ev && !cameraModel.isAutoExposure) ||
         (control == ManualControl.f && !cameraModel.supportsManualFocus)
     }
     
@@ -507,7 +511,7 @@ extension TopBarView {
     // MARK: - Focus helper
     @ViewBuilder
     private func focusHelperButton() -> some View {
-        if !cameraModel.isAutoFocus {
+        if !cameraModel.isLiveFilterPreviewActive, !cameraModel.isAutoFocus {
             Button {
                 hapticTrigger += 1
                 withAnimation(Animations.bouncy) {
@@ -618,6 +622,13 @@ struct TopBarView: View {
         }
         .onChange(of: cameraModel.isAutoExposure) { _, isAutoExposure in
             guard !isAutoExposure, selectedControl == .ev else { return }
+            
+            withAnimation(Animations.bouncy) {
+                selectedControl = nil
+            }
+        }
+        .onChange(of: cameraModel.isFilterRestrictingCaptureOptions) { _, isRestricting in
+            guard isRestricting, isExposurePairControl(selectedControl) else { return }
             
             withAnimation(Animations.bouncy) {
                 selectedControl = nil

@@ -156,6 +156,43 @@ extension CameraModel {
         selectedPhotoFilter = filter
     }
     
+    var isLiveFilterPreviewActive: Bool {
+        selectedPhotoFilter != .off && captureMode != .raw
+    }
+    
+    var isFilterRestrictingCaptureOptions: Bool {
+        selectedPhotoFilter != .off
+    }
+    
+    func enforcePhotoFilterConstraints() {
+        guard selectedPhotoFilter != .off else { return }
+        
+        if !isAutoExposure {
+            isAutoExposure = true
+            setAutoExposure()
+        }
+        
+        if captureMode == .raw {
+            captureMode = preferredFilteredCaptureMode
+        }
+    }
+    
+    func updateLiveFilterPreviewReferenceSize() {
+        if let selectedResolution {
+            liveFilterPreviewReferenceSize = CGSize(
+                width: CGFloat(selectedResolution.width),
+                height: CGFloat(selectedResolution.height)
+            )
+            return
+        }
+        
+        let maxPhotoDimensions = photoOutput.maxPhotoDimensions
+        liveFilterPreviewReferenceSize = CGSize(
+            width: CGFloat(maxPhotoDimensions.width),
+            height: CGFloat(maxPhotoDimensions.height)
+        )
+    }
+    
     func syncAutoRulerValues(
         iso liveISO: Float,
         exposureDuration: CMTime,

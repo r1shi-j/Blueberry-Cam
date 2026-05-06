@@ -156,30 +156,34 @@ struct StatusBarAreaView: View {
     
     var body: some View {
         VStack(spacing: Style.viewVSpacing) {
-            HStack(alignment: .center, spacing: Style.viewHSpacing) {
-                ZStack {
-                    if shouldShowSmallHistogram {
-                        smallHistogram()
-                    } else {
-                        if shouldShowHideLargeHistogram {
-                            hideLargeHistogram()
+            if !cameraModel.isLiveFilterPreviewActive {
+                HStack(alignment: .center, spacing: Style.viewHSpacing) {
+                    ZStack {
+                        if shouldShowSmallHistogram {
+                            smallHistogram()
                         } else {
-                            showHistograms()
+                            if shouldShowHideLargeHistogram {
+                                hideLargeHistogram()
+                            } else {
+                                showHistograms()
+                            }
                         }
                     }
+                    .animation(Animations.bouncy, value: cameraModel.histogramModeSmall)
+                    
+                    Spacer()
+                    
+                    HStack(alignment: .center, spacing: Style.overlayButtonsHSpacing) {
+                        zebras()
+                        clipping()
+                    }
                 }
-                .animation(Animations.bouncy, value: cameraModel.histogramModeSmall)
-                
-                Spacer()
-                
-                HStack(alignment: .center, spacing: Style.overlayButtonsHSpacing) {
-                    zebras()
-                    clipping()
-                }
+                .transition(.move(edge: .top).combined(with: .opacity))
             }
         }
         .padding(.horizontal, Style.viewHPadding)
         .frame(height: Style.viewHeight)
+        .animation(Animations.bouncy, value: cameraModel.isLiveFilterPreviewActive)
         .sensoryFeedback(.impact, trigger: hapticTrigger)
         .sensoryFeedback(.impact(flexibility: .soft), trigger: hapticTriggerR)
     }

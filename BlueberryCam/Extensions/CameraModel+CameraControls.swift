@@ -203,8 +203,8 @@ extension CameraModel {
     func updateCameraControlsMode() {
         filterControl?.isEnabled = captureMode != .raw
         evControl?.isEnabled = isAutoExposure
-        isoControl?.isEnabled = !isAutoExposure
-        ssControl?.isEnabled = !isAutoExposure
+        isoControl?.isEnabled = !isFilterRestrictingCaptureOptions && !isAutoExposure
+        ssControl?.isEnabled = !isFilterRestrictingCaptureOptions && !isAutoExposure
         focusControl?.isEnabled = !isAutoFocus
         wbControl?.isEnabled = !isAutoWhiteBalance
     }

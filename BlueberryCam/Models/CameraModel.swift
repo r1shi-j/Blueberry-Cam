@@ -9,10 +9,15 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
     nonisolated let session = AVCaptureSession()
     nonisolated let photoOutput = AVCapturePhotoOutput()
     nonisolated let videoOutput = AVCaptureVideoDataOutput()
+    nonisolated let liveFilterPreviewOutput = LiveFilterPreviewOutput()
     nonisolated let sessionQueue = DispatchQueue(label: "\(BundleIDs.appID).sessionQueue")
     nonisolated let frameCounter = FrameCounter()
     let _pendingCaptureModeBox = CaptureModeBox()
     let _pendingPhotoFilterBox = PhotoFilterBox()
+    let _liveCaptureModeBox = CaptureModeBox()
+    let _livePhotoFilterBox = PhotoFilterBox()
+    @ObservationIgnored
+    nonisolated(unsafe) var liveFilterPreviewReferenceSize: CGSize = .zero
     let _pendingSaveLocationBox = SaveLocationBox()
     let _captureContextStore = PhotoCaptureContextStore()
     let _burstCaptureTracker = BurstCaptureTracker()
@@ -121,6 +126,10 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
     var captureMode: CaptureMode = .raw {
         didSet {
             if oldValue != captureMode {
+                _liveCaptureModeBox.value = captureMode
+                if captureMode == .raw, selectedPhotoFilter != .off {
+                    selectedPhotoFilter = .off
+                }
                 buildAvailableFormats()
                 refreshFastCapturePrioritizationForBurstMode()
                 updateCameraControlsMode()
@@ -129,7 +138,11 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
     }
     var availableFormats: [CaptureMode] = []
     var enabledFormats: [CaptureMode] = []
-    var selectedResolution: ResolutionOption? = nil
+    var selectedResolution: ResolutionOption? = nil {
+        didSet {
+            updateLiveFilterPreviewReferenceSize()
+        }
+    }
     var availableResolutions: [ResolutionOption] = []
     var enabledResolutions: [ResolutionOption] = []
     var pendingCaptureModeAfterLensSwitch: CaptureMode?
@@ -155,10 +168,14 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
     }
     @ObservationIgnored
     nonisolated(unsafe) var shouldPauseAnalysis = false
-    @ObservationIgnored
     var selectedPhotoFilter: PhotoFilter = .off {
         didSet {
+            guard oldValue != selectedPhotoFilter else { return }
+            _livePhotoFilterBox.value = selectedPhotoFilter
+            enforcePhotoFilterConstraints()
             syncPhotoFilterToHardware()
+            buildAvailableFormats()
+            updateCameraControlsMode()
         }
     }
     var confettiCannonTrigger = 0

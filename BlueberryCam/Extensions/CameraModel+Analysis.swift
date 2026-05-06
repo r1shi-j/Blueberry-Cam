@@ -10,6 +10,16 @@ extension CameraModel: AVCaptureVideoDataOutputSampleBufferDelegate {
     }
     
     nonisolated func processFrame(pixelBuffer: CVPixelBuffer) {
+        let liveFilter = _livePhotoFilterBox.value
+        let isLiveFilterPreviewActive = liveFilter != .off && _liveCaptureModeBox.value != .raw
+        if isLiveFilterPreviewActive {
+            liveFilterPreviewOutput.render(
+                pixelBuffer: pixelBuffer,
+                filter: liveFilter,
+                referenceSize: liveFilterPreviewReferenceSize
+            )
+        }
+        
         guard !shouldPauseAnalysis else { return }
         
         let frameNumber = frameCounter.next()
@@ -30,6 +40,8 @@ extension CameraModel: AVCaptureVideoDataOutputSampleBufferDelegate {
                 }
             }
         }
+        
+        guard !isLiveFilterPreviewActive else { return }
         
         if frameNumber.isMultiple(of: 6),
            let isBright = sampledViewfinderIsBright(pixelBuffer: pixelBuffer) {

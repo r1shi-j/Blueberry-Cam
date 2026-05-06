@@ -211,19 +211,28 @@ extension CaptureView {
     
     // MARK: - Viewfinder
     private func viewFinder(_ previewRect: CGRect) -> some View {
-        CameraPreviewView(session: cameraModel.session, onCapture: {
-            cameraModel.handleShutterButton {
-                triggerShutterFeedback()
-                withAnimation { cameraModel.changeCapturingState(to: true) }
-                Task { @MainActor in
-                    try? await Task.sleep(for: Durations.shutter)
-                    withAnimation { cameraModel.changeCapturingState(to: false) }
+        ZStack {
+            CameraPreviewView(session: cameraModel.session, onCapture: {
+                cameraModel.handleShutterButton {
+                    triggerShutterFeedback()
+                    withAnimation { cameraModel.changeCapturingState(to: true) }
+                    Task { @MainActor in
+                        try? await Task.sleep(for: Durations.shutter)
+                        withAnimation { cameraModel.changeCapturingState(to: false) }
+                    }
+                } onBurstPhotoCaptured: {
+                    triggerShutterFeedback()
+                    shutterCountBurst += 1
                 }
-            } onBurstPhotoCaptured: {
-                triggerShutterFeedback()
-                shutterCountBurst += 1
+            }, proxy: previewProxy)
+            
+            if cameraModel.isLiveFilterPreviewActive {
+                FilteredCameraPreviewView(output: cameraModel.liveFilterPreviewOutput)
+                    .allowsHitTesting(false)
+                    .transition(.opacity)
             }
-        }, proxy: previewProxy)
+        }
+        .animation(Animations.easeInOut, value: cameraModel.isLiveFilterPreviewActive)
         .scaleEffect(visualZoomScale)
         .rotation3DEffect(
             .degrees(cameraModel.flipRotation),
@@ -262,7 +271,7 @@ extension CaptureView {
     // MARK: - Zebras
     @ViewBuilder
     private func zebras(_ previewRect: CGRect) -> some View {
-        if cameraModel.showZebraStripes {
+        if !cameraModel.isLiveFilterPreviewActive, cameraModel.showZebraStripes {
             AnalysisOverlayView(
                 mask: cameraModel.zebraMask,
                 gridSize: cameraModel.analysisGridSize,
@@ -276,7 +285,7 @@ extension CaptureView {
     // MARK: - Highlight Clipping
     @ViewBuilder
     private func highlightClipping(_ previewRect: CGRect) -> some View {
-        if cameraModel.showClipping {
+        if !cameraModel.isLiveFilterPreviewActive, cameraModel.showClipping {
             AnalysisOverlayView(
                 mask: cameraModel.clippingMask,
                 gridSize: cameraModel.analysisGridSize,
@@ -290,7 +299,7 @@ extension CaptureView {
     // MARK: - Focus Peaking
     @ViewBuilder
     private func focusPeaking(_ previewRect: CGRect) -> some View {
-        if !cameraModel.isAutoFocus && cameraModel.showFocusPeaking {
+        if !cameraModel.isLiveFilterPreviewActive, !cameraModel.isAutoFocus && cameraModel.showFocusPeaking {
             AnalysisOverlayView(
                 mask: cameraModel.focusPeakingMask,
                 gridSize: cameraModel.analysisGridSize,
@@ -304,7 +313,7 @@ extension CaptureView {
     // MARK: - Focus Loupe
     @ViewBuilder
     private func focusLoupe(_ previewRect: CGRect) -> some View {
-        if !cameraModel.isAutoFocus && cameraModel.showFocusLoupe, cameraModel.loupeImage != nil {
+        if !cameraModel.isLiveFilterPreviewActive, !cameraModel.isAutoFocus && cameraModel.showFocusLoupe, cameraModel.loupeImage != nil {
             let loupeSize: CGFloat = previewRect.width / 3
             FocusLoupeView(loupeImage: cameraModel.loupeImage)
                 .frame(width: loupeSize, height: loupeSize)
@@ -619,7 +628,7 @@ extension CaptureView {
     // MARK: - Bottom Histogram
     private func bottomHistogram() -> some View {
         ZStack {
-            if cameraModel.histogramModeLarge != .none {
+            if !cameraModel.isLiveFilterPreviewActive, cameraModel.histogramModeLarge != .none {
                 HistogramView(
                     mode: cameraModel.histogramModeLarge,
                     size: .large,
@@ -644,6 +653,7 @@ extension CaptureView {
             }
         }
         .animation(Animations.bouncy, value: cameraModel.histogramModeLarge)
+        .animation(Animations.bouncy, value: cameraModel.isLiveFilterPreviewActive)
     }
     
     // MARK: - Burst Real time Feedback

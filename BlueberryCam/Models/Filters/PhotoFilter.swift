@@ -9,6 +9,7 @@ enum PhotoFilter: String, CaseIterable, Identifiable {
     case temperatureAndTint = "1980s"
     case chrome = "Chrome"
     case instant = "Instant"
+    case sepia = "Sepia"
     case mono = "Mono"
     case tonal = "Tonal"
     case noir = "Noir"
