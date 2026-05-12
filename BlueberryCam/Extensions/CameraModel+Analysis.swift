@@ -6,6 +6,11 @@ extension CameraModel: AVCaptureVideoDataOutputSampleBufferDelegate {
                                    didOutput sampleBuffer: CMSampleBuffer,
                                    from connection: AVCaptureConnection) {
         guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
+        guard output !== secondaryVideoOutput else {
+            _secondaryFrameStore.set(pixelBuffer)
+            return
+        }
+        
         processFrame(pixelBuffer: pixelBuffer)
     }
     

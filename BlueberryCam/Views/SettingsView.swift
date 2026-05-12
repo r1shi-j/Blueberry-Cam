@@ -163,7 +163,7 @@ struct SettingsView: View {
 
                 NavigationLink {
                     Form {
-                        Text("Locked Capture opens Blueberry Cam from system surfaces like Control Centre and the Lock Screen. Some full-app features are unavailable there, including bursts, capture celebrations, overlays such as histograms, zebras, highlight clipping, focus peaking, focus loupe, level and grid, as well as selfie cameras, geotagging location, recognising barcodes. Settings, clean UI and filters will also not be available. Any settings above which you have changed will not be read and so the defaults the app shipped with will be used. Photos captured will be saved to photos not files. The background color will be black.")
+                        Text("Locked Capture opens Blueberry Cam from system surfaces like Control Centre and the Lock Screen. Some full-app features are unavailable there, including bursts, dualcam, capture celebrations, overlays such as histograms, zebras, highlight clipping, focus peaking, focus loupe, level and grid, as well as selfie cameras, geotagging location, recognising barcodes. Settings, clean UI and filters will also not be available. Any settings above which you have changed will not be read and so the defaults the app shipped with will be used. Photos captured will be saved to photos not files. The background color will be black.")
                         Text("You can open the full app from the locked session by clicking the icon in the bottom left.")
                         Text("Photos library usage is only required to search for the album to save photos taken with this app, you can set it to limited access and select no photos, the app still work.")
 
@@ -172,6 +172,7 @@ struct SettingsView: View {
                             Text("With manual controls holding or double tapping will reset it to auto, with manual burst config, double tapping resets to auto.")
                             Text("Tap on a histogram to cycle through, long press to hide it. When both are hidden they can be reshown by tapping the histogram icon in the top left status bar.")
                             Text("Double tapping the camera preview will switch to selfie mode as an alternative to tapping the camera flip icon above the camera preview.")
+                            Text("Applying a filter disables any overlays, enabling dualcam disables overlays, filters, and manual controls.")
                         }
                     }
                     .navigationTitle("About")

@@ -54,7 +54,6 @@ struct BlueberryCamApp: App {
 
 // Implement 3rd row on TopBarView: Macro, ***dual cam***, (raw) burst, flash, timer buttons
 // ProRaw
-// Live filter preview
 // View outside frame
 // Selfie cam horizontal mode and centre stage
 // Customisable accent colours (shutter color per state, top bar pickers)
@@ -62,3 +61,5 @@ struct BlueberryCamApp: App {
 // MARK: - FIXME
 
 // MARK: - Next Steps
+// image rotation bugs still
+// maunal manual burst and manual exposure, if MBurst is ever 0.25 seconds but MExposure is 0.5 seconds then a problem

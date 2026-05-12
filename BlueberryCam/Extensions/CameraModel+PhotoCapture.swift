@@ -130,7 +130,7 @@ extension CameraModel {
     }
     
     private var canStartBurstCapture: Bool {
-        guard session.isRunning, !isTimerCountingDown else { return false }
+        guard activeCaptureSession.isRunning, !isTimerCountingDown else { return false }
         guard isAutoExposure || manualExposureIsFastEnoughForBurst else { return false }
         return true
     }
@@ -275,6 +275,9 @@ extension CameraModel {
                 saveLocation: saveLocation,
                 isBurst: isBurst,
                 burstSessionID: burstSessionID,
+                isDualCameraCapture: isDualCameraEnabled,
+                dualCameraPipPlacement: dualCameraPipPlacement,
+                dualCameraPipRotationAngle: dualCameraPipRotationAngle,
                 onCapture: onCapture
             ),
             for: settings.uniqueID
@@ -539,18 +542,20 @@ extension CameraModel {
         return settings
     }
     
-    private func updateCaptureOrientation() {
-        guard session.isRunning,
+    func updateCaptureOrientation() {
+        guard activeCaptureSession.isRunning,
               let device,
               let photoConnection = photoOutput.connection(with: .video),
               photoConnection.isActive else { return }
         
         let coordinator = captureRotationCoordinator(for: device)
         let preferredDegrees = coordinator.videoRotationAngleForHorizonLevelCapture
+        let captureDegrees = supportedCaptureRotationAngle(preferredDegrees, for: photoConnection)
         
-        if let coordinatorDegrees = supportedCaptureRotationAngle(preferredDegrees, for: photoConnection) {
+        if let coordinatorDegrees = captureDegrees {
             photoConnection.videoRotationAngle = coordinatorDegrees
         }
+        updateDualCameraPipRotationAngle(from: captureDegrees ?? preferredDegrees, device: device)
         if photoConnection.isVideoMirroringSupported {
             photoConnection.isVideoMirrored = Lens.isMirrored(device, lens: activeLens)
         }
@@ -585,6 +590,17 @@ extension CameraModel {
     private func normalizedRotationAngle(_ degrees: CGFloat) -> CGFloat {
         let remainder = degrees.truncatingRemainder(dividingBy: 360)
         return remainder >= 0 ? remainder : remainder + 360
+    }
+    
+    private func updateDualCameraPipRotationAngle(from captureAngle: CGFloat,
+                                                  device: AVCaptureDevice) {
+        let mainPreviewAngle = Lens.rotationAngle(for: device, lens: activeLens)
+        let delta = normalizedRotationAngle(captureAngle - mainPreviewAngle)
+        dualCameraPipRotationAngle = nearestRightAngle(delta)
+    }
+    
+    private func nearestRightAngle(_ degrees: CGFloat) -> CGFloat {
+        normalizedRotationAngle((degrees / 90).rounded() * 90)
     }
     
     private func applyFlashModeIfSupported(to settings: AVCapturePhotoSettings) {

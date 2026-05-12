@@ -1,4 +1,5 @@
 internal import AVFoundation
+import CoreGraphics
 import CoreImage
 import Foundation
 import ImageIO
@@ -30,6 +31,9 @@ extension CameraModel: AVCapturePhotoCaptureDelegate {
             saveLocation: self._pendingSaveLocationBox.value,
             isBurst: false,
             burstSessionID: nil,
+            isDualCameraCapture: false,
+            dualCameraPipPlacement: .topTrailing,
+            dualCameraPipRotationAngle: 0,
             onCapture: nil
         )
         if let error {
@@ -56,11 +60,17 @@ extension CameraModel: AVCapturePhotoCaptureDelegate {
                 isRaw: photo.isRawPhoto,
                 isHEIF: isHeif
             ) ?? data
+            let outputData = self.dualCameraPhotoDataIfNeeded(
+                from: filteredData,
+                context: context,
+                isDNG: photo.isRawPhoto,
+                isHEIF: isHeif
+            ) ?? filteredData
             switch context.saveLocation {
                 case .photos:
-                    self.saveToPhotos(data: filteredData, location: loc, isDNG: photo.isRawPhoto, isHEIF: isHeif, context: context)
+                    self.saveToPhotos(data: outputData, location: loc, isDNG: photo.isRawPhoto, isHEIF: isHeif, context: context)
                 case .files:
-                    self.saveToFiles(data: filteredData, location: loc, isDNG: photo.isRawPhoto, isHEIF: isHeif, context: context)
+                    self.saveToFiles(data: outputData, location: loc, isDNG: photo.isRawPhoto, isHEIF: isHeif, context: context)
             }
             self._burstCaptureTracker.completeProcessing(uniqueID: uniqueID, success: true)
         }
@@ -76,6 +86,9 @@ extension CameraModel: AVCapturePhotoCaptureDelegate {
             saveLocation: self._pendingSaveLocationBox.value,
             isBurst: false,
             burstSessionID: nil,
+            isDualCameraCapture: false,
+            dualCameraPipPlacement: .topTrailing,
+            dualCameraPipRotationAngle: 0,
             onCapture: nil
         )
         guard let error else {
@@ -236,6 +249,210 @@ extension CameraModel: AVCapturePhotoCaptureDelegate {
                 self.showError = true
             }
         }
+    }
+    
+    private nonisolated func dualCameraPhotoDataIfNeeded(from data: Data,
+                                                         context: PhotoCaptureContext,
+                                                         isDNG: Bool,
+                                                         isHEIF: Bool) -> Data? {
+        guard context.isDualCameraCapture, !isDNG else { return nil }
+        guard let pipPixelBuffer = _secondaryFrameStore.currentPixelBuffer() else { return nil }
+        
+        guard let source = CGImageSourceCreateWithData(data as CFData, nil),
+              let mainImage = orientedImage(from: source) else { return nil }
+        
+        let ciContext = CIContext(options: [.cacheIntermediates: false])
+        let pipImage = CIImage(cvPixelBuffer: pipPixelBuffer)
+        guard let pipCGImage = ciContext.createCGImage(pipImage, from: pipImage.extent) else { return nil }
+        guard let compositedImage = compositedDualCameraImage(
+            mainImage: mainImage,
+            pipImage: pipCGImage,
+            pipPlacement: context.dualCameraPipPlacement,
+            pipRotationAngle: context.dualCameraPipRotationAngle
+        ) else { return nil }
+        
+        let outputData = NSMutableData()
+        let outputType = isHEIF ? UTType.heic.identifier : UTType.jpeg.identifier
+        guard let destination = CGImageDestinationCreateWithData(outputData, outputType as CFString, 1, nil) else {
+            return nil
+        }
+        
+        var properties = (CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any]) ?? [:]
+        properties[kCGImagePropertyOrientation] = CGImagePropertyOrientation.up.rawValue
+        properties[kCGImageDestinationLossyCompressionQuality] = 0.95
+        CGImageDestinationAddImage(destination, compositedImage, properties as CFDictionary)
+        addHDRGainMapIfPresent(from: source, to: destination)
+        guard CGImageDestinationFinalize(destination) else { return nil }
+        
+        return outputData as Data
+    }
+    
+    private nonisolated func addHDRGainMapIfPresent(from source: CGImageSource,
+                                                    to destination: CGImageDestination) {
+        if let isoGainMap = CGImageSourceCopyAuxiliaryDataInfoAtIndex(source, 0, kCGImageAuxiliaryDataTypeISOGainMap) {
+            CGImageDestinationAddAuxiliaryDataInfo(destination, kCGImageAuxiliaryDataTypeISOGainMap, isoGainMap)
+            return
+        }
+        
+        if let hdrGainMap = CGImageSourceCopyAuxiliaryDataInfoAtIndex(source, 0, kCGImageAuxiliaryDataTypeHDRGainMap) {
+            CGImageDestinationAddAuxiliaryDataInfo(destination, kCGImageAuxiliaryDataTypeHDRGainMap, hdrGainMap)
+        }
+    }
+    
+    private nonisolated func orientedImage(from source: CGImageSource) -> CGImage? {
+        guard let cgImage = CGImageSourceCreateImageAtIndex(source, 0, nil) else { return nil }
+        let properties = (CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any]) ?? [:]
+        let rawOrientation = properties[kCGImagePropertyOrientation] as? UInt32
+        let orientation = rawOrientation.flatMap(CGImagePropertyOrientation.init(rawValue:)) ?? .up
+        guard orientation != .up else { return cgImage }
+        
+        let ciContext = CIContext(options: [.cacheIntermediates: false])
+        let orientedImage = CIImage(cgImage: cgImage).oriented(orientation)
+        return ciContext.createCGImage(orientedImage, from: orientedImage.extent)
+    }
+    
+    private nonisolated func compositedDualCameraImage(mainImage: CGImage,
+                                                       pipImage: CGImage,
+                                                       pipPlacement: DualCameraPipPlacement,
+                                                       pipRotationAngle: CGFloat) -> CGImage? {
+        let width = mainImage.width
+        let height = mainImage.height
+        let colorSpace = mainImage.colorSpace ?? CGColorSpaceCreateDeviceRGB()
+        let bitmapInfo = CGImageAlphaInfo.premultipliedLast.rawValue
+        guard let context = CGContext(
+            data: nil,
+            width: width,
+            height: height,
+            bitsPerComponent: 8,
+            bytesPerRow: 0,
+            space: colorSpace,
+            bitmapInfo: bitmapInfo
+        ) else { return nil }
+        
+        let canvas = CGRect(x: 0, y: 0, width: width, height: height)
+        context.draw(mainImage, in: canvas)
+        
+        let rotatedPipImage = rotatedRightAngleImage(pipImage, by: pipRotationAngle) ?? pipImage
+        let pipAspectRatio = pipAspectRatio(for: pipRotationAngle)
+        let pipWidth = CGFloat(width) * 0.32
+        let pipHeight = pipWidth / pipAspectRatio
+        let inset = CGFloat(width) * 0.035
+        let displayPlacement = photoPlacement(pipPlacement, for: pipRotationAngle)
+        let pipRect = displayPlacement.photoRect(
+            in: CGSize(width: CGFloat(width), height: CGFloat(height)),
+            pipSize: CGSize(width: pipWidth, height: pipHeight),
+            inset: inset
+        )
+        let cornerRadius = pipWidth * 0.20
+        let rimWidth = max(1.5, pipWidth * 0.006)
+        let innerRect = pipRect.insetBy(dx: rimWidth, dy: rimWidth)
+        let innerCornerRadius = max(0, cornerRadius - rimWidth)
+        let outerPath = CGPath(
+            roundedRect: pipRect,
+            cornerWidth: cornerRadius,
+            cornerHeight: cornerRadius,
+            transform: nil
+        )
+        let innerPath = CGPath(
+            roundedRect: innerRect,
+            cornerWidth: innerCornerRadius,
+            cornerHeight: innerCornerRadius,
+            transform: nil
+        )
+        
+        context.setFillColor(CGColor(red: 0.30, green: 0.28, blue: 0.24, alpha: 0.32))
+        context.addPath(outerPath)
+        context.fillPath()
+        
+        context.saveGState()
+        context.addPath(innerPath)
+        context.clip()
+        drawAspectFill(image: rotatedPipImage, in: innerRect, context: context)
+        context.restoreGState()
+        
+        context.setStrokeColor(CGColor(red: 0.42, green: 0.39, blue: 0.34, alpha: 0.70))
+        context.setLineWidth(max(0.75, pipWidth * 0.0012))
+        context.addPath(outerPath)
+        context.strokePath()
+        
+        context.setStrokeColor(CGColor(red: 0.08, green: 0.07, blue: 0.06, alpha: 0.28))
+        context.setLineWidth(max(0.75, pipWidth * 0.0008))
+        context.addPath(innerPath)
+        context.strokePath()
+        
+        return context.makeImage()
+    }
+    
+    private nonisolated func rotatedRightAngleImage(_ image: CGImage, by degrees: CGFloat) -> CGImage? {
+        let normalizedDegrees = nearestRightAngle(degrees)
+        let orientation: CGImagePropertyOrientation
+        if normalizedDegrees == 90 {
+            orientation = .right
+        } else if normalizedDegrees == 180 {
+            orientation = .down
+        } else if normalizedDegrees == 270 {
+            orientation = .left
+        } else {
+            return image
+        }
+        
+        let ciContext = CIContext(options: [.cacheIntermediates: false])
+        let rotatedImage = CIImage(cgImage: image).oriented(orientation)
+        return ciContext.createCGImage(rotatedImage, from: rotatedImage.extent)
+    }
+    
+    private nonisolated func pipAspectRatio(for rotationAngle: CGFloat) -> CGFloat {
+        if isQuarterTurn(rotationAngle) {
+            return 4.0 / 3.0
+        }
+        
+        return 3.0 / 4.0
+    }
+    
+    private nonisolated func photoPlacement(_ placement: DualCameraPipPlacement,
+                                            for rotationAngle: CGFloat) -> DualCameraPipPlacement {
+        let normalizedDegrees = nearestRightAngle(rotationAngle)
+        if normalizedDegrees == 90 {
+            return placement.rotatedClockwise
+        }
+        if normalizedDegrees == 180 {
+            return placement.opposite
+        }
+        if normalizedDegrees == 270 {
+            return placement.rotatedCounterclockwise
+        }
+        
+        return placement
+    }
+    
+    private nonisolated func isQuarterTurn(_ degrees: CGFloat) -> Bool {
+        let normalizedDegrees = nearestRightAngle(degrees)
+        return normalizedDegrees == 90 || normalizedDegrees == 270
+    }
+    
+    private nonisolated func nearestRightAngle(_ degrees: CGFloat) -> CGFloat {
+        let normalizedDegrees = normalizedRotationAngle(degrees)
+        return normalizedRotationAngle((normalizedDegrees / 90).rounded() * 90)
+    }
+    
+    private nonisolated func normalizedRotationAngle(_ degrees: CGFloat) -> CGFloat {
+        let remainder = degrees.truncatingRemainder(dividingBy: 360)
+        return remainder >= 0 ? remainder : remainder + 360
+    }
+    
+    private nonisolated func drawAspectFill(image: CGImage, in rect: CGRect, context: CGContext) {
+        let sourceSize = CGSize(width: image.width, height: image.height)
+        guard sourceSize.width > 0, sourceSize.height > 0 else { return }
+        
+        let scale = max(rect.width / sourceSize.width, rect.height / sourceSize.height)
+        let drawSize = CGSize(width: sourceSize.width * scale, height: sourceSize.height * scale)
+        let drawRect = CGRect(
+            x: rect.midX - drawSize.width / 2,
+            y: rect.midY - drawSize.height / 2,
+            width: drawSize.width,
+            height: drawSize.height
+        )
+        context.draw(image, in: drawRect)
     }
     
     private nonisolated func dataWithLocationMetadataIfNeeded(_ data: Data,
@@ -545,11 +762,11 @@ extension CameraModel: AVCapturePhotoCaptureDelegate {
             point4: CIVector(x: 1, y: 1)
         ),
               let primedImage = colorControlledImage(
-            rangeExpandedImage,
-            saturation: 1,
-            brightness: 0,
-            contrast: 1.08
-        ),
+                rangeExpandedImage,
+                saturation: 1,
+                brightness: 0,
+                contrast: 1.08
+              ),
               let invertedImage = processedImage(named: "CIColorInvert", inputImage: primedImage),
               let thermalImage = processedImage(named: "CIThermal", inputImage: invertedImage),
               let vibrantImage = vibranceImage(thermalImage, amount: 0.55),

@@ -38,6 +38,7 @@ enum Animations {
     static let captureFlash: Animation = .easeOut(duration: 0.15)
     static let permissionsShown: Animation = .easeInOut(duration: 0.4)
     static let manualControlSnap: Animation = .snappy
+    static let pipSnap: Animation = .spring(response: 0.34, dampingFraction: 0.66)
     static let readoutShown: Animation = .smooth(duration: 0.34)
     static let selfieToggled: Animation = .easeInOut(duration: 0.28)
 }

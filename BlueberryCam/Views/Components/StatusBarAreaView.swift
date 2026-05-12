@@ -156,7 +156,7 @@ struct StatusBarAreaView: View {
     
     var body: some View {
         VStack(spacing: Style.viewVSpacing) {
-            if !cameraModel.isLiveFilterPreviewActive {
+            if !cameraModel.isLiveFilterPreviewActive, !cameraModel.isDualCameraEnabled {
                 HStack(alignment: .center, spacing: Style.viewHSpacing) {
                     ZStack {
                         if shouldShowSmallHistogram {
@@ -184,6 +184,7 @@ struct StatusBarAreaView: View {
         .padding(.horizontal, Style.viewHPadding)
         .frame(height: Style.viewHeight)
         .animation(Animations.bouncy, value: cameraModel.isLiveFilterPreviewActive)
+        .animation(Animations.bouncy, value: cameraModel.isDualCameraEnabled)
         .sensoryFeedback(.impact, trigger: hapticTrigger)
         .sensoryFeedback(.impact(flexibility: .soft), trigger: hapticTriggerR)
     }

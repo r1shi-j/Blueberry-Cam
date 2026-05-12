@@ -13,6 +13,11 @@ extension CameraModel {
     
     func toggleSelfie() {
         guard canToggleSelfie else { return }
+        if isDualCameraEnabled {
+            swapDualCameras()
+            return
+        }
+        
         let target: Lens = activeLens.isFront ? .wide : (captureMode == .raw ? .frontUltraWide : .front)
         switchLens(to: target)
     }
@@ -157,11 +162,11 @@ extension CameraModel {
     }
     
     var isLiveFilterPreviewActive: Bool {
-        selectedPhotoFilter != .off && captureMode != .raw
+        !isDualCameraEnabled && selectedPhotoFilter != .off && captureMode != .raw
     }
     
     var isFilterRestrictingCaptureOptions: Bool {
-        selectedPhotoFilter != .off
+        !isDualCameraEnabled && selectedPhotoFilter != .off
     }
     
     func enforcePhotoFilterConstraints() {

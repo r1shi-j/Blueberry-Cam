@@ -9,9 +9,15 @@ extension CameraModel {
     }
     
     func startSession() {
-        sessionQueue.async {
-            if !self.session.isRunning {
-                self.session.startRunning()
+        let shouldUseDualSession = isDualCameraEnabled
+        sessionQueue.async { [weak self] in
+            guard let self else { return }
+            let captureSession = shouldUseDualSession ? self.dualSession ?? self.session : self.session
+            if !captureSession.isRunning {
+                captureSession.startRunning()
+            }
+            Task { @MainActor [weak self] in
+                self?.updateCaptureOrientation()
             }
         }
     }
@@ -20,6 +26,9 @@ extension CameraModel {
         sessionQueue.async {
             if self.session.isRunning {
                 self.session.stopRunning()
+            }
+            if let dualSession = self.dualSession, dualSession.isRunning {
+                dualSession.stopRunning()
             }
         }
     }
@@ -40,7 +49,7 @@ extension CameraModel {
             guard let self else { return }
             
             self.session.beginConfiguration()
-            self.session.sessionPreset = .photo
+            self.configureSupportedPhotoSessionPreset()
             
             guard let initialCamera = Lens.initialCaptureDevice(),
                   let input = try? AVCaptureDeviceInput(device: initialCamera.device),
@@ -168,6 +177,18 @@ extension CameraModel {
         self.shouldPrioritizeBurstSpeed = defaults.object(forKey: "shouldPrioritizeBurstSpeed") as? Bool ?? true
         self.shouldShowBurstFeedback = defaults.object(forKey: "shouldShowBurstFeedback") as? Bool ?? false
         self.shouldShowConfettiCannons = defaults.object(forKey: "shouldShowConfettiCannons") as? Bool ?? true
+    }
+    
+    nonisolated func configureSupportedPhotoSessionPreset() {
+        configureSupportedPhotoSessionPreset(for: session)
+    }
+    
+    nonisolated func configureSupportedPhotoSessionPreset(for captureSession: AVCaptureSession) {
+        if captureSession.canSetSessionPreset(.photo) {
+            captureSession.sessionPreset = .photo
+        } else if captureSession.canSetSessionPreset(.inputPriority) {
+            captureSession.sessionPreset = .inputPriority
+        }
     }
     
     func resetToDefaults() {

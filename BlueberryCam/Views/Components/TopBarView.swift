@@ -12,7 +12,10 @@ extension TopBarView {
         static let verticalButtonPadding: CGFloat = 5
         static let horizontalPickerPadding: CGFloat = 10
         static let pickerCornerRadius: CGFloat = 6
+        static let verticalPadding: CGFloat = 0
+        static let expandedVerticalPadding: CGFloat = 10
         static let rowSpacing: CGFloat = 14
+        static let expandedRowSpacing: CGFloat = 24
         static let row1Spacing: CGFloat = 12
         static let row2Spacing: CGFloat = 16
         static let row3Spacing: CGFloat = 16
@@ -94,19 +97,19 @@ extension TopBarView {
     }
     
     private var dualcamButtonForeground: Color {
-        Colors.buttonText
+        cameraModel.isDualCameraEnabled ? Style.selectedForeground : Colors.buttonText
     }
     
     private var dualcamButtonBackground: Color {
-        Colors.buttonBackground
+        cameraModel.isDualCameraEnabled ? Style.selectedBackground : Colors.buttonBackground
     }
     
     private var dualcamButtonOpacity: Double {
-        Style.disabledOpacity
+        cameraModel.supportsDualCamera && !cameraModel.isSwitchingLens ? 1.0 : Style.disabledOpacity
     }
     
     private var isDualcamButtonDisabled: Bool {
-        true
+        !cameraModel.supportsDualCamera || cameraModel.isSwitchingLens
     }
     
     // MARK: - Burst properties
@@ -241,6 +244,10 @@ extension TopBarView {
     }
     
     private func isReadoutDisabled(for control: ManualControl) -> Bool {
+        if cameraModel.isDualCameraEnabled && control != .ev {
+            return true
+        }
+        
         if cameraModel.isFilterRestrictingCaptureOptions && isExposurePairControl(control) {
             return true
         }
@@ -403,6 +410,9 @@ extension TopBarView {
     private func dualcamButton() -> some View {
         Button {
             hapticTrigger += 1
+            withAnimation(Animations.bouncy) {
+                cameraModel.toggleDualCameraMode()
+            }
         } label: {
             imageIcon(systemName: dualcamButtonSymbol, foregroundStyle: dualcamButtonForeground, background: dualcamButtonBackground)
         }
@@ -511,7 +521,7 @@ extension TopBarView {
     // MARK: - Focus helper
     @ViewBuilder
     private func focusHelperButton() -> some View {
-        if !cameraModel.isLiveFilterPreviewActive, !cameraModel.isAutoFocus {
+        if !cameraModel.isDualCameraEnabled, !cameraModel.isLiveFilterPreviewActive, !cameraModel.isAutoFocus {
             Button {
                 hapticTrigger += 1
                 withAnimation(Animations.bouncy) {
@@ -559,12 +569,16 @@ struct TopBarView: View {
     @State private var burstFrameLimitInput = ""
     
     var body: some View {
-        VStack(spacing: Style.rowSpacing) {
+        VStack(spacing: cameraModel.isDualCameraEnabled ? Style.expandedRowSpacing : Style.rowSpacing) {
             // MARK: Row 1
-            HStack(alignment: .center, spacing: Style.row1Spacing) {
-                readouts()
+            if !cameraModel.isDualCameraEnabled {
+                HStack(alignment: .center, spacing: Style.row1Spacing) {
+                    readouts()
+                        .opacity(cameraModel.isDualCameraEnabled ? 0 : 1)
+                        .disabled(cameraModel.isDualCameraEnabled)
+                }
+                .padding(.horizontal, Style.row1HPadding)
             }
-            .padding(.horizontal, Style.row1HPadding)
             
             // MARK: Row 2
             HStack(alignment: .center, spacing: Style.row2Spacing) {
@@ -577,7 +591,7 @@ struct TopBarView: View {
             HStack(alignment: .center, spacing: Style.row3Spacing) {
                 flashButton()
                 macroButton()
-                // TODO: dualcamButton()
+                dualcamButton()
                 burstButton()
                 timerButton()
                 selfieButton()
@@ -586,6 +600,7 @@ struct TopBarView: View {
             .padding(.horizontal, Style.row3HPadding)
             .animation(Animations.bouncy, value: cameraModel.isAutoFocus)
         }
+        .padding(.vertical, cameraModel.isDualCameraEnabled ? Style.expandedVerticalPadding : Style.verticalPadding)
         .sensoryFeedback(.impact, trigger: hapticTrigger)
         .sensoryFeedback(.impact(flexibility: .soft), trigger: hapticTriggerR)
         .alert(Alerts.burstIntervalTitle, isPresented: $isShowingBurstIntervalAlert) {
@@ -629,6 +644,13 @@ struct TopBarView: View {
         }
         .onChange(of: cameraModel.isFilterRestrictingCaptureOptions) { _, isRestricting in
             guard isRestricting, isExposurePairControl(selectedControl) else { return }
+            
+            withAnimation(Animations.bouncy) {
+                selectedControl = nil
+            }
+        }
+        .onChange(of: cameraModel.isDualCameraEnabled) { _, isEnabled in
+            guard isEnabled, selectedControl != .ev else { return }
             
             withAnimation(Animations.bouncy) {
                 selectedControl = nil

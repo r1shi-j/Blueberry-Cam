@@ -3,6 +3,11 @@ import Foundation
 
 extension CameraModel {
     func switchLens(to lens: Lens) {
+        if isDualCameraEnabled {
+            switchDualMainLens(to: lens)
+            return
+        }
+        
         let lens = switchableLens(for: lens)
         guard !isSwitchingLens else { return }
         guard lens != activeLens else { return }

@@ -16,7 +16,7 @@ enum Lens: String, CaseIterable {
         }
     }
     
-    var isFront: Bool { self == .front || self == .frontUltraWide }
+    nonisolated var isFront: Bool { self == .front || self == .frontUltraWide }
     
     var deviceType: AVCaptureDevice.DeviceType {
         switch self {
@@ -145,7 +145,7 @@ enum Lens: String, CaseIterable {
         return availableVideoDevices.first(where: { $0.uniqueID == uniqueID })
     }
     
-    static func rotationAngle(for device: AVCaptureDevice, lens: Lens) -> CGFloat {
+    nonisolated static func rotationAngle(for device: AVCaptureDevice, lens: Lens) -> CGFloat {
         if device.isContinuityCamera || device.deviceType == .external || device.position == .unspecified {
             return 0
         }
@@ -153,11 +153,11 @@ enum Lens: String, CaseIterable {
         return lens.isFront ? 0 : 90
     }
     
-    static func isMirrored(_ device: AVCaptureDevice, lens: Lens) -> Bool {
+    nonisolated static func isMirrored(_ device: AVCaptureDevice, lens: Lens) -> Bool {
         return lens.isFront && hasMultipleVideoDevices
     }
     
-    static var hasMultipleVideoDevices: Bool {
+    nonisolated static var hasMultipleVideoDevices: Bool {
         availableVideoDevices.count > 1
     }
     
@@ -167,7 +167,7 @@ enum Lens: String, CaseIterable {
         return devices.first(where: { !$0.isSuspended }) ?? devices.first
     }
     
-    private static var availableVideoDevices: [AVCaptureDevice] {
+    private nonisolated static var availableVideoDevices: [AVCaptureDevice] {
         let devices = AVCaptureDevice.DiscoverySession(
             deviceTypes: generalPurposeDeviceTypes,
             mediaType: .video,
@@ -182,7 +182,7 @@ enum Lens: String, CaseIterable {
         }
     }
     
-    private static var generalPurposeDeviceTypes: [AVCaptureDevice.DeviceType] {
+    private nonisolated static var generalPurposeDeviceTypes: [AVCaptureDevice.DeviceType] {
         [
             .builtInWideAngleCamera,
             .builtInTrueDepthCamera,

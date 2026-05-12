@@ -8,20 +8,27 @@ extension CameraModel {
     }
     
     var supportsMacro: Bool {
+        guard !isDualCameraEnabled else { return false }
         guard let ultraWide = Lens.ultraWide.captureDevice() else { return false }
         return ultraWide.minimumFocusDistance > 0 && ultraWide.minimumFocusDistance <= 150
     }
     
     var supportsManualFocus: Bool {
-        device?.isLockingFocusWithCustomLensPositionSupported ?? false
+        guard !isDualCameraEnabled else { return false }
+        return device?.isLockingFocusWithCustomLensPositionSupported ?? false
     }
     
     var shouldShowResolutionPicker: Bool {
-        !activeLens.isFront && availableResolutions.count > 1
+        guard !isDualCameraEnabled else { return false }
+        return !activeLens.isFront && availableResolutions.count > 1
     }
     
     var canToggleSelfie: Bool {
         guard !ProcessInfo.processInfo.isiOSAppOnMac else { return false }
+        if isDualCameraEnabled {
+            return secondaryLens != nil && !isConfiguringDualCamera
+        }
+        
         guard Lens.supportsAlternateFacing(from: activeLens) else { return false }
         
         let targetLens: Lens = activeLens.isFront ? .wide : (captureMode == .raw ? .frontUltraWide : .front)
@@ -36,16 +43,17 @@ extension CameraModel {
         : [.ultraWide, .wide, .tele2x, .tele4x, .tele8x]
         
         let hardwareLenses = baseLenses.filter { $0 == activeLens || $0.captureDevice() != nil }
+        let compatibleLenses = isDualCameraEnabled ? hardwareLenses.filter { canUseDualCamera(mainLens: $0) } : hardwareLenses
         
         if captureMode == .raw {
-            return hardwareLenses.filter(\.preservesRawCaptureMode)
+            return compatibleLenses.filter(\.preservesRawCaptureMode)
         }
         
         if isHighResolutionSelected, !activeLens.isFront {
-            return hardwareLenses.filter(\.preservesHighResolutionCapture)
+            return compatibleLenses.filter(\.preservesHighResolutionCapture)
         }
         
-        return hardwareLenses
+        return compatibleLenses
     }
     
     var hasSwitchableLenses: Bool {
@@ -72,7 +80,7 @@ extension CameraModel {
             visibleModes.append(.heif)
         }
         visibleModes.append(.jpeg)
-        if !photoOutput.availableRawPhotoPixelFormatTypes.isEmpty {
+        if !isDualCameraEnabled, !photoOutput.availableRawPhotoPixelFormatTypes.isEmpty {
             visibleModes.append(.raw)
         }
         if availableFormats != visibleModes {
@@ -80,7 +88,9 @@ extension CameraModel {
         }
         
         let modes: [CaptureMode]
-        if isFilterRestrictingCaptureOptions {
+        if isDualCameraEnabled {
+            modes = visibleModes.filter { $0 != .raw }
+        } else if isFilterRestrictingCaptureOptions {
             modes = visibleModes.filter { $0 != .raw }
         } else if isAutoExposure {
             modes = visibleModes.filter { mode in
@@ -320,6 +330,7 @@ extension CameraModel {
     }
     
     var canSelectRawCaptureMode: Bool {
+        guard !isDualCameraEnabled else { return false }
         guard !isFilterRestrictingCaptureOptions else { return false }
         guard availableFormats.contains(.raw) else { return false }
         guard !isHighResolutionSelected else { return false }

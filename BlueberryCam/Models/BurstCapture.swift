@@ -1,3 +1,4 @@
+import CoreGraphics
 import Foundation
 
 struct PhotoCaptureContext: Sendable {
@@ -6,6 +7,9 @@ struct PhotoCaptureContext: Sendable {
     let saveLocation: SaveLocation
     let isBurst: Bool
     let burstSessionID: Int?
+    let isDualCameraCapture: Bool
+    let dualCameraPipPlacement: DualCameraPipPlacement
+    let dualCameraPipRotationAngle: CGFloat
     let onCapture: (@MainActor @Sendable () -> Void)?
 }
 

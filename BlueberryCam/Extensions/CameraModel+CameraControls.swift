@@ -10,6 +10,7 @@ extension CameraModel {
         guard supportsHardwareCameraControls else {
             return
         }
+        activeCaptureSession.setControlsDelegate(self, queue: DispatchQueue.main)
         
         // Early Exit: If settings sheet is active, we don't want any camera controls visible
         if self.appView == .settings {
@@ -28,20 +29,27 @@ extension CameraModel {
             self.cleanUIControl = picker
         }
         
-        // Filter Picker
-        let availableFilters = PhotoFilter.allCases
-        let filterTitles = availableFilters.map(\.rawValue)
-        let filterPicker = AVCaptureIndexPicker("Filters", symbolName: "camera.filters", localizedIndexTitles: filterTitles)
-        filterPicker.setActionQueue(.main) { [weak self] index in
-            guard let self else { return }
-            guard index >= 0 && index < availableFilters.count else { return }
-            self.changePhotoFilter(to: availableFilters[index])
+        guard !isDualCameraEnabled else {
+            updateCameraControlsMode()
+            return
         }
-        if let selectedIndex = availableFilters.firstIndex(of: selectedPhotoFilter) {
-            filterPicker.selectedIndex = selectedIndex
-        }
-        if addCameraControl(filterPicker) {
-            self.filterControl = filterPicker
+        
+        if !isDualCameraEnabled {
+            // Filter Picker
+            let availableFilters = PhotoFilter.allCases
+            let filterTitles = availableFilters.map(\.rawValue)
+            let filterPicker = AVCaptureIndexPicker("Filters", symbolName: "camera.filters", localizedIndexTitles: filterTitles)
+            filterPicker.setActionQueue(.main) { [weak self] index in
+                guard let self else { return }
+                guard index >= 0 && index < availableFilters.count else { return }
+                self.changePhotoFilter(to: availableFilters[index])
+            }
+            if let selectedIndex = availableFilters.firstIndex(of: selectedPhotoFilter) {
+                filterPicker.selectedIndex = selectedIndex
+            }
+            if addCameraControl(filterPicker) {
+                self.filterControl = filterPicker
+            }
         }
         
         // Lens Picker
@@ -77,97 +85,100 @@ extension CameraModel {
             self.evControl = ev
         }
         
-        // ISO Index Picker - mirrors the app ruler stops instead of exposing a long raw hardware range.
-        let isoPickerStops = isoStops.isEmpty ? availableISOStops : isoStops
-        if !isoPickerStops.isEmpty {
-            let isoPicker = AVCaptureIndexPicker("ISO", symbolName: "film", numberOfIndexes: isoPickerStops.count) { index in
-                guard isoPickerStops.indices.contains(index) else { return "" }
-                return Self.formatISO(isoPickerStops[index])
-            }
-            isoPicker.selectedIndex = nearestISOStopIndex(in: isoPickerStops, to: iso) ?? 0
-            isoPicker.setActionQueue(.main) { [weak self] index in
-                guard let self, !self.isUpdatingHardwareControl else { return }
-                let stops = self.isoStops.isEmpty ? self.availableISOStops : self.isoStops
-                guard stops.indices.contains(index) else { return }
-                
-                let nextISO = stops[index]
-                if abs(self.iso - nextISO) > 0.1 {
-                    self.iso = nextISO
-                    self.applyManualExposure()
+        if !isDualCameraEnabled {
+            // ISO Index Picker - mirrors the app ruler stops instead of exposing a long raw hardware range.
+            let isoPickerStops = isoStops.isEmpty ? availableISOStops : isoStops
+            if !isoPickerStops.isEmpty {
+                let isoPicker = AVCaptureIndexPicker("ISO", symbolName: "film", numberOfIndexes: isoPickerStops.count) { index in
+                    guard isoPickerStops.indices.contains(index) else { return "" }
+                    return Self.formatISO(isoPickerStops[index])
+                }
+                isoPicker.selectedIndex = nearestISOStopIndex(in: isoPickerStops, to: iso) ?? 0
+                isoPicker.setActionQueue(.main) { [weak self] index in
+                    guard let self, !self.isUpdatingHardwareControl else { return }
+                    let stops = self.isoStops.isEmpty ? self.availableISOStops : self.isoStops
+                    guard stops.indices.contains(index) else { return }
+                    
+                    let nextISO = stops[index]
+                    if abs(self.iso - nextISO) > 0.1 {
+                        self.iso = nextISO
+                        self.applyManualExposure()
+                    }
+                }
+                if addCameraControl(isoPicker) {
+                    self.isoControl = isoPicker
                 }
             }
-            if addCameraControl(isoPicker) {
-                self.isoControl = isoPicker
-            }
-        }
-        
-        // Shutter Speed Index Picker - index 0 is slowest, max index is fastest.
-        // This solves both the negative sign formatting limitations of AVCaptureSlider
-        // and ensures we only select valid stops for the current camera.
-        if shutterSpeeds.count > 0 {
-            let ssPicker = AVCaptureIndexPicker("Shutter Speed", symbolName: "lightspectrum.horizontal", numberOfIndexes: shutterSpeeds.count) { [weak self] index in
-                guard let self else { return "" }
-                guard index >= 0 && index < self.shutterSpeeds.count else { return "" }
-                return Self.formatCameraControlShutter(self.shutterSpeeds[index])
-            }
-            // Seed to current shutterIndex
-            let clampedIdx = max(0, min(shutterSpeeds.count - 1, shutterIndex))
-            ssPicker.selectedIndex = clampedIdx
-            ssPicker.setActionQueue(.main) { [weak self] index in
-                guard let self, !self.isUpdatingHardwareControl else { return }
-                if self.shutterIndex != index {
-                    self.shutterIndex = index
-                    self.applyManualExposure()
+            
+            // Shutter Speed Index Picker - index 0 is slowest, max index is fastest.
+            // This solves both the negative sign formatting limitations of AVCaptureSlider
+            // and ensures we only select valid stops for the current camera.
+            if shutterSpeeds.count > 0 {
+                let ssPicker = AVCaptureIndexPicker("Shutter Speed", symbolName: "lightspectrum.horizontal", numberOfIndexes: shutterSpeeds.count) { [weak self] index in
+                    guard let self else { return "" }
+                    guard index >= 0 && index < self.shutterSpeeds.count else { return "" }
+                    return Self.formatCameraControlShutter(self.shutterSpeeds[index])
+                }
+                // Seed to current shutterIndex
+                let clampedIdx = max(0, min(shutterSpeeds.count - 1, shutterIndex))
+                ssPicker.selectedIndex = clampedIdx
+                ssPicker.setActionQueue(.main) { [weak self] index in
+                    guard let self, !self.isUpdatingHardwareControl else { return }
+                    if self.shutterIndex != index {
+                        self.shutterIndex = index
+                        self.applyManualExposure()
+                    }
+                }
+                if addCameraControl(ssPicker) {
+                    self.ssControl = ssPicker
                 }
             }
-            if addCameraControl(ssPicker) {
-                self.ssControl = ssPicker
+            
+            let focus = AVCaptureSlider("Focus", symbolName: "scope", in: 0...1, step: 0.01)
+            focus.value = lensPosition
+            focus.setActionQueue(.main) { [weak self] value in
+                guard let self, !self.isUpdatingHardwareControl, !self.isAutoFocus else { return }
+                let normalized = max(0.0, min(1.0, value))
+                if abs(self.lensPosition - normalized) >= 0.005 {
+                    self.lensPosition = normalized
+                    self.applyManualFocus()
+                }
             }
-        }
-        
-        let focus = AVCaptureSlider("Focus", symbolName: "scope", in: 0...1, step: 0.01)
-        focus.value = lensPosition
-        focus.setActionQueue(.main) { [weak self] value in
-            guard let self, !self.isUpdatingHardwareControl, !self.isAutoFocus else { return }
-            let normalized = max(0.0, min(1.0, value))
-            if abs(self.lensPosition - normalized) >= 0.005 {
-                self.lensPosition = normalized
-                self.applyManualFocus()
+            if addCameraControl(focus) {
+                self.focusControl = focus
             }
-        }
-        if addCameraControl(focus) {
-            self.focusControl = focus
-        }
-        
-        // White Balance Slider
-        let wb = AVCaptureSlider("White Balance", symbolName: "thermometer.sun.fill", in: CameraModel.minWhiteBalance...CameraModel.maxWhiteBalance, step: 100)
-        wb.localizedValueFormat = "%@K"
-        wb.value = max(CameraModel.minWhiteBalance, min(CameraModel.maxWhiteBalance, whiteBalanceTargetKelvin))
-        wb.setActionQueue(.main) { [weak self] value in
-            guard let self, !self.isUpdatingHardwareControl else { return }
-            if abs(self.whiteBalanceTargetKelvin - value) > 10 {
-                self.whiteBalanceTargetKelvin = value
-                // Setting whiteBalanceTargetKelvin triggers applyManualWhiteBalance() via didSet if manual WB
+            
+            // White Balance Slider
+            let wb = AVCaptureSlider("White Balance", symbolName: "thermometer.sun.fill", in: CameraModel.minWhiteBalance...CameraModel.maxWhiteBalance, step: 100)
+            wb.localizedValueFormat = "%@K"
+            wb.value = max(CameraModel.minWhiteBalance, min(CameraModel.maxWhiteBalance, whiteBalanceTargetKelvin))
+            wb.setActionQueue(.main) { [weak self] value in
+                guard let self, !self.isUpdatingHardwareControl else { return }
+                if abs(self.whiteBalanceTargetKelvin - value) > 10 {
+                    self.whiteBalanceTargetKelvin = value
+                    // Setting whiteBalanceTargetKelvin triggers applyManualWhiteBalance() via didSet if manual WB
+                }
             }
-        }
-        if addCameraControl(wb) {
-            self.wbControl = wb
+            if addCameraControl(wb) {
+                self.wbControl = wb
+            }
         }
         
         updateCameraControlsMode()
     }
     
     private var supportsHardwareCameraControls: Bool {
-        UIDevice.current.userInterfaceIdiom == .phone && session.supportsControls
+        UIDevice.current.userInterfaceIdiom == .phone && activeCaptureSession.supportsControls
     }
     
     @discardableResult
     private func addCameraControl(_ control: AVCaptureControl) -> Bool {
-        guard supportsHardwareCameraControls, session.canAddControl(control) else {
+        let captureSession = activeCaptureSession
+        guard supportsHardwareCameraControls, captureSession.canAddControl(control) else {
             return false
         }
         
-        session.addControl(control)
+        captureSession.addControl(control)
         return true
     }
     
@@ -183,12 +194,18 @@ extension CameraModel {
             wbControl
         ].compactMap { $0 }
         
-        for control in controls where session.controls.contains(control) {
-            session.removeControl(control)
+        for control in controls {
+            if session.controls.contains(control) {
+                session.removeControl(control)
+            }
+            if let dualSession, dualSession.controls.contains(control) {
+                dualSession.removeControl(control)
+            }
         }
         
         // Final wipe of any orphans just in case.
         session.controls.forEach { session.removeControl($0) }
+        dualSession?.controls.forEach { dualSession?.removeControl($0) }
         
         cleanUIControl = nil
         filterControl = nil
@@ -201,12 +218,13 @@ extension CameraModel {
     }
     
     func updateCameraControlsMode() {
-        filterControl?.isEnabled = captureMode != .raw
-        evControl?.isEnabled = isAutoExposure
-        isoControl?.isEnabled = !isFilterRestrictingCaptureOptions && !isAutoExposure
-        ssControl?.isEnabled = !isFilterRestrictingCaptureOptions && !isAutoExposure
-        focusControl?.isEnabled = !isAutoFocus
-        wbControl?.isEnabled = !isAutoWhiteBalance
+        cleanUIControl?.isEnabled = true
+        filterControl?.isEnabled = !isDualCameraEnabled && captureMode != .raw
+        evControl?.isEnabled = !isDualCameraEnabled && isAutoExposure
+        isoControl?.isEnabled = !isDualCameraEnabled && !isFilterRestrictingCaptureOptions && !isAutoExposure
+        ssControl?.isEnabled = !isDualCameraEnabled && !isFilterRestrictingCaptureOptions && !isAutoExposure
+        focusControl?.isEnabled = !isDualCameraEnabled && !isAutoFocus
+        wbControl?.isEnabled = !isDualCameraEnabled && !isAutoWhiteBalance
     }
     
     // MARK: - Bidirectional Sync Helpers

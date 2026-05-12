@@ -7,8 +7,10 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
     // MARK: - Session
     var device: AVCaptureDevice?
     nonisolated let session = AVCaptureSession()
+    nonisolated let dualSession: AVCaptureMultiCamSession? = AVCaptureMultiCamSession.isMultiCamSupported ? AVCaptureMultiCamSession() : nil
     nonisolated let photoOutput = AVCapturePhotoOutput()
     nonisolated let videoOutput = AVCaptureVideoDataOutput()
+    nonisolated let secondaryVideoOutput = AVCaptureVideoDataOutput()
     nonisolated let liveFilterPreviewOutput = LiveFilterPreviewOutput()
     nonisolated let sessionQueue = DispatchQueue(label: "\(BundleIDs.appID).sessionQueue")
     nonisolated let frameCounter = FrameCounter()
@@ -21,6 +23,7 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
     let _pendingSaveLocationBox = SaveLocationBox()
     let _captureContextStore = PhotoCaptureContextStore()
     let _burstCaptureTracker = BurstCaptureTracker()
+    let _secondaryFrameStore = PixelBufferStore()
     @ObservationIgnored
     var captureRotationCoordinator: AVCaptureDevice.RotationCoordinator?
     
@@ -148,6 +151,37 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
     var pendingCaptureModeAfterLensSwitch: CaptureMode?
     var activeLens: Lens = .wide
     var isSwitchingLens = false
+    
+    // MARK: - Dual camera
+    var isDualCameraEnabled = false {
+        didSet {
+            guard oldValue != isDualCameraEnabled else { return }
+            updateAnalysisPauseState()
+            if isDualCameraEnabled {
+                selectedPhotoFilter = .off
+                isAutoExposure = true
+                isAutoFocus = true
+                isAutoWhiteBalance = true
+                isMacroEnabled = false
+                showFocusPeaking = false
+                showFocusLoupe = false
+                showZebraStripes = false
+                showClipping = false
+                histogramModeSmall = .none
+                histogramModeLarge = .none
+            }
+            buildAvailableFormats()
+            setupCameraControls()
+        }
+    }
+    var isConfiguringDualCamera = false
+    var isDetachingPreviewForReconfiguration = false
+    var secondaryDevice: AVCaptureDevice?
+    var secondaryLens: Lens?
+    var mainPreviewDeviceUniqueID: String?
+    var pipPreviewDeviceUniqueID: String?
+    var dualCameraPipPlacement: DualCameraPipPlacement = .topTrailing
+    var dualCameraPipRotationAngle: CGFloat = 0
     
     // MARK: - Save Location
     var fileSaveLocationName = FileSaveLocationStore.displayName()
@@ -505,8 +539,8 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
     // MARK: - Other properties / methods
     var captureAspectRatio: CGFloat { 3.0 / 4.0 }
     
-    private func updateAnalysisPauseState() {
-        shouldPauseAnalysis = showSimpleView
+    func updateAnalysisPauseState() {
+        shouldPauseAnalysis = showSimpleView || isDualCameraEnabled
     }
     
     deinit {

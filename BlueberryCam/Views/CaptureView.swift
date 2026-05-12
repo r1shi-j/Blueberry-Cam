@@ -63,6 +63,26 @@ extension CaptureView {
         return dx <= focusReticleSliderXTolerance && dy <= focusReticleSliderYTolerance
     }
     
+    private func dualCameraPipRect(in previewSize: CGSize) -> CGRect {
+        let pipWidth = previewSize.width * 0.32
+        let pipHeight = pipWidth / cameraModel.dualCameraPipAspectRatio
+        let inset = previewSize.width * 0.035
+        return cameraModel.dualCameraPipPlacement.previewRect(
+            in: previewSize,
+            pipSize: CGSize(width: pipWidth, height: pipHeight),
+            inset: inset
+        )
+    }
+    
+    private func isPointInsideDualCameraPip(_ point: CGPoint, previewSize: CGSize) -> Bool {
+        guard cameraModel.isDualCameraEnabled,
+              !cameraModel.isDetachingPreviewForReconfiguration,
+              cameraModel.pipPreviewDeviceUniqueID != nil else { return false }
+        return dualCameraPipRect(in: previewSize)
+            .insetBy(dx: -8, dy: -8)
+            .contains(point)
+    }
+    
     private func countdownText(for value: Double) -> String {
         let clampedValue = max(value, 0)
         
@@ -212,7 +232,7 @@ extension CaptureView {
     // MARK: - Viewfinder
     private func viewFinder(_ previewRect: CGRect) -> some View {
         ZStack {
-            CameraPreviewView(session: cameraModel.session, onCapture: {
+            CameraPreviewView(session: cameraModel.isDetachingPreviewForReconfiguration ? nil : cameraModel.previewSession, onCapture: {
                 cameraModel.handleShutterButton {
                     triggerShutterFeedback()
                     withAnimation { cameraModel.changeCapturingState(to: true) }
@@ -224,7 +244,10 @@ extension CaptureView {
                     triggerShutterFeedback()
                     shutterCountBurst += 1
                 }
-            }, proxy: previewProxy)
+            }, proxy: previewProxy,
+                              deviceUniqueID: cameraModel.isDualCameraEnabled ? cameraModel.mainPreviewDeviceUniqueID : nil,
+                              rotationAngle: cameraModel.mainPreviewRotationAngle,
+                              isMirrored: cameraModel.isMainPreviewMirrored)
             
             if cameraModel.isLiveFilterPreviewActive {
                 FilteredCameraPreviewView(output: cameraModel.liveFilterPreviewOutput)
@@ -232,7 +255,16 @@ extension CaptureView {
                     .transition(.opacity)
             }
         }
+        .overlay(alignment: .topLeading) {
+            if cameraModel.isDualCameraEnabled {
+                let pipRect = dualCameraPipRect(in: previewRect.size)
+                DualCameraPipPreviewView(cameraModel: cameraModel)
+                    .frame(width: pipRect.width)
+                    .position(x: pipRect.midX, y: pipRect.midY)
+            }
+        }
         .animation(Animations.easeInOut, value: cameraModel.isLiveFilterPreviewActive)
+        .animation(Animations.easeInOut, value: cameraModel.isDualCameraEnabled)
         .scaleEffect(visualZoomScale)
         .rotation3DEffect(
             .degrees(cameraModel.flipRotation),
@@ -249,17 +281,27 @@ extension CaptureView {
             DragGesture(minimumDistance: 0)
                 .onChanged { value in
                     if previewInteractionStartPoint == nil {
+                        if isPointInsideDualCameraPip(value.startLocation, previewSize: previewRect.size) {
+                            isIgnoringPreviewInteraction = true
+                            return
+                        }
                         beginPreviewInteraction(at: value.startLocation)
                     }
+                    guard !isIgnoringPreviewInteraction else { return }
                     updatePreviewInteraction(at: value.location)
                 }
                 .onEnded { value in
+                    if isIgnoringPreviewInteraction {
+                        isIgnoringPreviewInteraction = false
+                        return
+                    }
                     endPreviewInteraction(at: value.location)
                 }
         )
         .simultaneousGesture(
             SpatialTapGesture(count: 2)
-                .onEnded { _ in
+                .onEnded { value in
+                    guard !isPointInsideDualCameraPip(value.location, previewSize: previewRect.size) else { return }
                     hapticTrigger += 1
                     withAnimation(Animations.selfieToggled) {
                         cameraModel.toggleSelfie()
@@ -789,7 +831,6 @@ extension CaptureView {
                 
                 ZStack {
                     viewFinder(previewRect)
-                    
                     if !cameraModel.showSimpleView {
                         zebras(previewRect)
                         highlightClipping(previewRect)
@@ -797,13 +838,12 @@ extension CaptureView {
                         focusLoupe(previewRect)
                         grid()
                         level()
-                        focusBox()
-                        focusLock(previewRect)
-                        qrCode(previewRect)
-                        lensCleaning(previewRect)
-                        burstFeedback(previewRect)
                     }
-                    
+                    qrCode(previewRect)
+                    lensCleaning(previewRect)
+                    burstFeedback(previewRect)
+                    focusLock(previewRect)
+                    focusBox()
                     manualControlOverlays(in: previewRect)
                 }
                 .blur(radius: scenePhase != .active ? 20 : 0)
@@ -881,6 +921,7 @@ struct CaptureView: View {
     @State private var previewInteractionDidLock = false
     @State private var previewInteractionIsBiasOnly = false
     @State private var previewInteractionStartBias: Float = 0
+    @State private var isIgnoringPreviewInteraction = false
     @State private var previewInteractionHoldTask: Task<Void, Never>?
     
     // Transitions
@@ -914,6 +955,7 @@ struct CaptureView: View {
             .onChange(of: cameraModel.activeLens, handleOnChangeOfActiveLens)
             .onChange(of: cameraModel.lensSwitchCompletionCount, handleOnChangeOfLensSwitchCount)
             .onReceive(NotificationCenter.default.publisher(for: UIDevice.deviceDidShakeNotification), perform: handleOnRecieveShake)
+            .onReceive(NotificationCenter.default.publisher(for: UIDevice.orientationDidChangeNotification), perform: handleOnReceiveOrientationChange)
             .alert(Alerts.error, isPresented: $cameraModel.showError) {
                 Button(Alerts.ok, role: .cancel) {}
             } message: {
@@ -951,6 +993,7 @@ extension CaptureView {
             standardShutterCount.wrappedValue += 1
         }
         cameraModel.onTimerCountdownSecond = triggerCountdownFeedback
+        UIDevice.current.beginGeneratingDeviceOrientationNotifications()
         configureCameraIfPermitted()
         syncLevelMotionUpdates()
     }
@@ -963,6 +1006,7 @@ extension CaptureView {
         levelModel.setLevelDisplayEnabled(false)
         levelModel.stopUpdates()
         cameraModel.clearTapPointInteraction(resetDeviceState: false)
+        UIDevice.current.endGeneratingDeviceOrientationNotifications()
     }
     
     private func configureCameraIfPermitted() {
@@ -999,6 +1043,7 @@ extension CaptureView {
         if newPhase == .active {
             cameraModel.validateFilesSaveLocation()
             configureCameraIfPermitted()
+            cameraModel.updateCaptureOrientation()
         } else {
             cameraModel.stopBurstCapture()
             cameraModel.stopSession()
@@ -1085,6 +1130,10 @@ extension CaptureView {
             openURL(url)
             cameraModel.ignoreCurrentCode()
         }
+    }
+    
+    private func handleOnReceiveOrientationChange(_: Notification) {
+        cameraModel.updateCaptureOrientation()
     }
 }
 
