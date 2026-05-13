@@ -54,9 +54,6 @@ struct BlueberryCamApp: App {
 
 // MARK: - FIXME
 // locked app fix photo orientation
-// with custom background colour, can see top/small histogram width is too long, x -> x *= 45%
-// burst capture/info use same corner radius (visible from custom background colour), or maybe add glass effect
-// burst shutter button bit too orange (in green background view)
 
 // MARK: - Next Steps
 // ProRaw

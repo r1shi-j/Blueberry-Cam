@@ -203,13 +203,14 @@ struct HistogramView: View {
     
     var body: some View {
         ZStack(alignment: .bottomLeading) {
-            RoundedRectangle(cornerRadius: cornerRadius)
-                .fill(.black.opacity(backgroundOpacity))
-            
             if size == .small {
+                RoundedRectangle(cornerRadius: cornerRadius)
+                    .fill(.black.opacity(backgroundOpacity))
+                    .frame(width: 80, height: 30)
+                
                 Canvas { ctx, sz in
                     switch mode {
-                        case .luminance: drawBars(ctx, sz, channels: [(lumaData, .white)], buckets: 64,  opacity: 0.85)
+                        case .luminance: drawBars(ctx, sz, channels: [(lumaData, .white)], buckets: 64, opacity: 0.85)
                         case .color: drawBars(ctx, sz, channels: rgbChannels, buckets: 64,  opacity: 0.72)
                         case .waveform: drawWaveform(ctx, sz, outCols: 80)
                         case .parade: drawParade(ctx, sz, buckets: 32)
@@ -219,6 +220,9 @@ struct HistogramView: View {
                 .clipShape(.rect(cornerRadius: cornerRadius))
                 .frame(width: 80, height: 30)
             } else {
+                RoundedRectangle(cornerRadius: cornerRadius)
+                    .fill(.black.opacity(backgroundOpacity))
+                
                 Canvas { ctx, sz in
                     switch mode {
                         case .luminance: drawBars(ctx, sz, channels: [(lumaData, .white)], buckets: nil, opacity: 0.78)
