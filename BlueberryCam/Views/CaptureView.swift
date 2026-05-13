@@ -21,13 +21,11 @@ extension CameraModel {
 
 // MARK: - Functions
 extension CaptureView {
+    private var closeTitle: String { "Close" }
     private var copiedString: String { "Copied to clipboard!" }
-    private var closeLinkTitle: String { "Close" }
-    private var closeSymbolName: String { "xmark.square" }
     private var linkSymbolName: String { "link" }
     private var backupURLName: String { "Open Link" }
-    private var lensCleaningTitle: String { "You lens may need cleaning" }
-    private var closeCleaningTitle: String { "Done" }
+    private var lensCleaningTitle: String { "Clean the camera lens" }
     private var lensCleaningSymbolName: String { "camera.aperture" }
     private var tapHoldDuration: TimeInterval { 0.7 }
     private var tapMoveTolerance: CGFloat { 18 }
@@ -399,13 +397,13 @@ extension CaptureView {
     private func qrCode(_ previewRect: CGRect) -> some View {
         ZStack {
             if !cameraModel.isTimerCountingDown, !cameraModel.isBurstCapturing, let url = cameraModel.detectedCodeURL {
-                VStack(spacing: 4) {
+                VStack(spacing: 6) {
                     Text(copiedString)
                         .font(.system(size: 10, weight: .bold))
                         .fontWidth(.expanded)
                         .foregroundStyle(.yellow.opacity(0.8))
                         .padding(8)
-                        .glassEffect()
+                        .glassEffect(.regular.tint(.black.opacity(0.3)))
                     Button {
                         openURL(url)
                         cameraModel.ignoreCurrentCode()
@@ -421,13 +419,13 @@ extension CaptureView {
                     .buttonStyle(.glass)
                     .padding(.horizontal)
                     
-                    Button(closeLinkTitle, systemImage: closeSymbolName) {
+                    Button(closeTitle) {
                         cameraModel.ignoreCurrentCode()
                     }
-                    .font(.system(size: 10, weight: .bold))
+                    .font(.system(size: 14, weight: .bold))
                     .fontWidth(.expanded)
-                    .foregroundStyle(.yellow.opacity(0.8))
-                    .buttonStyle(.glass)
+                    .tint(.yellow.opacity(0.8))
+                    .buttonStyle(.glassProminent)
                 }
                 .position(x: previewRect.midX, y: previewRect.midY)
                 .transition(.opacity)
@@ -441,7 +439,7 @@ extension CaptureView {
     private func lensCleaning(_ previewRect: CGRect) -> some View {
         ZStack {
             if !cameraModel.isTimerCountingDown, !cameraModel.isBurstCapturing, cameraModel.shouldShowLensCleaningHint {
-                VStack(spacing: 4) {
+                VStack(spacing: 6) {
                     Button {
                         hapticTriggerR += 1
                         cameraModel.dismissLensCleaningHint()
@@ -456,13 +454,14 @@ extension CaptureView {
                     .buttonStyle(.glass)
                     .padding(.horizontal)
                     
-                    Button(closeCleaningTitle, systemImage: closeSymbolName) {
+                    Button(closeTitle) {
+                        hapticTriggerR += 1
                         cameraModel.dismissLensCleaningHint()
                     }
-                    .font(.system(size: 10, weight: .bold))
+                    .font(.system(size: 14, weight: .bold))
                     .fontWidth(.expanded)
-                    .foregroundStyle(.yellow.opacity(0.8))
-                    .buttonStyle(.glass)
+                    .tint(.yellow.opacity(0.8))
+                    .buttonStyle(.glassProminent)
                 }
                 .position(x: previewRect.midX, y: previewRect.midY)
                 .transition(.opacity)
@@ -481,7 +480,7 @@ extension CaptureView {
                 .foregroundStyle(.white)
                 .padding(.horizontal, 14)
                 .padding(.vertical, 10)
-                .background(.black.opacity(0.6), in: .capsule)
+                .glassEffect(.regular, in: .capsule)
                 .position(x: previewRect.midX, y: previewRect.midY)
                 .allowsHitTesting(false)
                 .opacity(isBurstFeedbackVisible ? 1 : 0)
@@ -513,7 +512,7 @@ extension CaptureView {
                     .foregroundStyle(.yellow)
                     .padding(.horizontal, 10)
                     .padding(.vertical, 6)
-                    .background(.black.opacity(0.55), in: .capsule)
+                    .glassEffect(.regular.tint(.black.opacity(0.75)), in: .capsule)
                     .position(x: previewRect.midX, y: previewRect.midY - previewRect.height / 2 + 20)
                     .transition(.opacity)
             }
@@ -735,7 +734,7 @@ extension CaptureView {
             .foregroundStyle(.white)
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
-            .background(.black.opacity(0.6), in: .rect(cornerRadius: 8))
+            .glassEffect(.regular, in: .capsule)
             .allowsHitTesting(false)
             .padding(.top, 16)
             .transition(.opacity)

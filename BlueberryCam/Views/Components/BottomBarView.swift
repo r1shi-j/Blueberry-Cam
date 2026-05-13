@@ -30,7 +30,7 @@ extension BottomBarView {
     }
     
     private var shutterTint: Color {
-        if cameraModel.isBurstCapturing { return .yellow.mix(with: .orange, by: 0.3).opacity(0.6) }
+        if cameraModel.isBurstCapturing { return .yellow.mix(with: .orange, by: 0.2).opacity(0.6) }
         if cameraModel.isBurstModeEnabled { return .yellow.opacity(0.8) }
         return cameraModel.captureMode == .raw ? .blue.mix(with: .mint, by: 0.5).opacity(0.4) : .white.opacity(0.2)
     }
