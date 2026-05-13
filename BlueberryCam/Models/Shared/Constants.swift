@@ -22,7 +22,7 @@ enum Alerts {
     static let infinityString = "Infinity"
     static let resetSettingsTitle = "Are you sure you want to reset all custom settings?"
     static let burstIntervalTitle = "Burst Interval"
-    static let burstIntervalMessage = "Minimum time (seconds) between frame starts.\nRange: 0.20 to 5.00.\nMay not be guaranteed for smaller intervals. Auto shoots as fast as safely possible."
+    static let burstIntervalMessage = "Minimum time (seconds) between frame starts.\nRange: 0.2 to 5.0.\nMay not be guaranteed for smaller intervals. Auto shoots as fast as safely possible."
     static let burstFramesTitle = "Burst Frames"
     static let burstFramesMessage = "Number of frames to capture.\nRange: 1 to 100.\nAuto keeps shooting until you tap the shutter button again."
 }

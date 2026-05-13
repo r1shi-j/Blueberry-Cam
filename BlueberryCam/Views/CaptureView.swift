@@ -247,7 +247,8 @@ extension CaptureView {
             }, proxy: previewProxy,
                               deviceUniqueID: cameraModel.isDualCameraEnabled ? cameraModel.mainPreviewDeviceUniqueID : nil,
                               rotationAngle: cameraModel.mainPreviewRotationAngle,
-                              isMirrored: cameraModel.isMainPreviewMirrored)
+                              isMirrored: cameraModel.isMainPreviewMirrored,
+                              handlesCaptureEvents: cameraModel.canUseShutterButton)
             
             if cameraModel.isLiveFilterPreviewActive {
                 FilteredCameraPreviewView(output: cameraModel.liveFilterPreviewOutput)
@@ -256,15 +257,15 @@ extension CaptureView {
             }
         }
         .overlay(alignment: .topLeading) {
-            if cameraModel.isDualCameraEnabled {
+            if cameraModel.isDualCameraEnabled && !cameraModel.isDetachingPreviewForReconfiguration {
                 let pipRect = dualCameraPipRect(in: previewRect.size)
                 DualCameraPipPreviewView(cameraModel: cameraModel)
                     .frame(width: pipRect.width)
                     .position(x: pipRect.midX, y: pipRect.midY)
+                    .transition(.identity)
             }
         }
         .animation(Animations.easeInOut, value: cameraModel.isLiveFilterPreviewActive)
-        .animation(Animations.easeInOut, value: cameraModel.isDualCameraEnabled)
         .scaleEffect(visualZoomScale)
         .rotation3DEffect(
             .degrees(cameraModel.flipRotation),
@@ -276,7 +277,7 @@ extension CaptureView {
         .animation(Animations.viewFinderShown, value: scenePhase)
         .frame(width: previewRect.width, height: previewRect.height)
         .position(x: previewRect.midX, y: previewRect.midY)
-        .allowsHitTesting(!cameraModel.isTimerCountingDown && !cameraModel.isBurstCapturing)
+        .allowsHitTesting(!cameraModel.isTimerCountingDown && !cameraModel.isBurstCapturing && !cameraModel.shouldShowDualCameraTransitionCurtain)
         .gesture(
             DragGesture(minimumDistance: 0)
                 .onChanged { value in
@@ -303,6 +304,10 @@ extension CaptureView {
                 .onEnded { value in
                     guard !isPointInsideDualCameraPip(value.location, previewSize: previewRect.size) else { return }
                     hapticTrigger += 1
+                    guard !cameraModel.isDualCameraEnabled else {
+                        cameraModel.toggleSelfie()
+                        return
+                    }
                     withAnimation(Animations.selfieToggled) {
                         cameraModel.toggleSelfie()
                     }
@@ -387,39 +392,6 @@ extension CaptureView {
             LevelOverlayView(model: levelModel)
                 .ignoresSafeArea()
         }
-    }
-    
-    // MARK: - Tap to focus overlay
-    @ViewBuilder
-    private func focusBox() -> some View {
-        if !cameraModel.isBurstCapturing, cameraModel.isTapFocusIndicatorVisible, let indicatorPoint = cameraModel.tapFocusIndicatorPoint {
-            FocusReticleView(
-                lockLabel: cameraModel.tapFocusLockLabel,
-                exposureOffset: cameraModel.tapFocusIndicatorOffset,
-                showsExposureHandle: cameraModel.canAdjustTapPointExposureBias,
-                isDimmed: cameraModel.isTapFocusIndicatorDimmed
-            )
-            .position(indicatorPoint)
-            .transition(.opacity)
-        }
-    }
-    
-    // MARK: - Focus lock overlay
-    @ViewBuilder
-    private func focusLock(_ previewRect: CGRect) -> some View {
-        ZStack {
-            if !cameraModel.isBurstCapturing, let lockLabel = cameraModel.tapFocusLockLabel {
-                Text(lockLabel)
-                    .font(.system(size: 12, weight: .bold))
-                    .foregroundStyle(.yellow)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
-                    .background(.black.opacity(0.55), in: .capsule)
-                    .position(x: previewRect.midX, y: previewRect.midY - previewRect.height / 2 + 20)
-                    .transition(.opacity)
-            }
-        }
-        .animation(Animations.bouncy, value: cameraModel.tapFocusLockLabel)
     }
     
     // MARK: - QR Code
@@ -514,6 +486,39 @@ extension CaptureView {
                 .allowsHitTesting(false)
                 .opacity(isBurstFeedbackVisible ? 1 : 0)
         }
+    }
+    
+    // MARK: - Tap to focus overlay
+    @ViewBuilder
+    private func focusBox() -> some View {
+        if !cameraModel.isBurstCapturing, cameraModel.isTapFocusIndicatorVisible, let indicatorPoint = cameraModel.tapFocusIndicatorPoint {
+            FocusReticleView(
+                lockLabel: cameraModel.tapFocusLockLabel,
+                exposureOffset: cameraModel.tapFocusIndicatorOffset,
+                showsExposureHandle: cameraModel.canAdjustTapPointExposureBias,
+                isDimmed: cameraModel.isTapFocusIndicatorDimmed
+            )
+            .position(indicatorPoint)
+            .transition(.opacity)
+        }
+    }
+    
+    // MARK: - Focus lock overlay
+    @ViewBuilder
+    private func focusLock(_ previewRect: CGRect) -> some View {
+        ZStack {
+            if !cameraModel.isBurstCapturing, let lockLabel = cameraModel.tapFocusLockLabel {
+                Text(lockLabel)
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(.yellow)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(.black.opacity(0.55), in: .capsule)
+                    .position(x: previewRect.midX, y: previewRect.midY - previewRect.height / 2 + 20)
+                    .transition(.opacity)
+            }
+        }
+        .animation(Animations.bouncy, value: cameraModel.tapFocusLockLabel)
     }
     
     // MARK: - Manual control rulers
@@ -659,6 +664,16 @@ extension CaptureView {
         .padding(.trailing, 14)
         .position(x: previewRect.midX, y: previewRect.midY)
         .transition(.move(edge: .trailing).combined(with: .opacity))
+    }
+    
+    // MARK: - Dual cam transition cover
+    private func dualCameraTransitionCurtain() -> some View {
+        Color.black
+            .ignoresSafeArea()
+            .opacity(cameraModel.shouldShowDualCameraTransitionCurtain ? 1 : 0)
+            .allowsHitTesting(cameraModel.shouldShowDualCameraTransitionCurtain)
+            .accessibilityHidden(true)
+            .animation(.easeOut(duration: 0.08), value: cameraModel.shouldShowDualCameraTransitionCurtain)
     }
     
     // MARK: - Top Bar View
@@ -848,6 +863,8 @@ extension CaptureView {
                 }
                 .blur(radius: scenePhase != .active ? 20 : 0)
                 
+                dualCameraTransitionCurtain()
+                
                 VStack(spacing: 0) {
                     if !cameraModel.showSimpleView {
                         VStack(spacing: 0) {
@@ -862,7 +879,7 @@ extension CaptureView {
                     }
                     bottomBarView()
                 }
-                .allowsHitTesting(!cameraModel.isTimerCountingDown)
+                .allowsHitTesting(!cameraModel.isTimerCountingDown && !cameraModel.shouldShowDualCameraTransitionCurtain)
                 .animation(Animations.easeInOut, value: cameraModel.showSimpleView)
                 
                 timerCountdownOverlay(in: previewRect)
@@ -999,6 +1016,7 @@ extension CaptureView {
     }
     
     private func handleOnDisappear() {
+        cameraModel.cancelTimerCountdown()
         cameraModel.stopBurstCapture()
         cameraModel.onStandardPhotoSaved = nil
         cameraModel.onTimerCountdownSecond = nil
@@ -1045,6 +1063,7 @@ extension CaptureView {
             configureCameraIfPermitted()
             cameraModel.updateCaptureOrientation()
         } else {
+            cameraModel.cancelTimerCountdown()
             cameraModel.stopBurstCapture()
             cameraModel.stopSession()
             if newPhase == .background {
@@ -1074,6 +1093,20 @@ extension CaptureView {
     
     private func handleOnChangeOfActiveLens(_ oldLens: Lens, _ newLens: Lens) {
         cameraModel.clearTapPointInteraction(resetDeviceState: false)
+        guard !cameraModel.shouldShowDualCameraTransitionCurtain else {
+            isAwaitingSameFacingLensCompletion = false
+            isAwaitingFacingFlipCompletion = false
+            var transaction = Transaction()
+            transaction.disablesAnimations = true
+            withTransaction(transaction) {
+                visualZoomScale = 1.0
+                visualBlur = 0
+                visualOpacity = 1.0
+                cameraModel.flipRotation = 0
+            }
+            return
+        }
+        
         // Handle visual "zoom" bump to mask lens hardware switch
         if oldLens.isFront == newLens.isFront {
             // Use a light zoom/blur mask for same-facing lens changes.

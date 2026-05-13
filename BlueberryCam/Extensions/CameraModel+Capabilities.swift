@@ -19,17 +19,28 @@ extension CameraModel {
     }
     
     var shouldShowResolutionPicker: Bool {
-        guard !isDualCameraEnabled else { return false }
+        guard !isDualCameraEnabled,
+              !isConfiguringDualCamera,
+              !isDetachingPreviewForReconfiguration else { return false }
         return !activeLens.isFront && availableResolutions.count > 1
     }
     
-    var canToggleSelfie: Bool {
+    var shouldUseDualCameraFormatSet: Bool {
+        isDualCameraEnabled ||
+        isConfiguringDualCamera ||
+        isDetachingPreviewForReconfiguration
+    }
+    
+    var supportsSelfieToggle: Bool {
         guard !ProcessInfo.processInfo.isiOSAppOnMac else { return false }
+        return Lens.supportsAlternateFacing(from: activeLens)
+    }
+    
+    var canToggleSelfie: Bool {
+        guard supportsSelfieToggle else { return false }
         if isDualCameraEnabled {
             return secondaryLens != nil && !isConfiguringDualCamera
         }
-        
-        guard Lens.supportsAlternateFacing(from: activeLens) else { return false }
         
         let targetLens: Lens = activeLens.isFront ? .wide : (captureMode == .raw ? .frontUltraWide : .front)
         guard let currentDevice = device, let targetDevice = targetLens.captureDevice() else { return false }

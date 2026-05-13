@@ -22,6 +22,7 @@ extension TopBarView {
         static let row1HPadding: CGFloat = 4
         static let row2HPadding: CGFloat = 8
         static let row3HPadding: CGFloat = 8
+        static let readoutRowTransitionOffset: CGFloat = -10
     }
     
     private enum Fonts {
@@ -45,12 +46,34 @@ extension TopBarView {
     
     private func formatForeground(for mode: CaptureMode, isEnabled: Bool) -> Color {
         guard isEnabled else { return Colors.buttonText.opacity(Style.disabledOpacity) }
-        return cameraModel.captureMode == mode ? Style.selectedForeground : .white
+        return isFormatSelected(mode) ? Style.selectedForeground : .white
     }
     
     private func formatBackground(for mode: CaptureMode, isEnabled: Bool) -> Color {
         guard isEnabled else { return Colors.buttonBackground.opacity(Style.disabledOpacity) }
-        return cameraModel.captureMode == mode ? Style.selectedBackground : Colors.buttonBackground
+        return isFormatSelected(mode) ? Style.selectedBackground : Colors.buttonBackground
+    }
+    
+    private var displayedFormats: [CaptureMode] {
+        guard cameraModel.shouldUseDualCameraFormatSet else { return cameraModel.availableFormats }
+        return cameraModel.availableFormats.filter { $0 != .raw }
+    }
+    
+    private var displayedCaptureMode: CaptureMode {
+        guard cameraModel.shouldUseDualCameraFormatSet,
+              cameraModel.captureMode == .raw else {
+            return cameraModel.captureMode
+        }
+        
+        if displayedFormats.contains(.heif) {
+            return .heif
+        }
+        
+        return .jpeg
+    }
+    
+    private func isFormatSelected(_ mode: CaptureMode) -> Bool {
+        displayedCaptureMode == mode
     }
     
     // MARK: - Flash properties
@@ -105,7 +128,8 @@ extension TopBarView {
     }
     
     private var dualcamButtonOpacity: Double {
-        cameraModel.supportsDualCamera && !cameraModel.isSwitchingLens ? 1.0 : Style.disabledOpacity
+        guard cameraModel.supportsDualCamera else { return Style.disabledOpacity }
+        return cameraModel.isDualCameraEnabled || !cameraModel.isSwitchingLens ? 1.0 : Style.disabledOpacity
     }
     
     private var isDualcamButtonDisabled: Bool {
@@ -187,6 +211,18 @@ extension TopBarView {
     
     private var isSelfieButtonDisabled: Bool {
         cameraModel.isSwitchingLens || !cameraModel.canToggleSelfie
+    }
+    
+    private var shouldShowSelfieButton: Bool {
+        if cameraModel.isDualCameraEnabled || cameraModel.isDualCameraTransitionCoverVisible || cameraModel.secondaryLens != nil {
+            return true
+        }
+        
+        return cameraModel.supportsSelfieToggle
+    }
+    
+    private var selfieButtonOpacity: Double {
+        isSelfieButtonDisabled ? Style.disabledOpacity : 1.0
     }
     
     // MARK: - Focus Assist properties
@@ -341,6 +377,7 @@ extension TopBarView {
             }
             .clipShape(.rect(cornerRadius: Style.pickerCornerRadius))
             .overlay(RoundedRectangle(cornerRadius: Style.pickerCornerRadius).stroke(.white.opacity(0.2), lineWidth: 1))
+            .allowsHitTesting(!cameraModel.isSwitchingLens)
             .animation(Animations.bouncy, value: cameraModel.availableResolutions)
             .transition(.opacity.combined(with: .scale(scale: 0.5)))
         }
@@ -349,7 +386,7 @@ extension TopBarView {
     // MARK: - Format picker
     private func formatPicker() -> some View {
         HStack(spacing: 0) {
-            ForEach(cameraModel.availableFormats) { mode in
+            ForEach(displayedFormats) { mode in
                 let isEnabled = cameraModel.isFormatEnabled(mode)
                 Button {
                     hapticTrigger += 1
@@ -366,11 +403,14 @@ extension TopBarView {
                         .foregroundStyle(formatForeground(for: mode, isEnabled: isEnabled))
                 }
                 .disabled(!isEnabled)
+                .transition(.opacity.combined(with: .scale(scale: 0.86)))
             }
         }
         .clipShape(.rect(cornerRadius: Style.pickerCornerRadius))
         .overlay(RoundedRectangle(cornerRadius: Style.pickerCornerRadius).stroke(.white.opacity(0.2), lineWidth: 1))
         .animation(Animations.bouncy, value: cameraModel.enabledFormats)
+        .animation(Animations.bouncy, value: cameraModel.availableFormats)
+        .animation(Animations.bouncy, value: cameraModel.shouldUseDualCameraFormatSet)
         .animation(Animations.bouncy, value: cameraModel.captureMode)
         
     }
@@ -416,8 +456,10 @@ extension TopBarView {
         } label: {
             imageIcon(systemName: dualcamButtonSymbol, foregroundStyle: dualcamButtonForeground, background: dualcamButtonBackground)
         }
-        .disabled(isDualcamButtonDisabled)
+        .disabled(!cameraModel.supportsDualCamera)
+        .allowsHitTesting(!isDualcamButtonDisabled)
         .opacity(dualcamButtonOpacity)
+        .animation(Animations.bouncy, value: cameraModel.isSwitchingLens)
     }
     
     // MARK: - Burst
@@ -471,6 +513,7 @@ extension TopBarView {
         .font(Fonts.button)
         .disabled(isBurstButtonDisabled)
         .opacity(burstButtonOpacity)
+        .animation(Animations.bouncy, value: cameraModel.isBurstModeEnabled)
     }
     
     // MARK: - Timer
@@ -501,9 +544,10 @@ extension TopBarView {
     // MARK: - Selfie switch
     @ViewBuilder
     private func selfieButton() -> some View {
-        if !isSelfieButtonDisabled {
+        if shouldShowSelfieButton {
             Button {
                 hapticTrigger += 1
+                guard !isSelfieButtonDisabled else { return }
                 withAnimation(Animations.selfieToggled) {
                     cameraModel.toggleSelfie()
                 }
@@ -514,7 +558,12 @@ extension TopBarView {
                         axis: (x: 0, y: 1, z: 0),
                         perspective: 0.1
                     )
+                    .animation(Animations.selfieToggled, value: cameraModel.activeLens.isFront)
             }
+            .opacity(selfieButtonOpacity)
+            .allowsHitTesting(!isSelfieButtonDisabled)
+            .transition(.opacity.combined(with: .scale(scale: 0.72)))
+            .animation(Animations.bouncy, value: isSelfieButtonDisabled)
         }
     }
     
@@ -574,10 +623,18 @@ struct TopBarView: View {
             if !cameraModel.isDualCameraEnabled {
                 HStack(alignment: .center, spacing: Style.row1Spacing) {
                     readouts()
-                        .opacity(cameraModel.isDualCameraEnabled ? 0 : 1)
-                        .disabled(cameraModel.isDualCameraEnabled)
                 }
                 .padding(.horizontal, Style.row1HPadding)
+                .transition(
+                    .asymmetric(
+                        insertion: .opacity
+                            .combined(with: .move(edge: .top))
+                            .combined(with: .scale(scale: 0.96, anchor: .top)),
+                        removal: .opacity
+                            .combined(with: .offset(y: Style.readoutRowTransitionOffset))
+                            .combined(with: .scale(scale: 0.96, anchor: .top))
+                    )
+                )
             }
             
             // MARK: Row 2
@@ -586,6 +643,7 @@ struct TopBarView: View {
                 formatPicker()
             }
             .padding(.horizontal, Style.row2HPadding)
+            .animation(Animations.bouncy, value: cameraModel.isDualCameraEnabled)
             
             // MARK: Row 3
             HStack(alignment: .center, spacing: Style.row3Spacing) {
@@ -599,8 +657,12 @@ struct TopBarView: View {
             }
             .padding(.horizontal, Style.row3HPadding)
             .animation(Animations.bouncy, value: cameraModel.isAutoFocus)
+            .animation(Animations.bouncy, value: cameraModel.isDualCameraEnabled)
+            .animation(Animations.bouncy, value: cameraModel.isSwitchingLens)
+            .animation(Animations.bouncy, value: cameraModel.canToggleSelfie)
         }
         .padding(.vertical, cameraModel.isDualCameraEnabled ? Style.expandedVerticalPadding : Style.verticalPadding)
+        .animation(Animations.bouncy, value: cameraModel.isDualCameraEnabled)
         .sensoryFeedback(.impact, trigger: hapticTrigger)
         .sensoryFeedback(.impact(flexibility: .soft), trigger: hapticTriggerR)
         .alert(Alerts.burstIntervalTitle, isPresented: $isShowingBurstIntervalAlert) {

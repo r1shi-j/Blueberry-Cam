@@ -52,12 +52,13 @@ struct BlueberryCamApp: App {
 // Improve iPad/Mac Support
 // Add tips, welcome screen and tutorials
 
-// ProRaw
-// View outside frame
-// Selfie cam horizontal mode and centre stage
-// Customisable accent colours (shutter color per state, top bar pickers)
-
 // MARK: - FIXME
-// image rotation bugs still
+// locked app fix photo orientation
+// with custom background colour, can see top/small histogram width is too long, x -> x *= 45%
+// burst capture/info use same corner radius (visible from custom background colour), or maybe add glass effect
+// burst shutter button bit too orange (in green background view)
 
 // MARK: - Next Steps
+// ProRaw
+// Photographic styles
+// Selfie cam horizontal mode and centre stage

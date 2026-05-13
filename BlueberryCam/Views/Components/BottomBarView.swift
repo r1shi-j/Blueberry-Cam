@@ -62,7 +62,7 @@ extension BottomBarView {
     
     // MARK: - Shutter button
     private func shutterButton() -> some View {
-        ShutterButton(tint: shutterTint, height: Style.buttonHeight) {
+        ShutterButton(tint: shutterTint, height: Style.buttonHeight, isEnabled: cameraModel.canUseShutterButton) {
             cameraModel.handleShutterButton {
                 onShutterFeedback()
                 withAnimation { cameraModel.changeCapturingState(to: true) }

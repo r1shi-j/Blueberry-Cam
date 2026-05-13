@@ -13,11 +13,14 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
     nonisolated let secondaryVideoOutput = AVCaptureVideoDataOutput()
     nonisolated let liveFilterPreviewOutput = LiveFilterPreviewOutput()
     nonisolated let sessionQueue = DispatchQueue(label: "\(BundleIDs.appID).sessionQueue")
+    nonisolated let analysisQueue = DispatchQueue(label: "\(BundleIDs.appID).analysisQueue")
+    nonisolated let pipFrameQueue = DispatchQueue(label: "\(BundleIDs.appID).pipFrameQueue")
     nonisolated let frameCounter = FrameCounter()
     let _pendingCaptureModeBox = CaptureModeBox()
     let _pendingPhotoFilterBox = PhotoFilterBox()
     let _liveCaptureModeBox = CaptureModeBox()
     let _livePhotoFilterBox = PhotoFilterBox()
+    var isCaptureSessionRunning = false
     @ObservationIgnored
     nonisolated(unsafe) var liveFilterPreviewReferenceSize: CGSize = .zero
     let _pendingSaveLocationBox = SaveLocationBox()
@@ -170,18 +173,24 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
                 histogramModeSmall = .none
                 histogramModeLarge = .none
             }
-            buildAvailableFormats()
-            setupCameraControls()
+            if !isConfiguringDualCamera {
+                buildAvailableFormats()
+                setupCameraControls()
+            }
         }
     }
     var isConfiguringDualCamera = false
     var isDetachingPreviewForReconfiguration = false
+    var isDualCameraTransitionCoverVisible = false
+    var isDualCameraPreviewSettling = false
     var secondaryDevice: AVCaptureDevice?
     var secondaryLens: Lens?
     var mainPreviewDeviceUniqueID: String?
     var pipPreviewDeviceUniqueID: String?
     var dualCameraPipPlacement: DualCameraPipPlacement = .topTrailing
     var dualCameraPipRotationAngle: CGFloat = 0
+    @ObservationIgnored
+    var dualCameraPreviewSettlingTask: Task<Void, Never>?
     
     // MARK: - Save Location
     var fileSaveLocationName = FileSaveLocationStore.displayName()

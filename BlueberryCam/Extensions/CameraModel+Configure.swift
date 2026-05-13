@@ -16,13 +16,18 @@ extension CameraModel {
             if !captureSession.isRunning {
                 captureSession.startRunning()
             }
+            let sessionIsRunning = captureSession.isRunning
             Task { @MainActor [weak self] in
-                self?.updateCaptureOrientation()
+                guard let self else { return }
+                self.isCaptureSessionRunning = sessionIsRunning
+                self.updateCaptureOrientation()
             }
         }
     }
     
     func stopSession() {
+        cancelTimerCountdown()
+        isCaptureSessionRunning = false
         sessionQueue.async {
             if self.session.isRunning {
                 self.session.stopRunning()
@@ -101,8 +106,7 @@ extension CameraModel {
             
             self.session.commitConfiguration()
             
-            let analysisQueue = DispatchQueue(label: "\(BundleIDs.appID).analysisQueue")
-            self.videoOutput.setSampleBufferDelegate(self, queue: analysisQueue)
+            self.videoOutput.setSampleBufferDelegate(self, queue: self.analysisQueue)
             
             if let largest = cam.activeFormat.supportedMaxPhotoDimensions.max(by: {
                 Int($0.width) * Int($0.height) < Int($1.width) * Int($1.height)

@@ -18,7 +18,6 @@ extension CameraModel {
         isSwitchingLens = true
         self.activeLens = lens
         self.flipRotation = 0
-        self.primeResolutionOptions(for: lens, device: previewCamera)
         
         // 2. Capture lens properties before crossing isolation boundary
         let previewCameraUniqueID = previewCamera.uniqueID

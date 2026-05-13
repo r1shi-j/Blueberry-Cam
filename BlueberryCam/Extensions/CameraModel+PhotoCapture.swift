@@ -27,12 +27,22 @@ extension CameraModel {
             if isBurstCapturing {
                 stopBurstCapture()
             } else {
+                guard canCapturePhotoInCurrentState else { return }
                 startBurstCapture(onBurstPhotoCaptured: onBurstPhotoCaptured)
             }
             return
         }
         
+        guard canUseShutterButton else { return }
+        
         capturePhoto(onCapture: onCapture)
+    }
+    
+    func cancelTimerCountdown() {
+        timerCountdownTask?.cancel()
+        timerCountdownTask = nil
+        isTimerCountingDown = false
+        timerCountdownValue = nil
     }
     
     private func startBurstCapture(onBurstPhotoCaptured: @escaping @MainActor @Sendable () -> Void) {
@@ -46,10 +56,7 @@ extension CameraModel {
         }
         
         flashMode = .off
-        timerCountdownTask?.cancel()
-        timerCountdownTask = nil
-        isTimerCountingDown = false
-        timerCountdownValue = nil
+        cancelTimerCountdown()
         burstCapturedCount = 0
         burstIntervalRemainingSeconds = nil
         burstSessionCounter += 1
@@ -130,7 +137,7 @@ extension CameraModel {
     }
     
     private var canStartBurstCapture: Bool {
-        guard activeCaptureSession.isRunning, !isTimerCountingDown else { return false }
+        guard canCapturePhotoInCurrentState, !isTimerCountingDown else { return false }
         guard isAutoExposure || manualExposureIsFastEnoughForBurst else { return false }
         return true
     }
@@ -445,6 +452,8 @@ extension CameraModel {
     
     private func performPhotoCapture(onCapture: @escaping @MainActor @Sendable () -> Void,
                                      requestsConfettiAfterCapture: Bool = false) {
+        guard canCapturePhotoInCurrentState else { return }
+        
         exposureDebounceTask?.cancel()
         _pendingCaptureModeBox.value = captureMode
         _pendingPhotoFilterBox.value = selectedPhotoFilter
@@ -468,7 +477,8 @@ extension CameraModel {
             d.setExposureModeCustom(duration: duration, iso: isoValue) { [weak self] _ in
                 guard let self else { return }
                 Task { @MainActor in
-                    let settings = self.buildPhotoSettings()
+                    guard self.canCapturePhotoInCurrentState,
+                          let settings = self.buildPhotoSettings() else { return }
                     self.registerCaptureContext(for: settings, isBurst: false, onCapture: onCapture)
                     self.photoOutput.capturePhoto(with: settings, delegate: self)
                     if requestsConfettiAfterCapture {
@@ -478,7 +488,7 @@ extension CameraModel {
             }
             d.unlockForConfiguration()
         } else {
-            let settings = buildPhotoSettings()
+            guard let settings = buildPhotoSettings() else { return }
             registerCaptureContext(for: settings, isBurst: false, onCapture: onCapture)
             photoOutput.capturePhoto(with: settings, delegate: self)
             if requestsConfettiAfterCapture {
@@ -487,9 +497,9 @@ extension CameraModel {
         }
     }
     
-    private func buildPhotoSettings() -> AVCapturePhotoSettings {
+    private func buildPhotoSettings() -> AVCapturePhotoSettings? {
         let zoomBlocksRAW = (device?.videoZoomFactor ?? 1.0) > 1.0
-        let dims = captureDimensions()
+        guard let dims = captureDimensions() else { return nil }
         
         switch captureMode {
             case .raw:
@@ -534,7 +544,7 @@ extension CameraModel {
             }
         }
         
-        let settings = buildPhotoSettings()
+        guard let settings = buildPhotoSettings() else { return nil }
         settings.flashMode = .off
         if shouldPrioritizeBurstSpeed, captureMode != .raw {
             settings.photoQualityPrioritization = .speed
@@ -615,13 +625,37 @@ extension CameraModel {
         }
     }
     
-    private func captureDimensions() -> CMVideoDimensions {
-        if let selected = selectedResolution { return selected.dimensions }
-        guard let d = device else { return photoOutput.maxPhotoDimensions }
+    private var canCapturePhotoInCurrentState: Bool {
+        guard isCaptureSessionRunning,
+              activeCaptureSession.isRunning,
+              device != nil,
+              photoOutput.connection(with: .video)?.isActive == true else { return false }
+        
+        return !isSwitchingLens &&
+        !isConfiguringDualCamera &&
+        !isDetachingPreviewForReconfiguration &&
+        !isDualCameraPreviewSettling &&
+        !shouldShowDualCameraTransitionCurtain
+    }
+    
+    var canUseShutterButton: Bool {
+        guard !isTimerCountingDown else { return false }
+        return isBurstCapturing || canCapturePhotoInCurrentState
+    }
+    
+    private func captureDimensions() -> CMVideoDimensions? {
+        guard let d = device else { return nil }
         let outputMax = photoOutput.maxPhotoDimensions
-        return d.activeFormat.supportedMaxPhotoDimensions
+        let supportedDimensions = d.activeFormat.supportedMaxPhotoDimensions
             .filter { $0.width <= outputMax.width && $0.height <= outputMax.height }
-            .max { Int($0.width) * Int($0.height) < Int($1.width) * Int($1.height) }
-        ?? outputMax
+        
+        if let selected = selectedResolution?.dimensions,
+           supportedDimensions.contains(where: { $0.width == selected.width && $0.height == selected.height }) {
+            return selected
+        }
+        
+        return supportedDimensions.max {
+            Int($0.width) * Int($0.height) < Int($1.width) * Int($1.height)
+        }
     }
 }

@@ -9,8 +9,7 @@ struct DualCameraPipPreviewView: View {
     private var innerCornerRadius: CGFloat { cornerRadius - rimWidth }
     
     var body: some View {
-        if !cameraModel.isDetachingPreviewForReconfiguration,
-           let pipDeviceUniqueID = cameraModel.pipPreviewDeviceUniqueID {
+        if let pipDeviceUniqueID = cameraModel.pipPreviewDeviceUniqueID {
             pipPreview(pipDeviceUniqueID)
                 .transition(.scale(scale: 0.85).combined(with: .opacity))
         }
