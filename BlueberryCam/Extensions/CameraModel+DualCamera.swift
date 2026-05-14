@@ -296,6 +296,7 @@ extension CameraModel {
                 self.isDetachingPreviewForReconfiguration = false
                 self.isSwitchingLens = false
                 self.isConfiguringDualCamera = false
+                self.refreshSmartSelfieFraming()
                 self.finishDualCameraPreviewTransition()
             }
         }
@@ -398,6 +399,7 @@ extension CameraModel {
                 self.isDetachingPreviewForReconfiguration = false
                 self.isSwitchingLens = false
                 self.isConfiguringDualCamera = false
+                self.refreshSmartSelfieFraming()
                 self.finishDualCameraPreviewTransition()
             }
         }

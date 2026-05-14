@@ -67,7 +67,7 @@ extension CameraModel {
                                 endsTransition: false)
     }
     
-    private func selectCaptureAspectRatio(_ ratio: CaptureAspectRatioOption) {
+    func selectCaptureAspectRatio(_ ratio: CaptureAspectRatioOption, zoomFactor: CGFloat? = nil) {
         guard availableCaptureAspectRatios.contains(ratio),
               let device else { return }
         
@@ -76,7 +76,7 @@ extension CameraModel {
         updateCaptureOrientation()
         applyCaptureAspectRatio(ratio,
                                 toDeviceWithUniqueID: device.uniqueID,
-                                zoomFactor: activeLens.zoomFactor,
+                                zoomFactor: zoomFactor ?? activeLens.zoomFactor,
                                 endsTransition: true)
     }
     

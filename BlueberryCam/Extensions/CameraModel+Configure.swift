@@ -23,6 +23,7 @@ extension CameraModel {
                 self.updateCaptureOrientation()
                 if let device {
                     self.refreshCaptureAspectRatioOptions(for: device)
+                    self.refreshSmartSelfieFraming()
                 }
             }
         }
@@ -39,6 +40,7 @@ extension CameraModel {
                 dualSession.stopRunning()
             }
         }
+        stopSmartSelfieFramingMonitoring()
     }
     
     func waitForSessionQueueIdle() async {
@@ -137,6 +139,7 @@ extension CameraModel {
                 self.normalizeFlashModeForCurrentDevice()
                 self.enforceExposureModeConstraints()
                 self.setupCameraControls()
+                self.refreshSmartSelfieFraming()
                 self.startSession()
             }
         }
@@ -185,6 +188,7 @@ extension CameraModel {
         self.shouldPrioritizeBurstSpeed = defaults.object(forKey: "shouldPrioritizeBurstSpeed") as? Bool ?? true
         self.shouldShowBurstFeedback = defaults.object(forKey: "shouldShowBurstFeedback") as? Bool ?? false
         self.shouldShowConfettiCannons = defaults.object(forKey: "shouldShowConfettiCannons") as? Bool ?? true
+        self.isSmartSelfieFramingEnabled = defaults.object(forKey: "isSmartSelfieFramingEnabled") as? Bool ?? false
     }
     
     nonisolated func configureSupportedPhotoSessionPreset() {
@@ -216,7 +220,8 @@ extension CameraModel {
             "shouldHideUIWhileCountingDown",
             "shouldPrioritizeBurstSpeed",
             "shouldShowBurstFeedback",
-            "shouldShowConfettiCannons"
+            "shouldShowConfettiCannons",
+            "isSmartSelfieFramingEnabled"
         ].forEach(defaults.removeObject)
         
         defaultFileFormat = .raw
@@ -235,5 +240,6 @@ extension CameraModel {
         shouldPrioritizeBurstSpeed = true
         shouldShowBurstFeedback = false
         shouldShowConfettiCannons = true
+        isSmartSelfieFramingEnabled = false
     }
 }

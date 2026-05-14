@@ -21,14 +21,10 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
     let _liveCaptureModeBox = CaptureModeBox()
     let _livePhotoFilterBox = PhotoFilterBox()
     var isCaptureSessionRunning = false
-    @ObservationIgnored
-    nonisolated(unsafe) var liveFilterPreviewReferenceSize: CGSize = .zero
     let _pendingSaveLocationBox = SaveLocationBox()
     let _captureContextStore = PhotoCaptureContextStore()
     let _burstCaptureTracker = BurstCaptureTracker()
     let _secondaryFrameStore = PixelBufferStore()
-    @ObservationIgnored
-    var captureRotationCoordinator: AVCaptureDevice.RotationCoordinator?
     
     // MARK: - Camera Control
     var cleanUIControl: AVCaptureIndexPicker?
@@ -127,6 +123,13 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
     var shouldShowConfettiCannons = true {
         didSet { UserDefaults.standard.set(shouldShowConfettiCannons, forKey: "shouldShowConfettiCannons") }
     }
+    var isSmartSelfieFramingEnabled = false {
+        didSet {
+            guard oldValue != isSmartSelfieFramingEnabled else { return }
+            UserDefaults.standard.set(isSmartSelfieFramingEnabled, forKey: "isSmartSelfieFramingEnabled")
+            refreshSmartSelfieFraming()
+        }
+    }
     
     // MARK: - Capture format
     var captureMode: CaptureMode = .raw {
@@ -139,6 +142,7 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
                 buildAvailableFormats()
                 refreshFastCapturePrioritizationForBurstMode()
                 updateCameraControlsMode()
+                refreshSmartSelfieFraming()
             }
         }
     }
@@ -158,12 +162,15 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
     var pendingCaptureModeAfterLensSwitch: CaptureMode?
     var activeLens: Lens = .wide
     var isSwitchingLens = false
+    @ObservationIgnored
+    var captureRotationCoordinator: AVCaptureDevice.RotationCoordinator?
     
     // MARK: - Dual camera
     var isDualCameraEnabled = false {
         didSet {
             guard oldValue != isDualCameraEnabled else { return }
             updateAnalysisPauseState()
+            refreshSmartSelfieFraming()
             if isDualCameraEnabled {
                 selectedPhotoFilter = .off
                 isAutoExposure = true
@@ -230,6 +237,8 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
     var onStandardPhotoSaved: (() -> Void)?
     @ObservationIgnored
     var analysisGridSize: CGSize = .zero
+    @ObservationIgnored
+    nonisolated(unsafe) var liveFilterPreviewReferenceSize: CGSize = .zero
     
     // MARK: - Live readouts
     var liveISO: Float = 0
@@ -397,6 +406,7 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
             guard oldValue != isTimerCountingDown else { return }
             updateAnalysisPauseState()
             updateMetadataOutputStatus()
+            refreshSmartSelfieFraming()
             if isTimerCountingDown {
                 detectedCodeURL = nil
                 detectedCodeString = nil
@@ -423,6 +433,7 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
         didSet {
             updateAnalysisPauseState()
             updateMetadataOutputStatus()
+            refreshSmartSelfieFraming()
             if isBurstCapturing {
                 detectedCodeURL = nil
                 detectedCodeString = nil
@@ -548,6 +559,24 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
     var didDismissLensCleaningHint = false
     @ObservationIgnored
     var lensSmudgeStatusObservation: NSKeyValueObservation?
+    
+    // MARK: - Smart selfie framing
+    @ObservationIgnored
+    var smartSelfieFramingMonitor: AVCaptureSmartFramingMonitor?
+    @ObservationIgnored
+    var smartSelfieFramingRecommendationObservation: NSKeyValueObservation?
+    @ObservationIgnored
+    var smartSelfieCenterStageActiveObservation: NSKeyValueObservation?
+    @ObservationIgnored
+    var smartSelfieCenterStageDeviceUniqueID: String?
+    @ObservationIgnored
+    var didEnableSmartSelfieCenterStage = false
+    @ObservationIgnored
+    var smartSelfieFramingApplyTask: Task<Void, Never>?
+    var isSmartSelfieFramingAvailable = false
+    var isSmartSelfieFramingMonitoring = false
+    var isSmartSelfieCenterStageActive = false
+    var lastAppliedSmartSelfieFramingRecommendation: SmartSelfieFramingRecommendation?
     
     // MARK: - Other properties / methods
     var captureAspectRatio: CGFloat {

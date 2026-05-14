@@ -99,6 +99,7 @@ extension CameraModel {
                 
                 self.reapplyManualSettingsAfterLensSwitch(previousShutterDuration: previousShutterDuration)
                 self.setupCameraControls()
+                self.refreshSmartSelfieFraming()
                 
                 if !cam.isLockingFocusWithCustomLensPositionSupported {
                     self.isAutoFocus = true
