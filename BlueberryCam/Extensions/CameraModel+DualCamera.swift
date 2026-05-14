@@ -284,6 +284,7 @@ extension CameraModel {
                 self.mainPreviewDeviceUniqueID = mainDevice.uniqueID
                 self.pipPreviewDeviceUniqueID = pipDevice.uniqueID
                 self.captureRotationCoordinator = AVCaptureDevice.RotationCoordinator(device: mainDevice, previewLayer: nil)
+                self.refreshCaptureAspectRatioOptions(for: mainDevice)
                 self.updateCaptureOrientation()
                 self.lensSwitchCompletionCount += 1
                 self.configureLensSmudgeDetection(for: mainDevice)
@@ -386,6 +387,7 @@ extension CameraModel {
                 self.dualCameraPipRotationAngle = 0
                 self.captureRotationCoordinator = AVCaptureDevice.RotationCoordinator(device: device, previewLayer: nil)
                 self.lensSwitchCompletionCount += 1
+                self.refreshCaptureAspectRatioOptions(for: device)
                 self.configureLensSmudgeDetection(for: device)
                 self.configureSubjectAreaMonitoring(for: device)
                 self.buildAvailableFormats()

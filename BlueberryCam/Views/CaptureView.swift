@@ -31,6 +31,9 @@ extension CaptureView {
     private var tapMoveTolerance: CGFloat { 18 }
     private var focusReticleSliderXTolerance: CGFloat { 24 }
     private var focusReticleSliderYTolerance: CGFloat { 96 }
+    private var shouldMaskCaptureAspectRatioTransition: Bool {
+        cameraModel.isCaptureAspectRatioTransitioning && cameraModel.activeLens.zoomFactor > 1
+    }
     private var countdownTextTransition: AnyTransition {
         .asymmetric(
             insertion: .scale(scale: 2.6).combined(with: .opacity),
@@ -43,10 +46,10 @@ extension CaptureView {
         let topInset = geo.safeAreaInsets.top
         let botInset = geo.safeAreaInsets.bottom
         let xHeight = (topInset - botInset) / 2
-        let aspect = cameraModel.captureAspectRatio
-        let previewW: CGFloat = aspect < size.width / size.height ? size.height * aspect : size.width
-        let previewH: CGFloat = aspect < size.width / size.height ? size.height : size.width / aspect
-        let previewX = (size.width - previewW) / 2
+        let aspect: CGFloat = 3.0 / 4.0
+        let previewW = size.width
+        let previewH = size.width / aspect
+        let previewX: CGFloat = 0
         let previewY = (size.height - previewH) / 2
         return CGRect(x: previewX, y: previewY - xHeight, width: previewW, height: previewH)
     }
@@ -229,7 +232,9 @@ extension CaptureView {
     
     // MARK: - Viewfinder
     private func viewFinder(_ previewRect: CGRect) -> some View {
-        ZStack {
+        let shouldMaskAspectRatioTransition = shouldMaskCaptureAspectRatioTransition
+        
+        return ZStack {
             CameraPreviewView(session: cameraModel.isDetachingPreviewForReconfiguration ? nil : cameraModel.previewSession, onCapture: {
                 cameraModel.handleShutterButton {
                     triggerShutterFeedback()
@@ -253,6 +258,13 @@ extension CaptureView {
                     .allowsHitTesting(false)
                     .transition(.opacity)
             }
+            
+            if shouldMaskAspectRatioTransition {
+                Color.black
+                    .opacity(0.22)
+                    .allowsHitTesting(false)
+                    .transition(.opacity)
+            }
         }
         .overlay(alignment: .topLeading) {
             if cameraModel.isDualCameraEnabled && !cameraModel.isDetachingPreviewForReconfiguration {
@@ -264,15 +276,16 @@ extension CaptureView {
             }
         }
         .animation(Animations.easeInOut, value: cameraModel.isLiveFilterPreviewActive)
-        .scaleEffect(visualZoomScale)
+        .scaleEffect(visualZoomScale * (shouldMaskAspectRatioTransition ? 1.016 : 1.0))
         .rotation3DEffect(
             .degrees(cameraModel.flipRotation),
             axis: (x: 0, y: 1, z: 0),
             perspective: 0.1
         )
-        .blur(radius: visualBlur)
+        .blur(radius: visualBlur + (shouldMaskAspectRatioTransition ? 10 : 0))
         .opacity(visualOpacity)
         .animation(Animations.viewFinderShown, value: scenePhase)
+        .animation(.smooth(duration: 0.08), value: shouldMaskAspectRatioTransition)
         .frame(width: previewRect.width, height: previewRect.height)
         .position(x: previewRect.midX, y: previewRect.midY)
         .allowsHitTesting(!cameraModel.isTimerCountingDown && !cameraModel.isBurstCapturing && !cameraModel.shouldShowDualCameraTransitionCurtain)

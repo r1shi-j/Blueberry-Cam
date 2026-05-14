@@ -12,6 +12,12 @@ struct ResolutionOption: Identifiable, Equatable {
     }
 }
 
+struct ResolutionOptionsSnapshot: Equatable {
+    let availableOptions: [ResolutionOption]
+    let enabledOptions: [ResolutionOption]
+    let selectedOption: ResolutionOption?
+}
+
 enum ResolutionPreference: String, CaseIterable, Identifiable {
     case efficient = "Efficient"
     case max = "Max"

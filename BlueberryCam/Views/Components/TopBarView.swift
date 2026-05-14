@@ -27,12 +27,22 @@ extension TopBarView {
     
     private enum Fonts {
         static let picker: Font = .system(size: 12, weight: .medium)
+        static let pickerIcon: Font = .system(size: 13, weight: .medium)
         static let readoutSize: CGFloat = 14
         static let button: Font = .system(size: 12, weight: .bold)
         static let buttonInfo: Font = .system(size: 12, weight: .medium, design: .monospaced)
     }
     
     // MARK: Properties
+    // MARK: - Capture Aspect Ratio properties
+    private var captureAspectRatioButtonRotation: Angle {
+        cameraModel.selectedCaptureAspectRatio == .landscape4x3 ? .degrees(90) : .zero
+    }
+    
+    private var row2AccessoryTransition: AnyTransition {
+        .opacity.combined(with: .scale(scale: 0.94, anchor: .leading))
+    }
+    
     // MARK: - Format/resolution properties
     private func resolutionForeground(for isSelected: Bool, isEnabled: Bool) -> Color {
         guard isEnabled else { return Colors.buttonText.opacity(Style.disabledOpacity) }
@@ -350,36 +360,74 @@ extension TopBarView {
         }
     }
     
-    // MARK: - Resolution picker
-    @ViewBuilder
-    private func resolutionPicker() -> some View {
-        if cameraModel.shouldShowResolutionPicker {
-            HStack(spacing: 0) {
-                ForEach(cameraModel.availableResolutions) { opt in
-                    let isSelected = cameraModel.selectedResolution?.id == opt.id
-                    let isEnabled = cameraModel.isResolutionEnabled(opt)
-                    Button {
-                        hapticTrigger += 1
-                        withAnimation(Animations.bouncy) {
-                            cameraModel.selectResolution(opt)
-                        }
-                    } label: {
-                        Text(opt.label)
-                            .font(Fonts.picker)
-                            .fontWidth(.expanded)
-                            .padding(.horizontal, Style.horizontalPickerPadding)
-                            .padding(.vertical, Style.verticalButtonPadding)
-                            .background(resolutionBackground(for: isSelected, isEnabled: isEnabled))
-                            .foregroundStyle(resolutionForeground(for: isSelected, isEnabled: isEnabled))
-                    }
-                    .disabled(!isEnabled)
-                }
+    // MARK: - Capture Aspect Ratio
+    private func captureAspectRatioButton() -> some View {
+        Button {
+            hapticTriggerR += 1
+            withAnimation(Animations.bouncy) {
+                cameraModel.cycleCaptureAspectRatio()
             }
-            .clipShape(.rect(cornerRadius: Style.pickerCornerRadius))
-            .overlay(RoundedRectangle(cornerRadius: Style.pickerCornerRadius).stroke(.white.opacity(0.2), lineWidth: 1))
-            .allowsHitTesting(!cameraModel.isSwitchingLens)
-            .animation(Animations.bouncy, value: cameraModel.availableResolutions)
-            .transition(.opacity.combined(with: .scale(scale: 0.5)))
+        } label: {
+            Label("Switch aspect ratio", systemImage: "aspectratio")
+                .labelStyle(.iconOnly)
+                .rotationEffect(captureAspectRatioButtonRotation)
+        }
+        .font(Fonts.pickerIcon)
+        .fontWidth(.expanded)
+        .padding(.horizontal, Style.horizontalPickerPadding)
+        .padding(.vertical, Style.verticalButtonPadding)
+        .background(Style.selectedBackground)
+        .foregroundStyle(Style.selectedForeground)
+        .clipShape(.rect(cornerRadius: Style.pickerCornerRadius))
+        .overlay(RoundedRectangle(cornerRadius: Style.pickerCornerRadius).stroke(.white.opacity(0.2), lineWidth: 1))
+        .allowsHitTesting(cameraModel.canCycleCaptureAspectRatio)
+        .animation(.smooth(duration: 0.22), value: cameraModel.selectedCaptureAspectRatio)
+        .animation(Animations.bouncy, value: cameraModel.selectedCaptureAspectRatio)
+        .animation(Animations.bouncy, value: cameraModel.availableCaptureAspectRatios)
+        .accessibilityValue(cameraModel.selectedCaptureAspectRatio.label)
+    }
+    
+    // MARK: - Resolution picker
+    private func resolutionPicker() -> some View {
+        HStack(spacing: 0) {
+            ForEach(cameraModel.availableResolutions) { opt in
+                let isSelected = cameraModel.selectedResolution?.id == opt.id
+                let isEnabled = cameraModel.isResolutionEnabled(opt)
+                Button {
+                    hapticTrigger += 1
+                    withAnimation(Animations.bouncy) {
+                        cameraModel.selectResolution(opt)
+                    }
+                } label: {
+                    Text(opt.label)
+                        .font(Fonts.picker)
+                        .fontWidth(.expanded)
+                        .lineLimit(1)
+                        .fixedSize(horizontal: true, vertical: false)
+                        .padding(.horizontal, Style.horizontalPickerPadding)
+                        .padding(.vertical, Style.verticalButtonPadding)
+                        .background(resolutionBackground(for: isSelected, isEnabled: isEnabled))
+                        .foregroundStyle(resolutionForeground(for: isSelected, isEnabled: isEnabled))
+                }
+                .disabled(!isEnabled)
+            }
+        }
+        .clipShape(.rect(cornerRadius: Style.pickerCornerRadius))
+        .overlay(RoundedRectangle(cornerRadius: Style.pickerCornerRadius).stroke(.white.opacity(0.2), lineWidth: 1))
+        .allowsHitTesting(!cameraModel.isSwitchingLens)
+        .fixedSize(horizontal: true, vertical: false)
+    }
+    
+    // MARK: - Row 2 accessory
+    @ViewBuilder
+    private func row2LeadingAccessory() -> some View {
+        if cameraModel.shouldShowCaptureAspectRatioButton {
+            captureAspectRatioButton()
+                .fixedSize(horizontal: true, vertical: false)
+                .transition(row2AccessoryTransition)
+        } else if cameraModel.shouldShowResolutionPicker {
+            resolutionPicker()
+                .transition(row2AccessoryTransition)
         }
     }
     
@@ -639,10 +687,14 @@ struct TopBarView: View {
             
             // MARK: Row 2
             HStack(alignment: .center, spacing: Style.row2Spacing) {
-                resolutionPicker()
+                row2LeadingAccessory()
                 formatPicker()
             }
             .padding(.horizontal, Style.row2HPadding)
+            .animation(.smooth(duration: 0.24), value: cameraModel.activeLens.isFront)
+            .animation(.smooth(duration: 0.24), value: cameraModel.shouldShowCaptureAspectRatioButton)
+            .animation(.smooth(duration: 0.24), value: cameraModel.shouldShowResolutionPicker)
+            .animation(.smooth(duration: 0.24), value: cameraModel.availableResolutions)
             .animation(Animations.bouncy, value: cameraModel.isDualCameraEnabled)
             
             // MARK: Row 3

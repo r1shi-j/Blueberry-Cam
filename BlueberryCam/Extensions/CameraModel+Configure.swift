@@ -21,6 +21,9 @@ extension CameraModel {
                 guard let self else { return }
                 self.isCaptureSessionRunning = sessionIsRunning
                 self.updateCaptureOrientation()
+                if let device {
+                    self.refreshCaptureAspectRatioOptions(for: device)
+                }
             }
         }
     }
@@ -126,6 +129,7 @@ extension CameraModel {
                 // Restoration of hardware defaults and state
                 self.device = cam
                 self.captureRotationCoordinator = AVCaptureDevice.RotationCoordinator(device: cam, previewLayer: nil)
+                self.refreshCaptureAspectRatioOptions(for: cam)
                 self.configureLensSmudgeDetection(for: cam)
                 self.configureSubjectAreaMonitoring(for: cam)
                 self.buildAvailableFormats()

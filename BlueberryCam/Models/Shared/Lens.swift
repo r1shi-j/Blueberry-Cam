@@ -1,7 +1,7 @@
 internal import AVFoundation
 import Foundation
 
-enum Lens: String, CaseIterable {
+enum Lens: String, CaseIterable, Hashable {
     case frontUltraWide, front, ultraWide, wide, tele2x, tele4x, tele8x
     
     var label: String {

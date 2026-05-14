@@ -151,6 +151,10 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
     }
     var availableResolutions: [ResolutionOption] = []
     var enabledResolutions: [ResolutionOption] = []
+    var cachedResolutionOptionsByLens: [Lens: ResolutionOptionsSnapshot] = [:]
+    var selectedCaptureAspectRatio: CaptureAspectRatioOption = .defaultSelection
+    var availableCaptureAspectRatios: [CaptureAspectRatioOption] = [.defaultSelection]
+    var isCaptureAspectRatioTransitioning = false
     var pendingCaptureModeAfterLensSwitch: CaptureMode?
     var activeLens: Lens = .wide
     var isSwitchingLens = false
@@ -546,7 +550,10 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
     var lensSmudgeStatusObservation: NSKeyValueObservation?
     
     // MARK: - Other properties / methods
-    var captureAspectRatio: CGFloat { 3.0 / 4.0 }
+    var captureAspectRatio: CGFloat {
+        let ratio: CaptureAspectRatioOption = activeLens.isFront ? selectedCaptureAspectRatio : .portrait4x3
+        return ratio.widthToHeightRatio
+    }
     
     func updateAnalysisPauseState() {
         shouldPauseAnalysis = showSimpleView || isDualCameraEnabled

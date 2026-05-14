@@ -56,6 +56,13 @@ struct BlueberryCamApp: App {
 // locked app fix photo orientation
 
 // MARK: - Next Steps
-// ProRaw
-// Photographic styles
 // Selfie cam horizontal mode and centre stage
+// settings for do you want centre stage on
+
+// ProRaw
+// settings for Shown Formats: discolusre groupe shows list of formats with circle tick box, default format updates to show this
+// Updated locked camera app to add proraw
+
+// control i
+// smoother animations everywhere
+// update settings desc: centre stage and aspect only 17pro

@@ -190,60 +190,73 @@ extension CameraModel {
             selectedResolution = defaultResolution == .max ? enabledOptions.last : enabledOptions.first
         }
         
+        cacheResolutionOptions(for: activeLens,
+                               availableOptions: visibleOptions,
+                               enabledOptions: enabledOptions)
         updateLiveFilterPreviewReferenceSize()
     }
     
-    func primeResolutionOptions(for lens: Lens, device: AVCaptureDevice) {
-        let visibleOptions: [ResolutionOption]
-        if lens.isFront {
-            visibleOptions = []
-        } else {
-            let outputMax = device.activeFormat.supportedMaxPhotoDimensions.max(by: {
-                Int($0.width) * Int($0.height) < Int($1.width) * Int($1.height)
-            }) ?? photoOutput.maxPhotoDimensions
-            let allDims = device.activeFormat.supportedMaxPhotoDimensions
-                .filter { $0.width <= outputMax.width && $0.height <= outputMax.height }
-                .sorted { Int($0.width) * Int($0.height) < Int($1.width) * Int($1.height) }
-            
-            var deduped: [ResolutionOption] = []
-            for dim in allDims {
-                let opt = ResolutionOption(width: dim.width, height: dim.height)
-                if !deduped.contains(where: { abs($0.id - opt.id) < 2_000_000 }) {
-                    deduped.append(opt)
-                }
-            }
-            
-            let smallest = deduped.first
-            let largest = deduped.last
-            if let s = smallest, let l = largest, s.id != l.id {
-                visibleOptions = [s, l]
-            } else {
-                visibleOptions = deduped
-            }
+    func primeResolutionOptions(for lens: Lens, device _: AVCaptureDevice) {
+        guard !lens.isFront else {
+            applyResolutionOptionsSnapshot(.init(availableOptions: [],
+                                                 enabledOptions: [],
+                                                 selectedOption: nil))
+            return
         }
         
+        let cachedSnapshot = cachedResolutionOptionsByLens[lens]
+        let fallbackSnapshot = cachedResolutionOptionsByLens[.wide] ?? cachedResolutionOptionsByLens.values.first
+        guard let sourceSnapshot = cachedSnapshot ?? fallbackSnapshot else { return }
+        let snapshot = resolutionOptionsSnapshot(for: lens,
+                                                 availableOptions: sourceSnapshot.availableOptions)
+        applyResolutionOptionsSnapshot(snapshot)
+        updateLiveFilterPreviewReferenceSize()
+    }
+    
+    private func cacheResolutionOptions(for lens: Lens,
+                                        availableOptions: [ResolutionOption],
+                                        enabledOptions: [ResolutionOption]) {
+        guard !lens.isFront else { return }
+        cachedResolutionOptionsByLens[lens] = .init(availableOptions: availableOptions,
+                                                    enabledOptions: enabledOptions,
+                                                    selectedOption: selectedResolution)
+    }
+    
+    private func resolutionOptionsSnapshot(for lens: Lens,
+                                           availableOptions: [ResolutionOption]) -> ResolutionOptionsSnapshot {
         let isCropLens = lens == .tele2x || lens == .tele8x
         let enabledOptions: [ResolutionOption]
-        if lens.isFront {
-            enabledOptions = []
-        } else if isCropLens || isMacroEnabled || captureMode == .raw {
-            enabledOptions = visibleOptions.first.map { [$0] } ?? []
+        if isCropLens || isMacroEnabled || captureMode == .raw {
+            enabledOptions = availableOptions.first.map { [$0] } ?? []
         } else {
-            enabledOptions = visibleOptions
+            enabledOptions = availableOptions
         }
         
-        availableResolutions = visibleOptions
-        enabledResolutions = enabledOptions
-        
+        let selectedOption: ResolutionOption?
         if enabledOptions.isEmpty {
-            selectedResolution = nil
-        } else if let current = selectedResolution, enabledOptions.contains(where: { $0.id == current.id }) {
-            return
+            selectedOption = nil
+        } else if let current = selectedResolution,
+                  enabledOptions.contains(where: { $0.id == current.id }) {
+            selectedOption = current
         } else {
-            selectedResolution = defaultResolution == .max ? enabledOptions.last : enabledOptions.first
+            selectedOption = defaultResolution == .max ? enabledOptions.last : enabledOptions.first
         }
         
-        updateLiveFilterPreviewReferenceSize()
+        return .init(availableOptions: availableOptions,
+                     enabledOptions: enabledOptions,
+                     selectedOption: selectedOption)
+    }
+    
+    private func applyResolutionOptionsSnapshot(_ snapshot: ResolutionOptionsSnapshot) {
+        if availableResolutions != snapshot.availableOptions {
+            availableResolutions = snapshot.availableOptions
+        }
+        if enabledResolutions != snapshot.enabledOptions {
+            enabledResolutions = snapshot.enabledOptions
+        }
+        if selectedResolution != snapshot.selectedOption {
+            selectedResolution = snapshot.selectedOption
+        }
     }
     
     func normalizeFlashModeForCurrentDevice() {
