@@ -181,6 +181,7 @@ struct SettingsView: View {
                 Section {
                     Toggle("Geotag Location", isOn: $cameraModel.shouldGeotagLocation)
                     Toggle("Faster Burst Capture", isOn: $cameraModel.shouldPrioritizeBurstSpeed)
+                    Toggle("Quick Burst from Shutter Controls", isOn: $cameraModel.shouldEnableQuickBurstFromShutterControls)
                     Toggle("Burst Feedback", isOn: $cameraModel.shouldShowBurstFeedback)
                     Toggle("Precise Timer", isOn: $cameraModel.detailedCountdownTimer)
                     Toggle("Hide UI When Counting Down", isOn: $cameraModel.shouldHideUIWhileCountingDown)
@@ -193,7 +194,7 @@ struct SettingsView: View {
                             .symbolEffect(.wiggle, options: .repeat(.periodic(delay: 1)).speed(0.7))
                     }
                 } footer: {
-                    Text("Faster burst capture prioritises speed over quality. Burst feedback shows a quick summary when a burst finishes. Precise Timer shows milliseconds instead of just seconds. Lens smudge detection is supported and always enabled.")
+                    Text("Faster burst capture prioritises speed over quality. Quick Burst starts a burst after holding the shutter, volume button or Camera Control. Burst feedback shows a quick summary when a burst finishes. Precise Timer shows milliseconds instead of just seconds. Lens smudge detection is supported and always enabled.")
                 }
                 
                 Section {

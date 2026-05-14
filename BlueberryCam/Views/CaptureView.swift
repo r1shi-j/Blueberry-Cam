@@ -235,19 +235,11 @@ extension CaptureView {
         let shouldMaskAspectRatioTransition = shouldMaskCaptureAspectRatioTransition
         
         return ZStack {
-            CameraPreviewView(session: cameraModel.isDetachingPreviewForReconfiguration ? nil : cameraModel.previewSession, onCapture: {
-                cameraModel.handleShutterButton {
-                    triggerShutterFeedback()
-                    withAnimation { cameraModel.changeCapturingState(to: true) }
-                    Task { @MainActor in
-                        try? await Task.sleep(for: Durations.shutter)
-                        withAnimation { cameraModel.changeCapturingState(to: false) }
-                    }
-                } onBurstPhotoCaptured: {
-                    triggerShutterFeedback()
-                    shutterCountBurst += 1
-                }
-            }, proxy: previewProxy,
+            CameraPreviewView(session: cameraModel.isDetachingPreviewForReconfiguration ? nil : cameraModel.previewSession,
+                              onCaptureBegan: handleShutterPressBegan,
+                              onCaptureEnded: handleShutterPressEnded,
+                              onCaptureCancelled: handleShutterPressCancelled,
+                              proxy: previewProxy,
                               deviceUniqueID: cameraModel.isDualCameraEnabled ? cameraModel.mainPreviewDeviceUniqueID : nil,
                               rotationAngle: cameraModel.mainPreviewRotationAngle,
                               isMirrored: cameraModel.isMainPreviewMirrored,
@@ -288,10 +280,11 @@ extension CaptureView {
         .animation(.smooth(duration: 0.08), value: shouldMaskAspectRatioTransition)
         .frame(width: previewRect.width, height: previewRect.height)
         .position(x: previewRect.midX, y: previewRect.midY)
-        .allowsHitTesting(!cameraModel.isTimerCountingDown && !cameraModel.isBurstCapturing && !cameraModel.shouldShowDualCameraTransitionCurtain)
+        .allowsHitTesting(!cameraModel.isTimerCountingDown && !cameraModel.shouldShowDualCameraTransitionCurtain)
         .gesture(
             DragGesture(minimumDistance: 0)
                 .onChanged { value in
+                    guard !cameraModel.isBurstCapturing else { return }
                     if previewInteractionStartPoint == nil {
                         if isPointInsideDualCameraPip(value.startLocation, previewSize: previewRect.size) {
                             isIgnoringPreviewInteraction = true
@@ -303,6 +296,10 @@ extension CaptureView {
                     updatePreviewInteraction(at: value.location)
                 }
                 .onEnded { value in
+                    guard !cameraModel.isBurstCapturing else {
+                        isIgnoringPreviewInteraction = false
+                        return
+                    }
                     if isIgnoringPreviewInteraction {
                         isIgnoringPreviewInteraction = false
                         return
@@ -760,7 +757,9 @@ extension CaptureView {
             cameraModel: cameraModel,
             shutterCount: $shutterCount,
             shutterCountBurst: $shutterCountBurst,
-            onShutterFeedback: triggerShutterFeedback
+            onShutterPressBegan: handleShutterPressBegan,
+            onShutterPressEnded: handleShutterPressEnded,
+            onShutterPressCancelled: handleShutterPressCancelled
         )
         .padding(.bottom, 30)
     }
@@ -1011,6 +1010,35 @@ extension CaptureView {
         hapticTrigger += 1
     }
     
+    private func triggerStandardCaptureFeedback() {
+        triggerShutterFeedback()
+        withAnimation { cameraModel.changeCapturingState(to: true) }
+        Task { @MainActor in
+            try? await Task.sleep(for: Durations.shutter)
+            withAnimation { cameraModel.changeCapturingState(to: false) }
+        }
+    }
+    
+    private func handleBurstPhotoCaptured() {
+        triggerShutterFeedback()
+        shutterCountBurst += 1
+    }
+    
+    private func handleShutterPressBegan() {
+        cameraModel.handleShutterPressBegan(onBurstPhotoCaptured: handleBurstPhotoCaptured)
+    }
+    
+    private func handleShutterPressEnded() {
+        cameraModel.handleShutterPressEnded(
+            onCapture: triggerStandardCaptureFeedback,
+            onBurstPhotoCaptured: handleBurstPhotoCaptured
+        )
+    }
+    
+    private func handleShutterPressCancelled() {
+        cameraModel.handleShutterPressCancelled()
+    }
+    
     private func triggerCountdownFeedback() {
         countdownHapticTrigger += 1
     }
@@ -1029,6 +1057,7 @@ extension CaptureView {
     
     private func handleOnDisappear() {
         cameraModel.cancelTimerCountdown()
+        cameraModel.handleShutterPressCancelled()
         cameraModel.stopBurstCapture()
         cameraModel.onStandardPhotoSaved = nil
         cameraModel.onTimerCountdownSecond = nil

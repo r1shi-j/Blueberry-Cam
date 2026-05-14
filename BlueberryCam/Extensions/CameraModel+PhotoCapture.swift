@@ -7,6 +7,7 @@ extension CameraModel {
     static let burstIntervalMax = 5.0
     static let burstFrameLimitMin = 1
     static let burstFrameLimitMax = 100
+    private static let shutterHoldBurstDelay: Duration = .seconds(1)
     
     func changeCapturingState(to new: Bool) {
         isCapturing = new
@@ -38,11 +39,98 @@ extension CameraModel {
         capturePhoto(onCapture: onCapture)
     }
     
+    func handleShutterPressBegan(onBurstPhotoCaptured: @escaping @MainActor @Sendable () -> Void = {}) {
+        guard shutterHoldCaptureTask == nil,
+              !isBurstCapturing,
+              shouldEnableQuickBurstFromShutterControls,
+              canUseShutterButton else { return }
+        
+        shutterHoldCaptureTask = Task { @MainActor [weak self] in
+            do {
+                try await Task.sleep(for: Self.shutterHoldBurstDelay)
+            } catch {
+                return
+            }
+            
+            guard let self, !Task.isCancelled else { return }
+            self.shutterHoldCaptureTask = nil
+            self.startShutterHoldBurst(onBurstPhotoCaptured: onBurstPhotoCaptured)
+        }
+    }
+    
+    func handleShutterPressEnded(onCapture: @escaping @MainActor @Sendable () -> Void,
+                                 onBurstPhotoCaptured: @escaping @MainActor @Sendable () -> Void = {}) {
+        if let shutterHoldCaptureTask {
+            shutterHoldCaptureTask.cancel()
+            self.shutterHoldCaptureTask = nil
+            handleShutterButton(onCapture: onCapture, onBurstPhotoCaptured: onBurstPhotoCaptured)
+            return
+        }
+        
+        guard shutterHoldBurstSnapshot != nil else {
+            handleShutterButton(onCapture: onCapture, onBurstPhotoCaptured: onBurstPhotoCaptured)
+            return
+        }
+        
+        stopShutterHoldBurst()
+    }
+    
+    func handleShutterPressCancelled() {
+        shutterHoldCaptureTask?.cancel()
+        shutterHoldCaptureTask = nil
+        
+        if shutterHoldBurstSnapshot != nil {
+            stopShutterHoldBurst()
+        }
+    }
+    
     func cancelTimerCountdown() {
         timerCountdownTask?.cancel()
         timerCountdownTask = nil
         isTimerCountingDown = false
         timerCountdownValue = nil
+    }
+    
+    private func startShutterHoldBurst(onBurstPhotoCaptured: @escaping @MainActor @Sendable () -> Void) {
+        guard canUseBurstButton,
+              !isBurstCapturing,
+              shutterHoldBurstSnapshot == nil else { return }
+        
+        let snapshot = ShutterHoldBurstSnapshot(
+            wasBurstModeEnabled: isBurstModeEnabled,
+            burstIntervalSeconds: burstIntervalSeconds,
+            burstFrameLimit: burstFrameLimit,
+            flashMode: flashMode
+        )
+        shutterHoldBurstSnapshot = snapshot
+        
+        if !isBurstModeEnabled {
+            isBurstModeEnabled = true
+            burstIntervalSeconds = nil
+            burstFrameLimit = nil
+        }
+        
+        startBurstCapture(onBurstPhotoCaptured: onBurstPhotoCaptured)
+        
+        if !isBurstCapturing {
+            restoreShutterHoldBurstSnapshot()
+        }
+    }
+    
+    private func stopShutterHoldBurst() {
+        stopBurstCapture()
+        restoreShutterHoldBurstSnapshot()
+    }
+    
+    private func restoreShutterHoldBurstSnapshot() {
+        guard let snapshot = shutterHoldBurstSnapshot else { return }
+        shutterHoldBurstSnapshot = nil
+        
+        guard !snapshot.wasBurstModeEnabled else { return }
+        isBurstModeEnabled = false
+        burstIntervalSeconds = snapshot.burstIntervalSeconds
+        burstFrameLimit = snapshot.burstFrameLimit
+        flashMode = snapshot.flashMode
     }
     
     private func startBurstCapture(onBurstPhotoCaptured: @escaping @MainActor @Sendable () -> Void) {
@@ -650,6 +738,10 @@ extension CameraModel {
     var canUseShutterButton: Bool {
         guard !isTimerCountingDown else { return false }
         return isBurstCapturing || canCapturePhotoInCurrentState
+    }
+    
+    var canUseBurstButton: Bool {
+        timerMode == .off && !isTimerCountingDown
     }
     
     private func captureDimensions() -> CMVideoDimensions? {

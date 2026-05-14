@@ -159,16 +159,13 @@ extension LockedCaptureView {
     
     // MARK: - Viewfinder
     private func viewFinder(_ previewRect: CGRect) -> some View {
-        CameraPreviewView(session: cameraModel.session, onCapture: {
-            cameraModel.capturePhoto {
-                triggerShutterFeedback()
-                withAnimation { cameraModel.changeCapturingState(to: true) }
-                Task { @MainActor in
-                    try? await Task.sleep(for: Durations.shutter)
-                    withAnimation { cameraModel.changeCapturingState(to: false) }
-                }
-            }
-        }, proxy: previewProxy)
+        CameraPreviewView(
+            session: cameraModel.session,
+            onCaptureBegan: {},
+            onCaptureEnded: capturePhoto,
+            onCaptureCancelled: {},
+            proxy: previewProxy
+        )
         .scaleEffect(visualZoomScale)
         .blur(radius: visualBlur)
         .opacity(visualOpacity)
@@ -523,6 +520,17 @@ struct LockedCaptureView: View {
 extension LockedCaptureView {
     private func triggerShutterFeedback() {
         hapticTrigger += 1
+    }
+    
+    private func capturePhoto() {
+        cameraModel.capturePhoto {
+            triggerShutterFeedback()
+            withAnimation { cameraModel.changeCapturingState(to: true) }
+            Task { @MainActor in
+                try? await Task.sleep(for: Durations.shutter)
+                withAnimation { cameraModel.changeCapturingState(to: false) }
+            }
+        }
     }
     
     private func triggerCountdownFeedback() {

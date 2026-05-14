@@ -155,11 +155,11 @@ extension TopBarView {
     }
     
     private var burstButtonOpacity: Double {
-        cameraModel.timerMode == .off && !cameraModel.isTimerCountingDown ? 1.0 : Style.disabledOpacity
+        cameraModel.canUseBurstButton ? 1.0 : Style.disabledOpacity
     }
     
     private var isBurstButtonDisabled: Bool {
-        cameraModel.timerMode != .off || cameraModel.isTimerCountingDown
+        !cameraModel.canUseBurstButton
     }
     
     private var parsedBurstInterval: Double? {

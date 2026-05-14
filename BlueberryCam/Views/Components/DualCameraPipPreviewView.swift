@@ -39,7 +39,9 @@ struct DualCameraPipPreviewView: View {
     private func pipPreview(_ pipDeviceUniqueID: String) -> some View {
         CameraPreviewView(
             session: cameraModel.previewSession,
-            onCapture: {},
+            onCaptureBegan: {},
+            onCaptureEnded: {},
+            onCaptureCancelled: {},
             proxy: PreviewViewProxy(),
             deviceUniqueID: pipDeviceUniqueID,
             rotationAngle: cameraModel.pipPreviewRotationAngle,

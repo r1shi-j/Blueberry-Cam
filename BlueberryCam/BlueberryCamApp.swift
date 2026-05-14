@@ -53,7 +53,6 @@ struct BlueberryCamApp: App {
 // Add tips, welcome screen and tutorials
 
 // MARK: - FIXME
-// locked app fix photo orientation
 
 // MARK: - Next Steps
 // hold shutter (volume) for bursts
@@ -65,3 +64,5 @@ struct BlueberryCamApp: App {
 // update shared models features albumn
 
 // control i
+
+// grid wrong way fo selfie aspect

@@ -48,14 +48,22 @@ extension LockedBottomBarView {
     
     // MARK: - Shutter button
     private func shutterButton() -> some View {
-        ShutterButton(tint: shutterTint, height: Style.buttonHeight) {
-            cameraModel.capturePhoto {
-                onShutterFeedback()
-                withAnimation { cameraModel.changeCapturingState(to: true) }
-                Task { @MainActor in
-                    try? await Task.sleep(for: Durations.shutter)
-                    withAnimation { cameraModel.changeCapturingState(to: false) }
-                }
+        ShutterButton(
+            tint: shutterTint,
+            height: Style.buttonHeight,
+            onPressBegan: {},
+            onPressEnded: capturePhoto,
+            onPressCancelled: {}
+        )
+    }
+    
+    private func capturePhoto() {
+        cameraModel.capturePhoto {
+            onShutterFeedback()
+            withAnimation { cameraModel.changeCapturingState(to: true) }
+            Task { @MainActor in
+                try? await Task.sleep(for: Durations.shutter)
+                withAnimation { cameraModel.changeCapturingState(to: false) }
             }
         }
     }

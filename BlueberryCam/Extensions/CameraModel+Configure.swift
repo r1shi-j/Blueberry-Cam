@@ -190,6 +190,7 @@ extension CameraModel {
         
         self.shouldGeotagLocation = defaults.object(forKey: "shouldGeotagLocation") as? Bool ?? false
         self.shouldPrioritizeBurstSpeed = defaults.object(forKey: "shouldPrioritizeBurstSpeed") as? Bool ?? true
+        self.shouldEnableQuickBurstFromShutterControls = defaults.object(forKey: "shouldEnableQuickBurstFromShutterControls") as? Bool ?? true
         self.shouldShowBurstFeedback = defaults.object(forKey: "shouldShowBurstFeedback") as? Bool ?? false
         self.detailedCountdownTimer = defaults.object(forKey: "detailedCountdownTimer") as? Bool ?? false
         self.shouldHideUIWhileCountingDown = defaults.object(forKey: "shouldHideUIWhileCountingDown") as? Bool ?? true
@@ -224,6 +225,7 @@ extension CameraModel {
             "defaultHistogramLarge",
             "shouldGeotagLocation",
             "shouldPrioritizeBurstSpeed",
+            "shouldEnableQuickBurstFromShutterControls",
             "shouldShowBurstFeedback",
             "detailedCountdownTimer",
             "shouldHideUIWhileCountingDown",
@@ -234,23 +236,24 @@ extension CameraModel {
             "isSmartSelfieFramingEnabled"
         ].forEach(defaults.removeObject)
         
+        saveLocation = .photos
+        resetFileSaveLocationToDefault()
         setShownCaptureFormats(CaptureMode.defaultShownFormats)
         defaultFileFormat = .raw
         defaultResolution = .max
         defaultPhotoFilter = .off
-        saveLocation = .photos
-        resetFileSaveLocationToDefault()
         defaultHistogramSmall = .none
         defaultHistogramLarge = .none
         shouldGeotagLocation = false
-        recognizeBarcodes = false
-        shouldShowGrid = false
-        shouldShowLevel = false
+        shouldPrioritizeBurstSpeed = true
+        shouldEnableQuickBurstFromShutterControls = true
+        shouldShowBurstFeedback = false
         detailedCountdownTimer = false
         shouldHideUIWhileCountingDown = true
-        shouldPrioritizeBurstSpeed = true
-        shouldShowBurstFeedback = false
-        shouldShowConfettiCannons = true
+        shouldShowConfettiCannons = false
+        shouldShowGrid = false
+        shouldShowLevel = false
+        recognizeBarcodes = false
         isSmartSelfieFramingEnabled = false
     }
 }

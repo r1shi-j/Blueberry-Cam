@@ -62,19 +62,14 @@ extension BottomBarView {
     
     // MARK: - Shutter button
     private func shutterButton() -> some View {
-        ShutterButton(tint: shutterTint, height: Style.buttonHeight, isEnabled: cameraModel.canUseShutterButton) {
-            cameraModel.handleShutterButton {
-                onShutterFeedback()
-                withAnimation { cameraModel.changeCapturingState(to: true) }
-                Task { @MainActor in
-                    try? await Task.sleep(for: Durations.shutter)
-                    withAnimation { cameraModel.changeCapturingState(to: false) }
-                }
-            } onBurstPhotoCaptured: {
-                onShutterFeedback()
-                shutterCountBurst += 1
-            }
-        }
+        ShutterButton(
+            tint: shutterTint,
+            height: Style.buttonHeight,
+            isEnabled: cameraModel.canUseShutterButton,
+            onPressBegan: onShutterPressBegan,
+            onPressEnded: onShutterPressEnded,
+            onPressCancelled: onShutterPressCancelled
+        )
     }
     
     // MARK: - Lens picker
@@ -93,7 +88,9 @@ struct BottomBarView: View {
     @Bindable var cameraModel: CameraModel
     @Binding var shutterCount: Int
     @Binding var shutterCountBurst: Int
-    let onShutterFeedback: () -> Void
+    let onShutterPressBegan: () -> Void
+    let onShutterPressEnded: () -> Void
+    let onShutterPressCancelled: () -> Void
     
     var body: some View {
         VStack {

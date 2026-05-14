@@ -12,7 +12,9 @@ final class PreviewViewProxy {
 
 struct CameraPreviewView: UIViewRepresentable {
     let session: AVCaptureSession?
-    let onCapture: () -> Void
+    let onCaptureBegan: @MainActor @Sendable () -> Void
+    let onCaptureEnded: @MainActor @Sendable () -> Void
+    let onCaptureCancelled: @MainActor @Sendable () -> Void
     let proxy: PreviewViewProxy
     var deviceUniqueID: String?
     var rotationAngle: CGFloat = 0
@@ -28,13 +30,17 @@ struct CameraPreviewView: UIViewRepresentable {
             isMirrored: isMirrored,
             handlesCaptureEvents: handlesCaptureEvents
         )
-        view.onCapture = onCapture
+        view.onCaptureBegan = onCaptureBegan
+        view.onCaptureEnded = onCaptureEnded
+        view.onCaptureCancelled = onCaptureCancelled
         proxy.view = view
         return view
     }
     
     func updateUIView(_ uiView: PreviewUIView, context: Context) {
-        uiView.onCapture = onCapture
+        uiView.onCaptureBegan = onCaptureBegan
+        uiView.onCaptureEnded = onCaptureEnded
+        uiView.onCaptureCancelled = onCaptureCancelled
         uiView.configure(
             session: session,
             deviceUniqueID: deviceUniqueID,
@@ -49,7 +55,9 @@ struct CameraPreviewView: UIViewRepresentable {
 final class PreviewUIView: UIView {
     override class var layerClass: AnyClass { AVCaptureVideoPreviewLayer.self }
     
-    var onCapture: (() -> Void)?
+    var onCaptureBegan: (@MainActor @Sendable () -> Void)?
+    var onCaptureEnded: (@MainActor @Sendable () -> Void)?
+    var onCaptureCancelled: (@MainActor @Sendable () -> Void)?
     private var eventInteraction: AVCaptureEventInteraction?
     private var previewConnection: AVCaptureConnection?
     private var connectedDeviceUniqueID: String?
@@ -167,8 +175,19 @@ final class PreviewUIView: UIView {
         
         if eventInteraction == nil {
             let interaction = AVCaptureEventInteraction { [weak self] event in
-                guard event.phase == .ended else { return }
-                self?.onCapture?()
+                let phase = event.phase
+                Task { @MainActor [weak self] in
+                    switch phase {
+                        case .began:
+                            self?.onCaptureBegan?()
+                        case .ended:
+                            self?.onCaptureEnded?()
+                        case .cancelled:
+                            self?.onCaptureCancelled?()
+                        @unknown default:
+                            self?.onCaptureCancelled?()
+                    }
+                }
             }
             addInteraction(interaction)
             self.eventInteraction = interaction

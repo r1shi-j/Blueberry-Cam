@@ -2,6 +2,13 @@ internal import AVFoundation
 internal import CoreLocation
 internal import Photos
 
+struct ShutterHoldBurstSnapshot {
+    let wasBurstModeEnabled: Bool
+    let burstIntervalSeconds: Double?
+    let burstFrameLimit: Int?
+    let flashMode: AVCaptureDevice.FlashMode
+}
+
 @MainActor @Observable
 class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
     // MARK: - Session
@@ -101,6 +108,11 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
             refreshFastCapturePrioritizationForBurstMode()
         }
     }
+    var shouldEnableQuickBurstFromShutterControls = true {
+        didSet {
+            UserDefaults.standard.set(shouldEnableQuickBurstFromShutterControls, forKey: "shouldEnableQuickBurstFromShutterControls")
+        }
+    }
     var shouldShowBurstFeedback = false {
         didSet {
             UserDefaults.standard.set(shouldShowBurstFeedback, forKey: "shouldShowBurstFeedback")
@@ -117,7 +129,7 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
             updateAnalysisPauseState()
         }
     }
-    var shouldShowConfettiCannons = true {
+    var shouldShowConfettiCannons = false {
         didSet {
             UserDefaults.standard.set(shouldShowConfettiCannons, forKey: "shouldShowConfettiCannons")
         }
@@ -132,7 +144,7 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
             UserDefaults.standard.set(shouldShowLevel, forKey: "shouldShowLevel")
         }
     }
-    var recognizeBarcodes: Bool = false {
+    var recognizeBarcodes = false {
         didSet {
             UserDefaults.standard.set(recognizeBarcodes, forKey: "recognizeBarcodes")
             updateMetadataOutputStatus()
@@ -467,6 +479,10 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
     var burstSaveStatsBySession: [Int: BurstSaveStats] = [:]
     @ObservationIgnored
     var burstCaptureTask: Task<Void, Never>?
+    @ObservationIgnored
+    var shutterHoldCaptureTask: Task<Void, Never>?
+    @ObservationIgnored
+    var shutterHoldBurstSnapshot: ShutterHoldBurstSnapshot?
     @ObservationIgnored
     var burstFeedbackTask: Task<Void, Never>?
     
