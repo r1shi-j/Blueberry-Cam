@@ -70,6 +70,7 @@ extension LockedCameraModel {
             // 4. Final synchronization back to UI state
             Task { @MainActor in
                 self.device = cam
+                self.lastKnownCaptureRotationAngle = rotationAngle
                 self.captureRotationCoordinator = AVCaptureDevice.RotationCoordinator(device: cam, previewLayer: nil)
                 self.lensSwitchCompletionCount += 1
                 self.configureSubjectAreaMonitoring(for: cam)

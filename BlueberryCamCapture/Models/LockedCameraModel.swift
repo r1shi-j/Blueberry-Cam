@@ -1,4 +1,5 @@
 internal import AVFoundation
+import CoreMotion
 internal import Photos
 
 @MainActor @Observable
@@ -15,6 +16,12 @@ class LockedCameraModel: NSObject {
     nonisolated let _sessionContentURLBox = SessionURLBox()
     @ObservationIgnored
     var captureRotationCoordinator: AVCaptureDevice.RotationCoordinator?
+    @ObservationIgnored
+    var lastKnownCaptureRotationAngle: CGFloat?
+    @ObservationIgnored
+    let captureMotionManager = CMMotionManager()
+    @ObservationIgnored
+    var captureMotionRotationOffset: CGFloat?
     
     /// Whether the extension has sufficient Photos access to save captures.
     /// Checks both `.addOnly` and `.readWrite` — if either is granted, we can save.

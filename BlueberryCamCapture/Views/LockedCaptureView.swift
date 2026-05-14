@@ -531,6 +531,7 @@ extension LockedCaptureView {
     
     private func handleOnAppear() {
         cameraModel.onTimerCountdownSecond = triggerCountdownFeedback
+        cameraModel.startCaptureOrientationUpdates()
         configureCameraIfPermitted()
     }
     
@@ -539,6 +540,7 @@ extension LockedCaptureView {
         cameraModel.onTimerCountdownSecond = nil
         cameraModel.stopSession()
         cameraModel.clearTapPointInteraction(resetDeviceState: false)
+        cameraModel.stopCaptureOrientationUpdates()
     }
     
     private func configureCameraIfPermitted() {
@@ -556,6 +558,8 @@ extension LockedCaptureView {
         guard newPhase == .active else { return }
         
         configureCameraIfPermitted()
+        cameraModel.startCaptureOrientationUpdates()
+        cameraModel.updateCaptureOrientation()
     }
     
     private func handleOnChangeOfActiveLens(_ oldLens: Lens, _ newLens: Lens) {

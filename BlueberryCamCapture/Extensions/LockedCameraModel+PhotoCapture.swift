@@ -1,7 +1,33 @@
 internal import AVFoundation
+import CoreMotion
 import Foundation
 
 extension LockedCameraModel {
+    func startCaptureOrientationUpdates() {
+        guard captureMotionManager.isDeviceMotionAvailable else { return }
+        guard !captureMotionManager.isDeviceMotionActive else { return }
+        
+        captureMotionManager.deviceMotionUpdateInterval = 1.0 / 30.0
+        captureMotionManager.startDeviceMotionUpdates(to: .main) { [weak self] motion, _ in
+            guard let motion else { return }
+            
+            let gravity = motion.gravity
+            Task { @MainActor [weak self] in
+                self?.updateCaptureRotationOffset(
+                    gravityX: gravity.x,
+                    gravityY: gravity.y,
+                    gravityZ: gravity.z
+                )
+            }
+        }
+    }
+    
+    func stopCaptureOrientationUpdates() {
+        guard captureMotionManager.isDeviceMotionActive else { return }
+        
+        captureMotionManager.stopDeviceMotionUpdates()
+    }
+    
     func changeCapturingState(to new: Bool) {
         isCapturing = new
     }
@@ -136,7 +162,7 @@ extension LockedCameraModel {
         }
     }
     
-    private func updateCaptureOrientation() {
+    func updateCaptureOrientation() {
         guard session.isRunning,
               let device,
               let photoConnection = photoOutput.connection(with: .video),
@@ -144,9 +170,18 @@ extension LockedCameraModel {
         
         let coordinator = captureRotationCoordinator(for: device)
         let preferredDegrees = coordinator.videoRotationAngleForHorizonLevelCapture
+        let sensorBaselineDegrees = Lens.rotationAngle(for: device, lens: activeLens)
+        updateCaptureRotationOffsetFromLatestMotion()
+        let requestedDegrees = captureRotationAngle(
+            preferredDegrees: preferredDegrees,
+            sensorBaselineDegrees: sensorBaselineDegrees,
+        )
+        let requestedSupportedDegrees = supportedCaptureRotationAngle(requestedDegrees, for: photoConnection)
+        let preferredSupportedDegrees = supportedCaptureRotationAngle(preferredDegrees, for: photoConnection)
         
-        if let coordinatorDegrees = supportedCaptureRotationAngle(preferredDegrees, for: photoConnection) {
-            photoConnection.videoRotationAngle = coordinatorDegrees
+        if let captureDegrees = requestedSupportedDegrees ?? preferredSupportedDegrees {
+            photoConnection.videoRotationAngle = captureDegrees
+            lastKnownCaptureRotationAngle = captureDegrees
         }
         if photoConnection.isVideoMirroringSupported {
             photoConnection.isVideoMirrored = Lens.isMirrored(device, lens: activeLens)
@@ -162,6 +197,40 @@ extension LockedCameraModel {
         let coordinator = AVCaptureDevice.RotationCoordinator(device: device, previewLayer: nil)
         captureRotationCoordinator = coordinator
         return coordinator
+    }
+    
+    private func captureRotationAngle(preferredDegrees: CGFloat,
+                                      sensorBaselineDegrees: CGFloat) -> CGFloat {
+        if let captureMotionRotationOffset {
+            return sensorBaselineDegrees + captureMotionRotationOffset
+        }
+        
+        if normalizedRotationAngle(preferredDegrees) == 0,
+           normalizedRotationAngle(sensorBaselineDegrees) != 0 {
+            return sensorBaselineDegrees
+        }
+        
+        return preferredDegrees
+    }
+    
+    private func updateCaptureRotationOffsetFromLatestMotion() {
+        guard let motion = captureMotionManager.deviceMotion else { return }
+        
+        updateCaptureRotationOffset(
+            gravityX: motion.gravity.x,
+            gravityY: motion.gravity.y,
+            gravityZ: motion.gravity.z
+        )
+    }
+    
+    private func updateCaptureRotationOffset(gravityX: Double,
+                                             gravityY: Double,
+                                             gravityZ: Double) {
+        let flatThreshold = 0.85
+        guard abs(gravityZ) < flatThreshold else { return }
+        
+        let rawAngle = atan2(gravityX, -gravityY) * 180.0 / .pi
+        captureMotionRotationOffset = nearestRightAngle(CGFloat(rawAngle))
     }
     
     private func supportedCaptureRotationAngle(_ degrees: CGFloat,
@@ -182,6 +251,10 @@ extension LockedCameraModel {
     private func normalizedRotationAngle(_ degrees: CGFloat) -> CGFloat {
         let remainder = degrees.truncatingRemainder(dividingBy: 360)
         return remainder >= 0 ? remainder : remainder + 360
+    }
+    
+    private func nearestRightAngle(_ degrees: CGFloat) -> CGFloat {
+        normalizedRotationAngle((degrees / 90).rounded() * 90)
     }
     
     private func applyFlashModeIfSupported(to settings: AVCapturePhotoSettings) {
