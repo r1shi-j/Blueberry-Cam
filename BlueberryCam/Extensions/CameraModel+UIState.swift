@@ -177,7 +177,7 @@ extension CameraModel {
             setAutoExposure()
         }
         
-        if captureMode == .raw {
+        if captureMode == .raw, let preferredFilteredCaptureMode {
             captureMode = preferredFilteredCaptureMode
         }
     }

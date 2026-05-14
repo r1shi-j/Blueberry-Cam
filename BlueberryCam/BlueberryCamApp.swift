@@ -57,8 +57,9 @@ struct BlueberryCamApp: App {
 
 // MARK: - Next Steps
 // ProRaw
-// settings for Shown Formats: discolusre groupe shows list of formats with circle tick box, default format updates to show this
-// Updated locked camera app to add proraw
+// Updated locked camera app to add proraw, maybe remove jpeg option for locked cam
+// Updated locked camera app pipeline (just update whole codebase)
+// update shared models features albumn
 
 // control i
 // smoother animations everywhere

@@ -148,10 +148,26 @@ extension CameraModel {
     private func loadSettings() {
         let defaults = UserDefaults.standard
         
+        if let location = defaults.string(forKey: "saveLocation"),
+           let saveLocation = SaveLocation(rawValue: location) {
+            self.saveLocation = saveLocation
+        }
+        self.refreshFileSaveLocationDisplay()
+        self.validateFilesSaveLocation()
+        
+        if let storedFormats = defaults.stringArray(forKey: "shownCaptureFormats") {
+            setShownCaptureFormats(storedFormats.compactMap { CaptureMode(rawValue: $0) })
+        } else {
+            setShownCaptureFormats(CaptureMode.defaultShownFormats)
+        }
+        
         if let format = defaults.string(forKey: "defaultFileFormat"), let mode = CaptureMode(rawValue: format) {
             self.defaultFileFormat = mode
             // Prime the active mode immediately so the UI reflects the saved state during launch.
             self.captureMode = mode
+        }
+        if !shownCaptureFormats.contains(defaultFileFormat) {
+            defaultFileFormat = .raw
         }
         
         if let res = defaults.string(forKey: "defaultResolution"), let rPref = ResolutionPreference(rawValue: res) {
@@ -164,13 +180,6 @@ extension CameraModel {
         }
         self.selectedPhotoFilter = defaultPhotoFilter
         
-        if let location = defaults.string(forKey: SaveLocation.storageKey),
-           let saveLocation = SaveLocation(rawValue: location) {
-            self.saveLocation = saveLocation
-        }
-        self.refreshFileSaveLocationDisplay()
-        self.validateFilesSaveLocation()
-        
         if let histSmall = defaults.string(forKey: "defaultHistogramSmall"), let hMode = HistogramMode(rawValue: histSmall) {
             self.defaultHistogramSmall = hMode
         }
@@ -180,14 +189,14 @@ extension CameraModel {
         }
         
         self.shouldGeotagLocation = defaults.object(forKey: "shouldGeotagLocation") as? Bool ?? false
-        self.recognizeBarcodes = defaults.object(forKey: "recognizeBarcodes") as? Bool ?? false
-        self.shouldShowGrid = defaults.object(forKey: "shouldShowGrid") as? Bool ?? false
-        self.shouldShowLevel = defaults.object(forKey: "shouldShowLevel") as? Bool ?? false
-        self.detailedCountdownTimer = defaults.object(forKey: "detailedCountdownTimer") as? Bool ?? false
-        self.shouldHideUIWhileCountingDown = defaults.object(forKey: "shouldHideUIWhileCountingDown") as? Bool ?? true
         self.shouldPrioritizeBurstSpeed = defaults.object(forKey: "shouldPrioritizeBurstSpeed") as? Bool ?? true
         self.shouldShowBurstFeedback = defaults.object(forKey: "shouldShowBurstFeedback") as? Bool ?? false
+        self.detailedCountdownTimer = defaults.object(forKey: "detailedCountdownTimer") as? Bool ?? false
+        self.shouldHideUIWhileCountingDown = defaults.object(forKey: "shouldHideUIWhileCountingDown") as? Bool ?? true
         self.shouldShowConfettiCannons = defaults.object(forKey: "shouldShowConfettiCannons") as? Bool ?? true
+        self.shouldShowGrid = defaults.object(forKey: "shouldShowGrid") as? Bool ?? false
+        self.shouldShowLevel = defaults.object(forKey: "shouldShowLevel") as? Bool ?? false
+        self.recognizeBarcodes = defaults.object(forKey: "recognizeBarcodes") as? Bool ?? false
         self.isSmartSelfieFramingEnabled = defaults.object(forKey: "isSmartSelfieFramingEnabled") as? Bool ?? false
     }
     
@@ -206,24 +215,26 @@ extension CameraModel {
     func resetToDefaults() {
         let defaults = UserDefaults.standard
         [
+            "saveLocation",
+            "shownCaptureFormats",
             "defaultFileFormat",
             "defaultResolution",
             "defaultPhotoFilter",
-            SaveLocation.storageKey,
             "defaultHistogramSmall",
             "defaultHistogramLarge",
             "shouldGeotagLocation",
-            "recognizeBarcodes",
-            "shouldShowGrid",
-            "shouldShowLevel",
-            "detailedCountdownTimer",
-            "shouldHideUIWhileCountingDown",
             "shouldPrioritizeBurstSpeed",
             "shouldShowBurstFeedback",
+            "detailedCountdownTimer",
+            "shouldHideUIWhileCountingDown",
             "shouldShowConfettiCannons",
+            "shouldShowGrid",
+            "shouldShowLevel",
+            "recognizeBarcodes",
             "isSmartSelfieFramingEnabled"
         ].forEach(defaults.removeObject)
         
+        setShownCaptureFormats(CaptureMode.defaultShownFormats)
         defaultFileFormat = .raw
         defaultResolution = .max
         defaultPhotoFilter = .off

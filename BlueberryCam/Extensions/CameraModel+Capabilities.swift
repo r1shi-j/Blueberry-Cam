@@ -71,12 +71,79 @@ extension CameraModel {
         availableLensOptions.contains { $0 != activeLens }
     }
     
-    var preferredFilteredCaptureMode: CaptureMode {
-        if availableFormats.contains(.heif) {
-            return .heif
+    var preferredFilteredCaptureMode: CaptureMode? {
+        preferredProcessedCaptureMode(in: shownAvailableFormats(includeRaw: false))
+    }
+    
+    var formatPreferenceOptions: [CaptureMode] {
+        let sourceFormats = availableFormats.isEmpty ? CaptureMode.allCases : availableFormats
+        return CaptureMode.allCases.filter { mode in
+            if mode == .raw {
+                return sourceFormats.contains(.raw) || shownCaptureFormats.contains(.raw)
+            }
+            
+            return sourceFormats.contains(mode)
+        }
+    }
+    
+    var defaultFileFormatOptions: [CaptureMode] {
+        let options = formatPreferenceOptions.filter { shownCaptureFormats.contains($0) }
+        return options.isEmpty ? shownCaptureFormats : options
+    }
+    
+    var shouldShowDefaultFileFormatPicker: Bool {
+        defaultFileFormatOptions.count > 1
+    }
+    
+    var shownCaptureFormatsSummary: String {
+        let selectedFormats = formatPreferenceOptions.filter { shownCaptureFormats.contains($0) }
+        return selectedFormats.map(\.rawValue).joined(separator: ", ")
+    }
+    
+    func isShownCaptureFormat(_ mode: CaptureMode) -> Bool {
+        shownCaptureFormats.contains(mode)
+    }
+    
+    func canToggleShownCaptureFormat(_ mode: CaptureMode) -> Bool {
+        guard mode != .raw, formatPreferenceOptions.contains(mode) else { return false }
+        guard shownCaptureFormats.contains(mode), mode.isProcessed else { return true }
+        return shownCaptureFormats.filter(\.isProcessed).count > 1
+    }
+    
+    func toggleShownCaptureFormat(_ mode: CaptureMode) {
+        guard mode != .raw, formatPreferenceOptions.contains(mode) else { return }
+        
+        var formats = shownCaptureFormats
+        if formats.contains(mode) {
+            guard canToggleShownCaptureFormat(mode) else { return }
+            formats.removeAll { $0 == mode }
+        } else {
+            formats.append(mode)
         }
         
-        return .jpeg
+        setShownCaptureFormats(formats)
+    }
+    
+    func setShownCaptureFormats(_ formats: [CaptureMode]) {
+        normalizeShownCaptureFormats(formats, availableModes: formatPreferenceOptions)
+        repairDefaultFileFormatForShownFormats()
+        buildAvailableFormats()
+    }
+    
+    func shownAvailableFormats(includeRaw: Bool = true) -> [CaptureMode] {
+        let sourceFormats = availableFormats.isEmpty ? CaptureMode.allCases : availableFormats
+        return sourceFormats.filter { mode in
+            (includeRaw || mode != .raw) && shownCaptureFormats.contains(mode)
+        }
+    }
+    
+    func preferredProcessedCaptureMode(in modes: [CaptureMode]) -> CaptureMode? {
+        let processedModes = modes.filter(\.isProcessed)
+        if defaultFileFormat.isProcessed, processedModes.contains(defaultFileFormat) {
+            return defaultFileFormat
+        }
+        
+        return CaptureMode.processedFallbackOrder.first { processedModes.contains($0) }
     }
     
     func buildAvailableFormats() {
@@ -97,14 +164,17 @@ extension CameraModel {
         if availableFormats != visibleModes {
             availableFormats = visibleModes
         }
+        normalizeShownCaptureFormats(shownCaptureFormats, availableModes: visibleModes)
+        repairDefaultFileFormatForShownFormats()
+        let visibleUserModes = visibleModes.filter { shownCaptureFormats.contains($0) }
         
         let modes: [CaptureMode]
         if isDualCameraEnabled {
-            modes = visibleModes.filter { $0 != .raw }
+            modes = visibleUserModes.filter { $0 != .raw }
         } else if isFilterRestrictingCaptureOptions {
-            modes = visibleModes.filter { $0 != .raw }
+            modes = visibleUserModes.filter { $0 != .raw }
         } else if isAutoExposure {
-            modes = visibleModes.filter { mode in
+            modes = visibleUserModes.filter { mode in
                 switch mode {
                     case .jpeg, .heif:
                         return true
@@ -113,23 +183,14 @@ extension CameraModel {
                 }
             }
         } else {
-            modes = visibleModes.filter { $0 == .raw }
+            modes = visibleUserModes.filter { $0 == .raw }
         }
         if enabledFormats != modes {
             enabledFormats = modes
         }
         
         // SMART SWITCH: Keep the current selection if valid, else fallback to preference, else base fallback.
-        let targetMode: CaptureMode
-        if modes.contains(captureMode) {
-            targetMode = captureMode
-        } else if modes.contains(defaultFileFormat) {
-            targetMode = defaultFileFormat
-        } else {
-            targetMode = modes.contains(.heif) ? .heif : .jpeg
-        }
-        
-        if captureMode != targetMode {
+        if let targetMode = preferredCaptureMode(in: modes), captureMode != targetMode {
             captureMode = targetMode
         }
         
@@ -345,6 +406,8 @@ extension CameraModel {
     
     // MARK: - Capture Settings
     func isFormatEnabled(_ mode: CaptureMode) -> Bool {
+        guard shownCaptureFormats.contains(mode) else { return false }
+        
         if mode == .raw {
             guard !isFilterRestrictingCaptureOptions else { return false }
             return canSelectRawCaptureMode
@@ -409,5 +472,44 @@ extension CameraModel {
             lens.preservesHighResolutionCapture &&
             lens.captureDevice() != nil
         }
+    }
+    
+    private func preferredCaptureMode(in modes: [CaptureMode]) -> CaptureMode? {
+        if modes.contains(captureMode) {
+            return captureMode
+        }
+        
+        if modes.contains(defaultFileFormat) {
+            return defaultFileFormat
+        }
+        
+        return preferredProcessedCaptureMode(in: modes) ?? modes.first
+    }
+    
+    private func normalizeShownCaptureFormats(_ formats: [CaptureMode], availableModes: [CaptureMode]) {
+        let availableModes = availableModes.isEmpty ? CaptureMode.allCases : availableModes
+        let selectedProcessedFormats = CaptureMode.processedFallbackOrder.filter { mode in
+            formats.contains(mode) && availableModes.contains(mode)
+        }
+        
+        var normalizedFormats: [CaptureMode] = []
+        if selectedProcessedFormats.isEmpty {
+            if let fallback = CaptureMode.processedFallbackOrder.first(where: { availableModes.contains($0) }) {
+                normalizedFormats.append(fallback)
+            }
+        } else {
+            normalizedFormats.append(contentsOf: selectedProcessedFormats)
+        }
+        normalizedFormats.append(.raw)
+        
+        let orderedFormats = CaptureMode.allCases.filter { normalizedFormats.contains($0) }
+        if shownCaptureFormats != orderedFormats {
+            shownCaptureFormats = orderedFormats
+        }
+    }
+    
+    private func repairDefaultFileFormatForShownFormats() {
+        guard !shownCaptureFormats.contains(defaultFileFormat) else { return }
+        defaultFileFormat = .raw
     }
 }

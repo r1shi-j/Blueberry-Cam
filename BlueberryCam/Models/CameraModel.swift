@@ -39,6 +39,20 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
     var isUpdatingHardwareControl = false
     
     // MARK: - Defaults (for settings)
+    var saveLocation: SaveLocation = .stored {
+        didSet {
+            UserDefaults.standard.set(saveLocation.rawValue, forKey: "saveLocation")
+            if saveLocation == .files {
+                ensureDefaultFileSaveLocation()
+                validateFilesSaveLocation()
+            }
+        }
+    }
+    var shownCaptureFormats: [CaptureMode] = CaptureMode.defaultShownFormats {
+        didSet {
+            UserDefaults.standard.set(shownCaptureFormats.map(\.rawValue), forKey: "shownCaptureFormats")
+        }
+    }
     var defaultFileFormat: CaptureMode = .raw {
         didSet {
             UserDefaults.standard.set(defaultFileFormat.rawValue, forKey: "defaultFileFormat")
@@ -63,15 +77,6 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
             UserDefaults.standard.set(defaultPhotoFilter.rawValue, forKey: "defaultPhotoFilter")
         }
     }
-    var saveLocation: SaveLocation = .stored {
-        didSet {
-            UserDefaults.standard.set(saveLocation.rawValue, forKey: SaveLocation.storageKey)
-            if saveLocation == .files {
-                ensureDefaultFileSaveLocation()
-                validateFilesSaveLocation()
-            }
-        }
-    }
     var defaultHistogramSmall: HistogramMode = .none {
         didSet {
             UserDefaults.standard.set(defaultHistogramSmall.rawValue, forKey: "defaultHistogramSmall")
@@ -90,27 +95,6 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
             toggleLocationGeotag()
         }
     }
-    var recognizeBarcodes: Bool = false {
-        didSet {
-            UserDefaults.standard.set(recognizeBarcodes, forKey: "recognizeBarcodes")
-            updateMetadataOutputStatus()
-        }
-    }
-    var shouldShowGrid = false {
-        didSet { UserDefaults.standard.set(shouldShowGrid, forKey: "shouldShowGrid") }
-    }
-    var shouldShowLevel = false {
-        didSet { UserDefaults.standard.set(shouldShowLevel, forKey: "shouldShowLevel") }
-    }
-    var detailedCountdownTimer = false {
-        didSet { UserDefaults.standard.set(detailedCountdownTimer, forKey: "detailedCountdownTimer") }
-    }
-    var shouldHideUIWhileCountingDown = true {
-        didSet {
-            UserDefaults.standard.set(shouldHideUIWhileCountingDown, forKey: "shouldHideUIWhileCountingDown")
-            updateAnalysisPauseState()
-        }
-    }
     var shouldPrioritizeBurstSpeed = true {
         didSet {
             UserDefaults.standard.set(shouldPrioritizeBurstSpeed, forKey: "shouldPrioritizeBurstSpeed")
@@ -118,10 +102,41 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
         }
     }
     var shouldShowBurstFeedback = false {
-        didSet { UserDefaults.standard.set(shouldShowBurstFeedback, forKey: "shouldShowBurstFeedback") }
+        didSet {
+            UserDefaults.standard.set(shouldShowBurstFeedback, forKey: "shouldShowBurstFeedback")
+        }
+    }
+    var detailedCountdownTimer = false {
+        didSet {
+            UserDefaults.standard.set(detailedCountdownTimer, forKey: "detailedCountdownTimer")
+        }
+    }
+    var shouldHideUIWhileCountingDown = true {
+        didSet {
+            UserDefaults.standard.set(shouldHideUIWhileCountingDown, forKey: "shouldHideUIWhileCountingDown")
+            updateAnalysisPauseState()
+        }
     }
     var shouldShowConfettiCannons = true {
-        didSet { UserDefaults.standard.set(shouldShowConfettiCannons, forKey: "shouldShowConfettiCannons") }
+        didSet {
+            UserDefaults.standard.set(shouldShowConfettiCannons, forKey: "shouldShowConfettiCannons")
+        }
+    }
+    var shouldShowGrid = false {
+        didSet {
+            UserDefaults.standard.set(shouldShowGrid, forKey: "shouldShowGrid")
+        }
+    }
+    var shouldShowLevel = false {
+        didSet {
+            UserDefaults.standard.set(shouldShowLevel, forKey: "shouldShowLevel")
+        }
+    }
+    var recognizeBarcodes: Bool = false {
+        didSet {
+            UserDefaults.standard.set(recognizeBarcodes, forKey: "recognizeBarcodes")
+            updateMetadataOutputStatus()
+        }
     }
     var isSmartSelfieFramingEnabled = false {
         didSet {

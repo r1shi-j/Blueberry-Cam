@@ -65,8 +65,7 @@ extension TopBarView {
     }
     
     private var displayedFormats: [CaptureMode] {
-        guard cameraModel.shouldUseDualCameraFormatSet else { return cameraModel.availableFormats }
-        return cameraModel.availableFormats.filter { $0 != .raw }
+        cameraModel.shownAvailableFormats(includeRaw: !cameraModel.shouldUseDualCameraFormatSet)
     }
     
     private var displayedCaptureMode: CaptureMode {
@@ -75,11 +74,7 @@ extension TopBarView {
             return cameraModel.captureMode
         }
         
-        if displayedFormats.contains(.heif) {
-            return .heif
-        }
-        
-        return .jpeg
+        return cameraModel.preferredProcessedCaptureMode(in: displayedFormats) ?? displayedFormats.first ?? cameraModel.captureMode
     }
     
     private func isFormatSelected(_ mode: CaptureMode) -> Bool {
@@ -458,6 +453,7 @@ extension TopBarView {
         .overlay(RoundedRectangle(cornerRadius: Style.pickerCornerRadius).stroke(.white.opacity(0.2), lineWidth: 1))
         .animation(Animations.bouncy, value: cameraModel.enabledFormats)
         .animation(Animations.bouncy, value: cameraModel.availableFormats)
+        .animation(Animations.bouncy, value: cameraModel.shownCaptureFormats)
         .animation(Animations.bouncy, value: cameraModel.shouldUseDualCameraFormatSet)
         .animation(Animations.bouncy, value: cameraModel.captureMode)
         

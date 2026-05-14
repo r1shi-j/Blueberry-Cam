@@ -512,21 +512,30 @@ extension CameraModel {
                     applyFlashModeIfSupported(to: s)
                     return s
                 }
-                fallthrough
+                guard let processedMode = preferredProcessedCaptureModeForPhotoSettings() else { return nil }
+                return makeProcessedPhotoSettings(for: processedMode, dimensions: dims)
             case .heif:
-                if photoOutput.availablePhotoCodecTypes.contains(.hevc) {
-                    let s = AVCapturePhotoSettings(format: [AVVideoCodecKey: AVVideoCodecType.hevc])
-                    s.maxPhotoDimensions = dims
-                    applyFlashModeIfSupported(to: s)
-                    return s
-                }
-                fallthrough
+                return makeProcessedPhotoSettings(for: .heif, dimensions: dims)
             case .jpeg:
-                let s = AVCapturePhotoSettings()
-                s.maxPhotoDimensions = dims
-                applyFlashModeIfSupported(to: s)
-                return s
+                return makeProcessedPhotoSettings(for: .jpeg, dimensions: dims)
         }
+    }
+    
+    private func preferredProcessedCaptureModeForPhotoSettings() -> CaptureMode? {
+        preferredProcessedCaptureMode(in: enabledFormats) ??
+        preferredProcessedCaptureMode(in: shownAvailableFormats(includeRaw: false))
+    }
+    
+    private func makeProcessedPhotoSettings(for mode: CaptureMode, dimensions: CMVideoDimensions) -> AVCapturePhotoSettings {
+        let settings: AVCapturePhotoSettings
+        if mode == .heif, photoOutput.availablePhotoCodecTypes.contains(.hevc) {
+            settings = AVCapturePhotoSettings(format: [AVVideoCodecKey: AVVideoCodecType.hevc])
+        } else {
+            settings = AVCapturePhotoSettings()
+        }
+        settings.maxPhotoDimensions = dimensions
+        applyFlashModeIfSupported(to: settings)
+        return settings
     }
     
     private func buildNextBurstPhotoSettings() async -> AVCapturePhotoSettings? {

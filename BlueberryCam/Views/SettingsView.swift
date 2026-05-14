@@ -66,15 +66,54 @@ struct SettingsView: View {
                         }
                     }
                     
-                    LabeledContent("Format ") {
-                        Picker("", selection: $cameraModel.defaultFileFormat) {
-                            ForEach(CaptureMode.allCases, id: \.self) { format in
-                                Text(format.rawValue)
-                                    .tag(format)
+                    DisclosureGroup {
+                        ForEach(cameraModel.formatPreferenceOptions) { format in
+                            let isSelected = cameraModel.isShownCaptureFormat(format)
+                            let canToggle = cameraModel.canToggleShownCaptureFormat(format)
+                            Button {
+                                withAnimation(Animations.easeInOut) {
+                                    cameraModel.toggleShownCaptureFormat(format)
+                                }
+                            } label: {
+                                HStack {
+                                    Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                                        .foregroundStyle(.blue)
+                                        .contentTransition(.symbolEffect(.replace))
+                                        .symbolEffect(.bounce, value: isSelected)
+                                    
+                                    Text(format.rawValue)
+                                        .foregroundStyle(.primary)
+                                    
+                                    Spacer()
+                                }
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .contentShape(.rect)
                             }
+                            .buttonStyle(.plain)
+                            .disabled(!canToggle)
+                            .allowsHitTesting(canToggle)
                         }
-                        .pickerStyle(.segmented)
-                        .frame(maxWidth: 200)
+                    } label: {
+                        LabeledContent("Enabled Formats") {
+                            Text(cameraModel.shownCaptureFormatsSummary)
+                                .contentTransition(.opacity)
+                                .animation(Animations.easeInOut, value: cameraModel.shownCaptureFormatsSummary)
+                        }
+                    }
+                    
+                    if cameraModel.shouldShowDefaultFileFormatPicker {
+                        LabeledContent("Format ") {
+                            Picker("", selection: $cameraModel.defaultFileFormat) {
+                                ForEach(cameraModel.defaultFileFormatOptions) { format in
+                                    Text(format.rawValue)
+                                        .tag(format)
+                                }
+                            }
+                            .pickerStyle(.segmented)
+                            .frame(maxWidth: 200)
+                            .animation(Animations.easeInOut, value: cameraModel.defaultFileFormatOptions)
+                        }
+                        .transition(.opacity.combined(with: .move(edge: .top)))
                     }
                     
                     LabeledContent("Resolution ") {
@@ -129,6 +168,8 @@ struct SettingsView: View {
                 }
                 .animation(Animations.easeInOut, value: cameraModel.saveLocation)
                 .animation(Animations.easeInOut, value: cameraModel.isFileSaveLocationAvailable)
+                .animation(Animations.easeInOut, value: cameraModel.shownCaptureFormats)
+                .animation(Animations.easeInOut, value: cameraModel.shouldShowDefaultFileFormatPicker)
                 
                 Section {
                     Toggle("Geotag Location", isOn: $cameraModel.shouldGeotagLocation)

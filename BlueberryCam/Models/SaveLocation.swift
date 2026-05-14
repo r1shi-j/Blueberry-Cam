@@ -10,10 +10,8 @@ enum SaveLocation: String, CaseIterable, Identifiable, Sendable {
     
     var id: String { rawValue }
     
-    nonisolated static let storageKey = "saveLocation"
-    
     nonisolated static var stored: SaveLocation {
-        guard let value = UserDefaults.standard.string(forKey: storageKey),
+        guard let value = UserDefaults.standard.string(forKey: "saveLocation"),
               let location = SaveLocation(rawValue: value) else {
             return .photos
         }
