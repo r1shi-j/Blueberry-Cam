@@ -56,12 +56,12 @@ struct BlueberryCamApp: App {
 // locked app fix photo orientation
 
 // MARK: - Next Steps
+// hold shutter (volume) for bursts
+// smoother animations everywhere
+
 // ProRaw
 // Updated locked camera app to add proraw, maybe remove jpeg option for locked cam
 // Updated locked camera app pipeline (just update whole codebase)
 // update shared models features albumn
 
 // control i
-// smoother animations everywhere
-
-// hold shutter (volume) for bursts

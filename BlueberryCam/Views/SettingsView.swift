@@ -13,6 +13,8 @@ struct SettingsView: View {
     let resetToDefaults: () -> ()
     
     @State private var confettiCount = 0
+    @State private var settingsSelectionHapticTrigger = 0
+    @State private var settingsResetHapticTrigger = 0
     @State private var isShowingDefaultsResetAlert = false
     @State private var isShowingFileLocationImporter = false
     @State private var countResetTarget: ShutterCountResetTarget?
@@ -39,9 +41,13 @@ struct SettingsView: View {
                     if cameraModel.saveLocation == .files {
                         LabeledContent("Folder") {
                             HStack(spacing: 10) {
-                                Button("Reset Folder", systemImage: "arrow.counterclockwise.circle.fill", action: cameraModel.resetFileSaveLocationToDefault)
-                                    .labelStyle(.iconOnly)
-                                    .foregroundStyle(.red)
+                                Button("Reset Folder", systemImage: "arrow.counterclockwise.circle.fill") {
+                                    triggerSettingsSelectionHaptic()
+                                    cameraModel.resetFileSaveLocationToDefault()
+                                    triggerSettingsResetHaptic()
+                                }
+                                .labelStyle(.iconOnly)
+                                .foregroundStyle(.red)
                                 
                                 Button {
                                     isShowingFileLocationImporter = true
@@ -71,6 +77,7 @@ struct SettingsView: View {
                             let isSelected = cameraModel.isShownCaptureFormat(format)
                             let canToggle = cameraModel.canToggleShownCaptureFormat(format)
                             Button {
+                                triggerSettingsSelectionHaptic()
                                 withAnimation(Animations.easeInOut) {
                                     cameraModel.toggleShownCaptureFormat(format)
                                 }
@@ -103,7 +110,7 @@ struct SettingsView: View {
                     
                     if cameraModel.shouldShowDefaultFileFormatPicker {
                         LabeledContent("Format ") {
-                            Picker("", selection: $cameraModel.defaultFileFormat) {
+                            Picker("", selection: defaultFileFormatSelection) {
                                 ForEach(cameraModel.defaultFileFormatOptions) { format in
                                     Text(format.rawValue)
                                         .tag(format)
@@ -117,7 +124,7 @@ struct SettingsView: View {
                     }
                     
                     LabeledContent("Resolution ") {
-                        Picker("", selection: $cameraModel.defaultResolution) {
+                        Picker("", selection: defaultResolutionSelection) {
                             ForEach(ResolutionPreference.allCases, id: \.self) { pref in
                                 Text(pref.rawValue)
                                     .tag(pref)
@@ -128,7 +135,7 @@ struct SettingsView: View {
                     }
                     
                     LabeledContent("Filter ") {
-                        Picker("", selection: $cameraModel.defaultPhotoFilter) {
+                        Picker("", selection: defaultPhotoFilterSelection) {
                             ForEach(PhotoFilter.allCases, id: \.self) { filter in
                                 Text(filter.rawValue)
                                     .tag(filter)
@@ -138,7 +145,7 @@ struct SettingsView: View {
                     }
                     
                     LabeledContent("Small Histogram ") {
-                        Picker("", selection: $cameraModel.defaultHistogramSmall) {
+                        Picker("", selection: defaultSmallHistogramSelection) {
                             ForEach(HistogramMode.allCases, id: \.self) { format in
                                 Text(format.rawValue)
                                     .tag(format)
@@ -148,7 +155,7 @@ struct SettingsView: View {
                     }
                     
                     LabeledContent("Large Histogram ") {
-                        Picker("", selection: $cameraModel.defaultHistogramLarge) {
+                        Picker("", selection: defaultLargeHistogramSelection) {
                             ForEach(HistogramMode.allCases, id: \.self) { format in
                                 Text(format.rawValue)
                                     .tag(format)
@@ -240,7 +247,7 @@ struct SettingsView: View {
                             Form {
                                 ForEach(backgroundColors.indices, id: \.self) { index in
                                     Button {
-                                        appBackgroundColorIndex = index
+                                        selectAppBackground(index)
                                     } label: {
                                         HStack {
                                             Circle()
@@ -293,6 +300,7 @@ struct SettingsView: View {
                 
                 Section {
                     Button {
+                        triggerSettingsSelectionHaptic()
                         isShowingDefaultsResetAlert = true
                     } label: {
                         LabeledContent("Reset to Defaults") {
@@ -308,6 +316,7 @@ struct SettingsView: View {
                         Text(shutterCount.formatted())
                     } label: {
                         Button("Reset Shutter Count") {
+                            triggerSettingsSelectionHaptic()
                             countResetTarget = .standard
                         }
                         .tint(.red)
@@ -317,6 +326,7 @@ struct SettingsView: View {
                         Text(shutterCountBurst.formatted())
                     } label: {
                         Button("Reset Burst Shutter Count") {
+                            triggerSettingsSelectionHaptic()
                             countResetTarget = .burst
                         }
                         .tint(.red)
@@ -361,6 +371,8 @@ struct SettingsView: View {
                 }
             }
             .navigationTitle("Settings")
+            .sensoryFeedback(.selection, trigger: settingsSelectionHapticTrigger)
+            .sensoryFeedback(.impact(flexibility: .soft), trigger: settingsResetHapticTrigger)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Close") {
@@ -370,7 +382,11 @@ struct SettingsView: View {
             }
             .alert(Alerts.resetSettingsTitle, isPresented: $isShowingDefaultsResetAlert) {
                 Button(Alerts.cancel, role: .cancel) { }
-                Button(Alerts.reset, role: .destructive, action: resetToDefaults)
+                Button(Alerts.reset, role: .destructive) {
+                    triggerSettingsResetHaptic()
+                    resetToDefaults()
+                    appBackgroundColorIndex = 0
+                }
             }
             .alert(countResetTarget?.confirmationTitle ?? "", isPresented: Binding(get: {
                 countResetTarget != nil
@@ -381,6 +397,7 @@ struct SettingsView: View {
             })) {
                 Button(Alerts.cancel, role: .cancel) { }
                 Button(Alerts.reset, role: .destructive) {
+                    triggerSettingsResetHaptic()
                     switch countResetTarget {
                         case .standard:
                             shutterCount = 0
@@ -452,10 +469,76 @@ struct SettingsView: View {
         Binding {
             cameraModel.saveLocation
         } set: { newValue in
+            guard newValue != cameraModel.saveLocation else { return }
+            triggerSettingsSelectionHaptic()
             withAnimation(Animations.easeInOut) {
                 cameraModel.saveLocation = newValue
             }
         }
+    }
+    
+    private var defaultFileFormatSelection: Binding<CaptureMode> {
+        Binding {
+            cameraModel.defaultFileFormat
+        } set: { newValue in
+            guard newValue != cameraModel.defaultFileFormat else { return }
+            triggerSettingsSelectionHaptic()
+            cameraModel.defaultFileFormat = newValue
+        }
+    }
+    
+    private var defaultResolutionSelection: Binding<ResolutionPreference> {
+        Binding {
+            cameraModel.defaultResolution
+        } set: { newValue in
+            guard newValue != cameraModel.defaultResolution else { return }
+            triggerSettingsSelectionHaptic()
+            cameraModel.defaultResolution = newValue
+        }
+    }
+    
+    private var defaultPhotoFilterSelection: Binding<PhotoFilter> {
+        Binding {
+            cameraModel.defaultPhotoFilter
+        } set: { newValue in
+            guard newValue != cameraModel.defaultPhotoFilter else { return }
+            triggerSettingsSelectionHaptic()
+            cameraModel.defaultPhotoFilter = newValue
+        }
+    }
+    
+    private var defaultSmallHistogramSelection: Binding<HistogramMode> {
+        Binding {
+            cameraModel.defaultHistogramSmall
+        } set: { newValue in
+            guard newValue != cameraModel.defaultHistogramSmall else { return }
+            triggerSettingsSelectionHaptic()
+            cameraModel.defaultHistogramSmall = newValue
+        }
+    }
+    
+    private var defaultLargeHistogramSelection: Binding<HistogramMode> {
+        Binding {
+            cameraModel.defaultHistogramLarge
+        } set: { newValue in
+            guard newValue != cameraModel.defaultHistogramLarge else { return }
+            triggerSettingsSelectionHaptic()
+            cameraModel.defaultHistogramLarge = newValue
+        }
+    }
+    
+    private func selectAppBackground(_ index: Int) {
+        guard index != appBackgroundColorIndex else { return }
+        triggerSettingsSelectionHaptic()
+        appBackgroundColorIndex = index
+    }
+    
+    private func triggerSettingsSelectionHaptic() {
+        settingsSelectionHapticTrigger += 1
+    }
+    
+    private func triggerSettingsResetHaptic() {
+        settingsResetHapticTrigger += 1
     }
     
     private func openMail(subject: String, description: String) {
