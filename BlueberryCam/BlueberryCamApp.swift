@@ -55,7 +55,6 @@ struct BlueberryCamApp: App {
 // MARK: - FIXME
 
 // MARK: - Next Steps
-// hold shutter (volume) for bursts
 // smoother animations everywhere
 
 // ProRaw

@@ -151,11 +151,11 @@ struct PhotoFilterLiveRenderer {
             point4: CIVector(x: 1, y: 1)
         ),
               let primedImage = colorControlledImage(
-            rangeExpandedImage,
-            saturation: 1,
-            brightness: 0,
-            contrast: 1.08
-        ),
+                rangeExpandedImage,
+                saturation: 1,
+                brightness: 0,
+                contrast: 1.08
+              ),
               let invertedImage = processedImage(named: "CIColorInvert", inputImage: primedImage),
               let thermalImage = processedImage(named: "CIThermal", inputImage: invertedImage),
               let vibrantImage = vibranceImage(thermalImage, amount: 0.55),
