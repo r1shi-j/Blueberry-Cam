@@ -60,4 +60,3 @@ struct BlueberryCamApp: App {
 
 // MARK: - Next Steps
 // Updated locked camera app pipeline (just update whole codebase)
-// big ctr i

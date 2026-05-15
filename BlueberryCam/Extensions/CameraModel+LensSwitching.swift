@@ -32,7 +32,7 @@ extension CameraModel {
                enabledResolutions.contains(where: { $0.id == restoreRes.id }) {
                 selectedResolution = restoreRes
             }
-
+            
         }
         
         // 2. Capture lens properties before crossing isolation boundary
