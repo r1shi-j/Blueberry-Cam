@@ -88,6 +88,7 @@
 			membershipExceptions = (
 				Models/Shared/AppTheme.swift,
 				Models/Shared/BundleIDs.swift,
+				Models/Shared/CaptureAspectRatioOption.swift,
 				Models/Shared/CaptureMode.swift,
 				Models/Shared/Constants.swift,
 				Models/Shared/FloatExtension.swift,

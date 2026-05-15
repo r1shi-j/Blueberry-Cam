@@ -8,7 +8,6 @@ extension CameraModel {
             return
         }
         
-        let lens = switchableLens(for: lens)
         guard !isSwitchingLens else { return }
         guard lens != activeLens else { return }
         guard let previewCamera = lens.captureDevice() else { return }
@@ -171,10 +170,6 @@ extension CameraModel {
         pendingCaptureModeAfterLensSwitch = nil
         guard isFormatEnabled(pendingMode) else { return }
         captureMode = pendingMode
-    }
-    
-    private func switchableLens(for lens: Lens) -> Lens {
-        lens
     }
     
     func applyMacroMode() {

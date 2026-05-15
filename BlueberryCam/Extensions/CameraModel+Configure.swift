@@ -254,8 +254,8 @@ extension CameraModel {
         resetFileSaveLocationToDefault()
         setShownCaptureFormats(CaptureMode.defaultShownFormats)
         proRawFileFormat = .jpegXLLossless
-        defaultFileFormat = .raw
-        defaultResolution = .max
+        defaultFileFormat = .heif
+        defaultResolution = .efficient
         defaultPhotoFilter = .off
         defaultHistogramSmall = .none
         defaultHistogramLarge = .none

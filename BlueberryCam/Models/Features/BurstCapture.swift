@@ -1,3 +1,4 @@
+internal import AVFoundation
 import CoreGraphics
 import Foundation
 
@@ -11,6 +12,13 @@ struct PhotoCaptureContext: Sendable {
     let dualCameraPipPlacement: DualCameraPipPlacement
     let dualCameraPipRotationAngle: CGFloat
     let onCapture: (@MainActor @Sendable () -> Void)?
+}
+
+struct ShutterHoldBurstSnapshot {
+    let wasBurstModeEnabled: Bool
+    let burstIntervalSeconds: Double?
+    let burstFrameLimit: Int?
+    let flashMode: AVCaptureDevice.FlashMode
 }
 
 struct BurstSaveStats {

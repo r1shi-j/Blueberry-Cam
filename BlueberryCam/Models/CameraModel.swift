@@ -2,13 +2,6 @@ internal import AVFoundation
 internal import CoreLocation
 internal import Photos
 
-struct ShutterHoldBurstSnapshot {
-    let wasBurstModeEnabled: Bool
-    let burstIntervalSeconds: Double?
-    let burstFrameLimit: Int?
-    let flashMode: AVCaptureDevice.FlashMode
-}
-
 @MainActor @Observable
 class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
     // MARK: - Session
@@ -27,11 +20,11 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
     let _pendingPhotoFilterBox = PhotoFilterBox()
     let _liveCaptureModeBox = CaptureModeBox()
     let _livePhotoFilterBox = PhotoFilterBox()
-    var isCaptureSessionRunning = false
     let _pendingSaveLocationBox = SaveLocationBox()
     let _captureContextStore = PhotoCaptureContextStore()
     let _burstCaptureTracker = BurstCaptureTracker()
     let _secondaryFrameStore = PixelBufferStore()
+    var isCaptureSessionRunning = false
     
     // MARK: - Camera Control
     var cleanUIControl: AVCaptureIndexPicker?
@@ -65,7 +58,7 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
             UserDefaults.standard.set(proRawFileFormat.rawValue, forKey: "proRawFileFormat")
         }
     }
-    var defaultFileFormat: CaptureMode = .raw {
+    var defaultFileFormat: CaptureMode = .heif {
         didSet {
             UserDefaults.standard.set(defaultFileFormat.rawValue, forKey: "defaultFileFormat")
             // Always try to apply the preference to the active mode immediately.
@@ -75,7 +68,7 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
             }
         }
     }
-    var defaultResolution: ResolutionPreference = .max {
+    var defaultResolution: ResolutionPreference = .efficient {
         didSet {
             UserDefaults.standard.set(defaultResolution.rawValue, forKey: "defaultResolution")
             // Force apply the new preference immediately to the current selection

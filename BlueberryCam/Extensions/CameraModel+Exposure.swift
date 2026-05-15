@@ -169,13 +169,9 @@ extension CameraModel {
             isAutoExposure = false
         }
         exposureBias = 0
-        setCustomShutter(to: clampedIndex)
+        shutterIndex = clampedIndex
         liveShutter = formattedShutterSpeed
         applyManualExposure()
-    }
-    
-    func setCustomShutter(to val: Int) {
-        shutterIndex = val
     }
     
     func resetEV() {
