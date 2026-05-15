@@ -1,7 +1,12 @@
 import SwiftUI
 
-struct CropOverlayView: View {
-    let aspectRatio: CGFloat  // width/height e.g. 3/4 = 0.75
+struct CropOverlayView: View, Animatable {
+    var aspectRatio: CGFloat  // width/height e.g. 3/4 = 0.75
+    
+    var animatableData: CGFloat {
+        get { aspectRatio }
+        set { aspectRatio = newValue }
+    }
     
     var body: some View {
         GeometryReader { geo in
@@ -17,14 +22,6 @@ struct CropOverlayView: View {
             let cropRect = CGRect(x: cropX, y: cropY, width: cropW, height: cropH)
             
             ZStack {
-                // Dim areas outside crop rect
-                Color.black.opacity(0.5)
-                    .reverseMask {
-                        Rectangle()
-                            .frame(width: cropW, height: cropH)
-                            .position(x: cropRect.midX, y: cropRect.midY)
-                    }
-                
                 // Rule-of-thirds grid (2 vertical + 2 horizontal inner lines only)
                 Canvas { ctx, _ in
                     let lineColor: Color = .white.opacity(0.25)
@@ -77,17 +74,5 @@ struct CornerMarks: Shape {
             p.addLine(to: CGPoint(x: origin.x, y: origin.y + dy * len))
         }
         return p
-    }
-}
-
-extension View {
-    func reverseMask<M: View>(@ViewBuilder mask: () -> M) -> some View {
-        self.mask(
-            ZStack {
-                Rectangle()
-                mask().blendMode(.destinationOut)
-            }
-                .compositingGroup()
-        )
     }
 }

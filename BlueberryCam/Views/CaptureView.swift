@@ -401,6 +401,7 @@ extension CaptureView {
             CropOverlayView(aspectRatio: cameraModel.gridAspectRatio)
                 .frame(width: previewRect.width, height: previewRect.height)
                 .position(x: previewRect.midX, y: previewRect.midY)
+                .animation(.smooth(duration: 0.28), value: cameraModel.gridAspectRatio)
         }
     }
     
