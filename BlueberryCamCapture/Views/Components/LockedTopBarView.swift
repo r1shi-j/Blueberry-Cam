@@ -6,7 +6,6 @@ extension LockedTopBarView {
     private enum Style {
         static let disabledOpacity = 0.3
         static let selectedForeground: Color = .black
-        static let selectedBackground: Color = .yellow
         static let buttonHeight: CGFloat = 18
         static let horizontalButtonPadding: CGFloat = 8
         static let verticalButtonPadding: CGFloat = 5
@@ -37,7 +36,7 @@ extension LockedTopBarView {
     
     private func resolutionBackground(for isSelected: Bool, isEnabled: Bool) -> Color {
         guard isEnabled else { return Colors.buttonBackground.opacity(Style.disabledOpacity) }
-        return isSelected ? Style.selectedBackground : Colors.buttonBackground
+        return isSelected ? theme.accent : Colors.buttonBackground
     }
     
     private func formatForeground(for mode: CaptureMode, isEnabled: Bool) -> Color {
@@ -47,7 +46,7 @@ extension LockedTopBarView {
     
     private func formatBackground(for mode: CaptureMode, isEnabled: Bool) -> Color {
         guard isEnabled else { return Colors.buttonBackground.opacity(Style.disabledOpacity) }
-        return cameraModel.captureMode == mode ? Style.selectedBackground : Colors.buttonBackground
+        return cameraModel.captureMode == mode ? theme.accent : Colors.buttonBackground
     }
     
     // MARK: - Flash properties
@@ -64,7 +63,7 @@ extension LockedTopBarView {
     }
     
     private var flashButtonBackground: Color {
-        cameraModel.flashMode == .off || !cameraModel.supportsFlash ? Colors.buttonBackground : Style.selectedBackground
+        cameraModel.flashMode == .off || !cameraModel.supportsFlash ? Colors.buttonBackground : theme.accent
     }
     
     private var flashButtonOpacity: Double {
@@ -85,7 +84,7 @@ extension LockedTopBarView {
     }
     
     private var macroButtonBackground: Color {
-        cameraModel.isMacroEnabled ? Style.selectedBackground : Colors.buttonBackground
+        cameraModel.isMacroEnabled ? theme.accent : Colors.buttonBackground
     }
     
     // MARK: - Timer properties
@@ -98,7 +97,7 @@ extension LockedTopBarView {
     }
     
     private var timerButtonBackground: Color {
-        cameraModel.timerMode == .off ? Colors.buttonBackground : Style.selectedBackground
+        cameraModel.timerMode == .off ? Colors.buttonBackground : theme.accent
     }
     
     // MARK: - General Readout properties
@@ -338,6 +337,7 @@ extension LockedTopBarView {
 struct LockedTopBarView: View {
     @Bindable var cameraModel: LockedCameraModel
     @Binding var selectedControl: ManualControl?
+    let theme: AppTheme
     @State private var hapticTrigger = 0
     @State private var hapticTriggerR = 0
     

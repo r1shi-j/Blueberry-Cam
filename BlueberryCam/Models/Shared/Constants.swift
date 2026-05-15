@@ -1,7 +1,5 @@
 import SwiftUI
 
-let backgroundColors: [Color] = [.black, .blue.opacity(0.3), .green.opacity(0.3), .pink.opacity(0.3)]
-
 enum Colors {
     static let buttonBackground: Color = .white.opacity(0.15)
     static let buttonText: Color = .white.opacity(0.7)

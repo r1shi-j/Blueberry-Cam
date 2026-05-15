@@ -123,7 +123,7 @@ extension LensSelectorView {
         .glassEffect(
             .regular
                 .interactive()
-                .tint(isActive ? .yellow.opacity(0.86) : .black.mix(with: .white, by: 0.24)),
+                .tint(isActive ? theme.accent.opacity(0.86) : .black.mix(with: .white, by: 0.24)),
             in: .circle
         )
     }
@@ -159,6 +159,7 @@ extension LensSelectorView {
 struct LensSelectorView: View {
     @Bindable var cameraModel: CameraModel
     let height: CGFloat
+    let theme: AppTheme
     
     @State private var isExpanded = false
     @State private var hapticTrigger = 0
@@ -182,5 +183,5 @@ struct LensSelectorView: View {
 
 #Preview {
     @Previewable @State var cameraModel: CameraModel = CameraModel()
-    LensSelectorView(cameraModel: cameraModel, height: 30)
+    LensSelectorView(cameraModel: cameraModel, height: 30, theme: .theme(for: AppTheme.defaultID))
 }

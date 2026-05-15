@@ -10,7 +10,8 @@ import SwiftUI
 @main
 struct BlueberryCamApp: App {
     @Environment(\.scenePhase) private var scenePhase
-    @AppStorage("appBackgroundColorIndex") var appBackgroundColorIndex = 0
+    @AppStorage("selectedAppThemeID") var selectedAppThemeID = AppTheme.defaultID
+    @AppStorage("usesAppThemeReadouts") var usesAppThemeReadouts = false
     @AppStorage("shutterCount") var shutterCount = 0
     @AppStorage("shutterCountBurst") var shutterCountBurst = 0
     @State var permissionModel = PermissionModel()
@@ -19,7 +20,8 @@ struct BlueberryCamApp: App {
     var body: some Scene {
         WindowGroup {
             CaptureView(
-                appBackgroundColorIndex: $appBackgroundColorIndex,
+                selectedAppThemeID: $selectedAppThemeID,
+                usesAppThemeReadouts: $usesAppThemeReadouts,
                 shutterCount: $shutterCount,
                 shutterCountBurst: $shutterCountBurst,
                 permissionModel: permissionModel
@@ -57,6 +59,4 @@ struct BlueberryCamApp: App {
 // MARK: - Next Steps
 // smoother animations everywhere
 // Updated locked camera app pipeline (just update whole codebase)
-
 // lens picker back to camera control
-// add theme packs, sets background colour

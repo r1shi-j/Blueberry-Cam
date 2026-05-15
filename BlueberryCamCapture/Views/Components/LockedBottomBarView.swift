@@ -22,11 +22,11 @@ extension LockedBottomBarView {
     private var shutterTint: Color {
         switch cameraModel.captureMode {
             case .raw:
-                return .blue.mix(with: .mint, by: 0.5).opacity(0.4)
+                return theme.shutterRaw
             case .proRaw:
-                return .purple.mix(with: .pink, by: 0.35).opacity(0.45)
+                return theme.shutterProRaw
             case .heif, .jpeg:
-                return .white.opacity(0.2)
+                return theme.shutterProcessed
         }
     }
     
@@ -77,7 +77,7 @@ extension LockedBottomBarView {
     
     // MARK: - Lens picker
     private func lensPicker() -> some View {
-        LockedLensSelectorView(cameraModel: cameraModel, height: Style.buttonHeight)
+        LockedLensSelectorView(cameraModel: cameraModel, height: Style.buttonHeight, theme: theme)
             .frame(height: Style.buttonHeight)
             .frame(maxWidth: .infinity)
             .transition(.opacity)
@@ -87,6 +87,7 @@ extension LockedBottomBarView {
 // MARK: - View
 struct LockedBottomBarView: View {
     @Bindable var cameraModel: LockedCameraModel
+    let theme: AppTheme
     let lockedSession: LockedCameraCaptureSession
     let onShutterFeedback: () -> Void
     

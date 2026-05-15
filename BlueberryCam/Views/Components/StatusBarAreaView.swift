@@ -10,7 +10,6 @@ extension StatusBarAreaView {
         static let overlayButtonsHSpacing: CGFloat = 16
         static let disabledOpacity = 0.3
         static let selectedForeground: Color = .black
-        static let selectedBackground: Color = .yellow
         static let horizontalButtonPadding: CGFloat = 8
         static let verticalButtonPadding: CGFloat = 5
     }
@@ -34,7 +33,7 @@ extension StatusBarAreaView {
     }
     
     private var zebrasBackgroundColor: Color {
-        cameraModel.showZebraStripes ? .yellow : Colors.buttonBackground
+        cameraModel.showZebraStripes ? theme.accent : Colors.buttonBackground
     }
     
     private var highlightClippingTitle: String {
@@ -46,7 +45,7 @@ extension StatusBarAreaView {
     }
     
     private var clippingBackgroundColor: Color {
-        cameraModel.showClipping ? .yellow : Colors.buttonBackground
+        cameraModel.showClipping ? theme.accent : Colors.buttonBackground
     }
     
     private var shouldShowSmallHistogram: Bool {
@@ -91,7 +90,7 @@ extension StatusBarAreaView {
                 .foregroundStyle(.black)
                 .padding(.horizontal, Style.horizontalButtonPadding)
                 .padding(.vertical, Style.verticalButtonPadding)
-                .background(.yellow)
+                .background(theme.accent)
                 .clipShape(.capsule)
         }
         .padding(.leading)
@@ -151,6 +150,7 @@ extension StatusBarAreaView {
 // MARK: - View
 struct StatusBarAreaView: View {
     @Bindable var cameraModel: CameraModel
+    let theme: AppTheme
     @State private var hapticTrigger = 0
     @State private var hapticTriggerR = 0
     

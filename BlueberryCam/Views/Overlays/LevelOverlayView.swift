@@ -2,6 +2,7 @@ import SwiftUI
 
 struct LevelOverlayView: View {
     @Bindable var model: LevelMotionModel
+    let theme: AppTheme
     
     var body: some View {
         GeometryReader { geo in
@@ -50,7 +51,7 @@ struct LevelOverlayView: View {
         let lw: CGFloat = 1.2                 // same line width as crosshair
         
         let aligned = model.isAligned
-        let barColor: Color = aligned ? .yellow : .white
+        let barColor: Color = aligned ? theme.accent : .white
         let tickColor: Color = Colors.buttonText
         
         // Ticks rotate to the NEAREST cardinal (0°, 90°, 180°, 270°),
@@ -108,7 +109,7 @@ struct LevelOverlayView: View {
         let dx = max(-maxOffset, min(maxOffset, CGFloat(model.screenGravityX) * scale))
         let dy = max(-maxOffset, min(maxOffset, CGFloat(model.screenGravityY) * scale))
         
-        drawCrosshair(ctx: ctx, x: cx + dx, y: cy + dy, color: .yellow.opacity(model.isCrosshairAligned ? 1.0 : 0.9), armLen: armLen, lineWidth: lw)
+        drawCrosshair(ctx: ctx, x: cx + dx, y: cy + dy, color: theme.accent.opacity(model.isCrosshairAligned ? 1.0 : 0.9), armLen: armLen, lineWidth: lw)
     }
     
     // MARK: - Shared helper

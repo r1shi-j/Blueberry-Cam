@@ -30,16 +30,16 @@ extension BottomBarView {
     }
     
     private var shutterTint: Color {
-        if cameraModel.isBurstCapturing { return .yellow.mix(with: .orange, by: 0.2).opacity(0.6) }
-        if cameraModel.isBurstModeEnabled { return .yellow.opacity(0.8) }
+        if cameraModel.isBurstCapturing { return theme.shutterBurstCapturing }
+        if cameraModel.isBurstModeEnabled { return theme.shutterBurst }
         
         switch cameraModel.captureMode {
             case .raw:
-                return .blue.mix(with: .mint, by: 0.5).opacity(0.4)
+                return theme.shutterRaw
             case .proRaw:
-                return .purple.mix(with: .pink, by: 0.35).opacity(0.45)
+                return theme.shutterProRaw
             case .heif, .jpeg:
-                return .white.opacity(0.2)
+                return theme.shutterProcessed
         }
     }
     
@@ -48,7 +48,7 @@ extension BottomBarView {
     private func photosShortcut() -> some View {
         Button(action: openPhotosApp) {
             Image(systemName: photosLinkSymbolName)
-                .font(.system(size: 20))
+                .font(.system(size: 18))
                 .symbolRenderingMode(.hierarchical)
                 .tint(.primary)
                 .padding()
@@ -82,8 +82,7 @@ extension BottomBarView {
     
     // MARK: - Lens picker
     private func lensPicker() -> some View {
-        LensSelectorView(cameraModel: cameraModel, height: Style.buttonHeight)
-            .frame(height: Style.buttonHeight)
+        LensSelectorView(cameraModel: cameraModel, height: Style.buttonHeight, theme: theme)
             .frame(maxWidth: .infinity)
             .transition(.opacity)
     }
@@ -94,6 +93,7 @@ struct BottomBarView: View {
     @Environment(\.openURL) private var openURL
     
     @Bindable var cameraModel: CameraModel
+    let theme: AppTheme
     @Binding var shutterCount: Int
     @Binding var shutterCountBurst: Int
     let onShutterPressBegan: () -> Void

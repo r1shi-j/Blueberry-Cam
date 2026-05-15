@@ -7,6 +7,9 @@ extension LockedCaptureView {
     private var tapMoveTolerance: CGFloat { 18 }
     private var focusReticleSliderXTolerance: CGFloat { 24 }
     private var focusReticleSliderYTolerance: CGFloat { 96 }
+    private var appTheme: AppTheme {
+        AppTheme.theme(for: selectedAppThemeID)
+    }
     private var countdownTextTransition: AnyTransition {
         .asymmetric(
             insertion: .scale(scale: 2.6).combined(with: .opacity),
@@ -155,6 +158,7 @@ extension LockedCaptureView {
     // MARK: - Background Color
     private func backgroundColor() -> some View {
         Color.black.ignoresSafeArea()
+            .overlay(appTheme.background)
     }
     
     // MARK: - Viewfinder
@@ -194,7 +198,8 @@ extension LockedCaptureView {
                 lockLabel: cameraModel.tapFocusLockLabel,
                 exposureOffset: cameraModel.tapFocusIndicatorOffset,
                 showsExposureHandle: cameraModel.canAdjustTapPointExposureBias,
-                isDimmed: cameraModel.isTapFocusIndicatorDimmed
+                isDimmed: cameraModel.isTapFocusIndicatorDimmed,
+                theme: appTheme
             )
             .position(indicatorPoint)
             .transition(.opacity)
@@ -208,10 +213,10 @@ extension LockedCaptureView {
             if let lockLabel = cameraModel.tapFocusLockLabel {
                 Text(lockLabel)
                     .font(.system(size: 12, weight: .bold))
-                    .foregroundStyle(.yellow)
+                    .foregroundStyle(appTheme.accent)
                     .padding(.horizontal, 10)
                     .padding(.vertical, 6)
-                    .background(.black.opacity(0.55), in: .capsule)
+                    .glassEffect(.regular.tint(.black.opacity(0.35)), in: .capsule)
                     .position(x: previewRect.midX, y: previewRect.midY - previewRect.height / 2 + 20)
                     .transition(.opacity)
             }
@@ -366,7 +371,7 @@ extension LockedCaptureView {
     
     // MARK: - Top Bar View
     private func topBarView() -> some View {
-        LockedTopBarView(cameraModel: cameraModel, selectedControl: $selectedControl)
+        LockedTopBarView(cameraModel: cameraModel, selectedControl: $selectedControl, theme: appTheme)
             .offset(y:-2)
     }
     
@@ -374,6 +379,7 @@ extension LockedCaptureView {
     private func bottomBarView() -> some View {
         LockedBottomBarView(
             cameraModel: cameraModel,
+            theme: appTheme,
             lockedSession: lockedSession,
             onShutterFeedback: triggerShutterFeedback
         )
@@ -472,6 +478,7 @@ extension LockedCaptureView {
 
 struct LockedCaptureView: View {
     @Environment(\.scenePhase) private var scenePhase
+    private var selectedAppThemeID: String { AppTheme.defaultID }
     
     let lockedSession: LockedCameraCaptureSession
     

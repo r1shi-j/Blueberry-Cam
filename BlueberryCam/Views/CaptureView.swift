@@ -31,6 +31,12 @@ extension CaptureView {
     private var tapMoveTolerance: CGFloat { 18 }
     private var focusReticleSliderXTolerance: CGFloat { 24 }
     private var focusReticleSliderYTolerance: CGFloat { 96 }
+    private var appTheme: AppTheme {
+        AppTheme.theme(for: selectedAppThemeID)
+    }
+    private var usesThemedReadouts: Bool {
+        usesAppThemeReadouts && selectedAppThemeID != AppTheme.defaultID
+    }
     private var shouldMaskCaptureAspectRatioTransition: Bool {
         cameraModel.isCaptureAspectRatioTransitioning && cameraModel.activeLens.zoomFactor > 1
     }
@@ -200,12 +206,16 @@ extension CaptureView {
     }
     
     private func manualControlColor(for control: ManualControl) -> Color {
+        if usesThemedReadouts {
+            return appTheme.readoutColor
+        }
+        
         switch control {
-            case .ev: .orange.opacity(0.85)
-            case .iso: .yellow.opacity(0.85)
-            case .ss: .white.opacity(0.85)
-            case .f: .green.opacity(0.85)
-            case .wb: .cyan.opacity(0.85)
+            case .ev: return .orange.opacity(0.85)
+            case .iso: return .yellow.opacity(0.85)
+            case .ss: return .white.opacity(0.85)
+            case .f: return .green.opacity(0.85)
+            case .wb: return .cyan.opacity(0.85)
         }
     }
     
@@ -227,7 +237,7 @@ extension CaptureView {
     // MARK: - Background Color
     private func backgroundColor() -> some View {
         Color.black.ignoresSafeArea()
-            .overlay(backgroundColors[appBackgroundColorIndex])
+            .overlay(appTheme.background)
     }
     
     // MARK: - Viewfinder
@@ -398,7 +408,7 @@ extension CaptureView {
     @ViewBuilder
     private func level() -> some View {
         if cameraModel.shouldShowLevel {
-            LevelOverlayView(model: levelModel)
+            LevelOverlayView(model: levelModel, theme: appTheme)
                 .ignoresSafeArea()
         }
     }
@@ -412,7 +422,7 @@ extension CaptureView {
                     Text(copiedString)
                         .font(.system(size: 10, weight: .bold))
                         .fontWidth(.expanded)
-                        .foregroundStyle(.yellow.opacity(0.8))
+                        .foregroundStyle(appTheme.accent.opacity(0.8))
                         .padding(8)
                         .glassEffect(.regular.tint(.black.opacity(0.3)))
                     Button {
@@ -435,7 +445,7 @@ extension CaptureView {
                     }
                     .font(.system(size: 14, weight: .bold))
                     .fontWidth(.expanded)
-                    .tint(.yellow.opacity(0.8))
+                    .tint(appTheme.accent.opacity(0.8))
                     .buttonStyle(.glassProminent)
                 }
                 .position(x: previewRect.midX, y: previewRect.midY)
@@ -471,7 +481,7 @@ extension CaptureView {
                     }
                     .font(.system(size: 14, weight: .bold))
                     .fontWidth(.expanded)
-                    .tint(.yellow.opacity(0.8))
+                    .tint(appTheme.accent.opacity(0.8))
                     .buttonStyle(.glassProminent)
                 }
                 .position(x: previewRect.midX, y: previewRect.midY)
@@ -506,7 +516,8 @@ extension CaptureView {
                 lockLabel: cameraModel.tapFocusLockLabel,
                 exposureOffset: cameraModel.tapFocusIndicatorOffset,
                 showsExposureHandle: cameraModel.canAdjustTapPointExposureBias,
-                isDimmed: cameraModel.isTapFocusIndicatorDimmed
+                isDimmed: cameraModel.isTapFocusIndicatorDimmed,
+                theme: appTheme
             )
             .position(indicatorPoint)
             .transition(.opacity)
@@ -520,10 +531,10 @@ extension CaptureView {
             if !cameraModel.isBurstCapturing, let lockLabel = cameraModel.tapFocusLockLabel {
                 Text(lockLabel)
                     .font(.system(size: 12, weight: .bold))
-                    .foregroundStyle(.yellow)
+                    .foregroundStyle(appTheme.accent)
                     .padding(.horizontal, 10)
                     .padding(.vertical, 6)
-                    .glassEffect(.regular.tint(.black.opacity(0.75)), in: .capsule)
+                    .glassEffect(.regular.tint(.black.opacity(0.35)), in: .capsule)
                     .position(x: previewRect.midX, y: previewRect.midY - previewRect.height / 2 + 20)
                     .transition(.opacity)
             }
@@ -688,8 +699,13 @@ extension CaptureView {
     
     // MARK: - Top Bar View
     private func topBarView() -> some View {
-        TopBarView(cameraModel: cameraModel, selectedControl: $selectedControl)
-            .offset(y:-10)
+        TopBarView(
+            cameraModel: cameraModel,
+            selectedControl: $selectedControl,
+            theme: appTheme,
+            usesAppThemeReadouts: usesThemedReadouts
+        )
+        .offset(y:-10)
     }
     
     // MARK: - Bottom Histogram
@@ -756,6 +772,7 @@ extension CaptureView {
     private func bottomBarView() -> some View {
         BottomBarView(
             cameraModel: cameraModel,
+            theme: appTheme,
             shutterCount: $shutterCount,
             shutterCountBurst: $shutterCountBurst,
             onShutterPressBegan: handleShutterPressBegan,
@@ -832,7 +849,7 @@ extension CaptureView {
     @ViewBuilder
     private func statusBarView() -> some View {
         if !cameraModel.showSimpleView {
-            StatusBarAreaView(cameraModel: cameraModel)
+            StatusBarAreaView(cameraModel: cameraModel, theme: appTheme)
                 .padding()
                 .ignoresSafeArea()
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -929,7 +946,8 @@ struct CaptureView: View {
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.openURL) private var openURL
     
-    @Binding var appBackgroundColorIndex: Int
+    @Binding var selectedAppThemeID: String
+    @Binding var usesAppThemeReadouts: Bool
     @Binding var shutterCount: Int
     @Binding var shutterCountBurst: Int
     @Bindable var permissionModel: PermissionModel
@@ -997,7 +1015,8 @@ struct CaptureView: View {
             })) {
                 SettingsView(
                     cameraModel: cameraModel,
-                    appBackgroundColorIndex: $appBackgroundColorIndex,
+                    selectedAppThemeID: $selectedAppThemeID,
+                    usesAppThemeReadouts: $usesAppThemeReadouts,
                     shutterCount: $shutterCount,
                     shutterCountBurst: $shutterCountBurst,
                     resetToDefaults: cameraModel.resetToDefaults)

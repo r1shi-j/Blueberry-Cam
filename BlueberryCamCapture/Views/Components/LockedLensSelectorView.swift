@@ -123,7 +123,7 @@ extension LockedLensSelectorView {
         .glassEffect(
             .regular
                 .interactive()
-                .tint(isActive ? .yellow.opacity(0.86) : .black.mix(with: .white, by: 0.24)),
+                .tint(isActive ? theme.accent.opacity(0.86) : .black.mix(with: .white, by: 0.24)),
             in: .circle
         )
     }
@@ -159,6 +159,7 @@ extension LockedLensSelectorView {
 struct LockedLensSelectorView: View {
     @Bindable var cameraModel: LockedCameraModel
     let height: CGFloat
+    let theme: AppTheme
     
     @State private var isExpanded = false
     @State private var hapticTrigger = 0

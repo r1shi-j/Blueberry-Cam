@@ -4,7 +4,7 @@ extension FocusReticleView {
     private var foregroundColor: Color {
         let baseOpacity: CGFloat = lockLabel == nil ? 1.0 : 0.75
         let dimmedOpacity: CGFloat = isDimmed ? 0.45 : 1.0
-        return .yellow.opacity(baseOpacity * dimmedOpacity)
+        return theme.accent.opacity(baseOpacity * dimmedOpacity)
     }
     
     private var sunIcon: String {
@@ -17,6 +17,7 @@ struct FocusReticleView: View {
     let exposureOffset: CGFloat
     let showsExposureHandle: Bool
     let isDimmed: Bool
+    let theme: AppTheme
     
     var body: some View {
         VStack(spacing: 10) {

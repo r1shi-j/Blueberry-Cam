@@ -7,7 +7,8 @@ struct SettingsView: View {
     @Environment(\.openURL) private var openURL
     
     @Bindable var cameraModel: CameraModel
-    @Binding var appBackgroundColorIndex: Int
+    @Binding var selectedAppThemeID: String
+    @Binding var usesAppThemeReadouts: Bool
     @Binding var shutterCount: Int
     @Binding var shutterCountBurst: Int
     let resetToDefaults: () -> ()
@@ -250,9 +251,37 @@ struct SettingsView: View {
                     Text(cameraModel.isSmartSelfieFramingAvailable ? "Uses supported selfie cameras to enable Center Stage and apply recommended selfie aspect and zoom. RAW keeps recommended aspect only." : "Smart Selfie Framing is unavailable on this device.")
                 }
                 
+                Section {
+                    NavigationLink {
+                        AppThemeSelectionView(selectedThemeID: $selectedAppThemeID)
+                    } label: {
+                        LabeledContent("App Theme") {
+                            Text(AppTheme.theme(for: selectedAppThemeID).name)
+                                .contentTransition(.opacity)
+                                .animation(Animations.easeInOut, value: selectedAppThemeID)
+                        }
+                    }
+                    
+                    Toggle("Readouts using App Theme", isOn: usesAppThemeReadoutsSelection)
+                        .disabled(selectedAppThemeID == AppTheme.defaultID)
+                } header: {
+                    HStack {
+                        Text("Customisation")
+                        Spacer()
+                        Image(systemName: "paintbrush.fill")
+                            .symbolEffect(.bounce, options: .repeat(.periodic(delay: 1)).speed(0.7))
+                    }
+                } footer: {
+                    if selectedAppThemeID == AppTheme.defaultID {
+                        Text("For the default theme, readout colours are restricted to the standard colour palette")
+                    } else {
+                        Text("Use the default colour palette or use a single colour defined in the app theme for the live readouts.")
+                    }
+                }
+                
                 NavigationLink {
                     Form {
-                        Text("Locked Capture opens Blueberry Cam from system surfaces like Control Centre and the Lock Screen. Some full-app features are unavailable there, including bursts, dualcam, capture celebrations, overlays such as histograms, zebras, highlight clipping, focus peaking, focus loupe, level and grid, as well as selfie cameras, geotagging location, recognising barcodes. Settings, clean UI and filters will also not be available. Any settings above which you have changed will not be read and so the defaults the app shipped with will be used. Photos captured will be saved to photos not files. The background color will be black.")
+                        Text("Locked Capture opens Blueberry Cam from system surfaces like Control Centre and the Lock Screen. Some full-app features are unavailable there, including bursts, dualcam, capture celebrations, overlays such as histograms, zebras, highlight clipping, focus peaking, focus loupe, level and grid, as well as selfie cameras, geotagging location, recognising barcodes. Settings, clean UI and filters will also not be available. Any settings above which you have changed will not be read and so the defaults the app shipped with will be used. Photos captured will be saved to photos not files. The default app theme will be used.")
                         Text("You can open the full app from the locked session by clicking the icon in the bottom left.")
                         Text("Photos library usage is only required to search for the album to save photos taken with this app, you can set it to limited access and select no photos, the app still work.")
                         
@@ -273,62 +302,6 @@ struct SettingsView: View {
                         Spacer()
                         Image(systemName: "info.circle")
                             .symbolEffect(.rotate.byLayer, options: .repeat(.periodic(delay: 1)).speed(0.7))
-                    }
-                }
-                
-                Section {
-                    NavigationLink {
-                        ZStack {
-                            Color.black.ignoresSafeArea()
-                                .overlay(backgroundColors[appBackgroundColorIndex])
-                            Form {
-                                ForEach(backgroundColors.indices, id: \.self) { index in
-                                    Button {
-                                        selectAppBackground(index)
-                                    } label: {
-                                        HStack {
-                                            Circle()
-                                                .fill(.black)
-                                                .overlay {
-                                                    Circle()
-                                                        .fill(backgroundColors[index])
-                                                }
-                                                .frame(width: 20, height: 20)
-                                            
-                                            Spacer()
-                                            
-                                            if appBackgroundColorIndex == index {
-                                                Image(systemName: "checkmark")
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                            .scrollContentBackground(.hidden)
-                        }
-                        .environment(\.colorScheme, .dark)
-                        .navigationTitle("App Background")
-                        .toolbarColorScheme(.dark, for: .navigationBar)
-                        .tint(.white)
-                    } label: {
-                        HStack {
-                            Text("App Background")
-                            Spacer()
-                            Circle()
-                                .fill(.black)
-                                .overlay {
-                                    Circle()
-                                        .fill(backgroundColors[appBackgroundColorIndex])
-                                }
-                                .frame(width: 20, height: 20)
-                        }
-                    }
-                } header: {
-                    HStack {
-                        Text("Customisation")
-                        Spacer()
-                        Image(systemName: "paintbrush.fill")
-                            .symbolEffect(.bounce, options: .repeat(.periodic(delay: 1)).speed(0.7))
                     }
                 }
                 
@@ -419,7 +392,8 @@ struct SettingsView: View {
                 Button(Alerts.reset, role: .destructive) {
                     triggerSettingsResetHaptic()
                     resetToDefaults()
-                    appBackgroundColorIndex = 0
+                    selectedAppThemeID = AppTheme.defaultID
+                    usesAppThemeReadouts = false
                 }
             }
             .alert(countResetTarget?.confirmationTitle ?? "", isPresented: Binding(get: {
@@ -452,6 +426,11 @@ struct SettingsView: View {
             .onChange(of: cameraModel.shouldShowConfettiCannons) { _, new in
                 if new {
                     confettiCount += 1
+                }
+            }
+            .onChange(of: selectedAppThemeID) { _, newThemeID in
+                if newThemeID == AppTheme.defaultID {
+                    usesAppThemeReadouts = false
                 }
             }
         }
@@ -561,10 +540,17 @@ struct SettingsView: View {
         }
     }
     
-    private func selectAppBackground(_ index: Int) {
-        guard index != appBackgroundColorIndex else { return }
-        triggerSettingsSelectionHaptic()
-        appBackgroundColorIndex = index
+    private var usesAppThemeReadoutsSelection: Binding<Bool> {
+        Binding {
+            selectedAppThemeID == AppTheme.defaultID ? false : usesAppThemeReadouts
+        } set: { newValue in
+            guard selectedAppThemeID != AppTheme.defaultID else {
+                usesAppThemeReadouts = false
+                return
+            }
+            triggerSettingsSelectionHaptic()
+            usesAppThemeReadouts = newValue
+        }
     }
     
     private func selectProRawFileFormat(_ fileFormat: ProRawFileFormat) {
@@ -624,12 +610,14 @@ private enum ShutterCountResetTarget {
 
 #Preview {
     @Previewable @State var cameraModel = CameraModel()
-    @Previewable @State var appBackgroundColorIndex = 2
+    @Previewable @State var selectedAppThemeID = AppTheme.defaultID
+    @Previewable @State var usesAppThemeReadouts = false
     @Previewable @State var shutterCount = 0
     @Previewable @State var shutterCountBurst = 0
     SettingsView(
         cameraModel: cameraModel,
-        appBackgroundColorIndex: $appBackgroundColorIndex,
+        selectedAppThemeID: $selectedAppThemeID,
+        usesAppThemeReadouts: $usesAppThemeReadouts,
         shutterCount: $shutterCount,
         shutterCountBurst: $shutterCountBurst) { }
 }

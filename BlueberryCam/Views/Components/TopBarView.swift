@@ -6,7 +6,6 @@ extension TopBarView {
     private enum Style {
         static let disabledOpacity = 0.3
         static let selectedForeground: Color = .black
-        static let selectedBackground: Color = .yellow
         static let buttonHeight: CGFloat = 18
         static let horizontalButtonPadding: CGFloat = 8
         static let verticalButtonPadding: CGFloat = 5
@@ -51,7 +50,7 @@ extension TopBarView {
     
     private func resolutionBackground(for isSelected: Bool, isEnabled: Bool) -> Color {
         guard isEnabled else { return Colors.buttonBackground.opacity(Style.disabledOpacity) }
-        return isSelected ? Style.selectedBackground : Colors.buttonBackground
+        return isSelected ? theme.accent : Colors.buttonBackground
     }
     
     private func formatForeground(for mode: CaptureMode, isEnabled: Bool) -> Color {
@@ -61,7 +60,7 @@ extension TopBarView {
     
     private func formatBackground(for mode: CaptureMode, isEnabled: Bool) -> Color {
         guard isEnabled else { return Colors.buttonBackground.opacity(Style.disabledOpacity) }
-        return isFormatSelected(mode) ? Style.selectedBackground : Colors.buttonBackground
+        return isFormatSelected(mode) ? theme.accent : Colors.buttonBackground
     }
     
     private var displayedFormats: [CaptureMode] {
@@ -95,7 +94,7 @@ extension TopBarView {
     }
     
     private var flashButtonBackground: Color {
-        cameraModel.flashMode == .off || !cameraModel.supportsFlash ? Colors.buttonBackground : Style.selectedBackground
+        cameraModel.flashMode == .off || !cameraModel.supportsFlash ? Colors.buttonBackground : theme.accent
     }
     
     private var flashButtonOpacity: Double {
@@ -116,7 +115,7 @@ extension TopBarView {
     }
     
     private var macroButtonBackground: Color {
-        cameraModel.isMacroEnabled ? Style.selectedBackground : Colors.buttonBackground
+        cameraModel.isMacroEnabled ? theme.accent : Colors.buttonBackground
     }
     
     // MARK: - Dual Camera properties
@@ -129,7 +128,7 @@ extension TopBarView {
     }
     
     private var dualcamButtonBackground: Color {
-        cameraModel.isDualCameraEnabled ? Style.selectedBackground : Colors.buttonBackground
+        cameraModel.isDualCameraEnabled ? theme.accent : Colors.buttonBackground
     }
     
     private var dualcamButtonOpacity: Double {
@@ -151,7 +150,7 @@ extension TopBarView {
     }
     
     private var burstButtonBackground: Color {
-        cameraModel.isBurstModeEnabled ? Style.selectedBackground : Colors.buttonBackground
+        cameraModel.isBurstModeEnabled ? theme.accent : Colors.buttonBackground
     }
     
     private var burstButtonOpacity: Double {
@@ -190,7 +189,7 @@ extension TopBarView {
     }
     
     private var timerButtonBackground: Color {
-        cameraModel.timerMode == .off ? Colors.buttonBackground : Style.selectedBackground
+        cameraModel.timerMode == .off ? Colors.buttonBackground : theme.accent
     }
     
     private var timerButtonOpacity: Double {
@@ -254,7 +253,11 @@ extension TopBarView {
     // MARK: - General Readout properties
     private func readoutColor(for control: ManualControl) -> Color {
         guard !isReadoutDisabled(for: control) else {
-            return Colors.buttonText.opacity(Style.disabledOpacity)
+            return usesAppThemeReadouts ? theme.readoutColor.opacity(Style.disabledOpacity) : Colors.buttonText.opacity(Style.disabledOpacity)
+        }
+        
+        if usesAppThemeReadouts {
+            return theme.readoutColor
         }
         
         switch control {
@@ -371,7 +374,7 @@ extension TopBarView {
         .fontWidth(.expanded)
         .padding(.horizontal, Style.horizontalPickerPadding)
         .padding(.vertical, Style.verticalButtonPadding)
-        .background(Style.selectedBackground)
+        .background(theme.accent)
         .foregroundStyle(Style.selectedForeground)
         .clipShape(.rect(cornerRadius: Style.pickerCornerRadius))
         .overlay(RoundedRectangle(cornerRadius: Style.pickerCornerRadius).stroke(.white.opacity(0.2), lineWidth: 1))
@@ -654,6 +657,8 @@ extension TopBarView {
 struct TopBarView: View {
     @Bindable var cameraModel: CameraModel
     @Binding var selectedControl: ManualControl?
+    let theme: AppTheme
+    let usesAppThemeReadouts: Bool
     @State private var hapticTrigger = 0
     @State private var hapticTriggerR = 0
     @State private var isShowingBurstIntervalAlert = false
