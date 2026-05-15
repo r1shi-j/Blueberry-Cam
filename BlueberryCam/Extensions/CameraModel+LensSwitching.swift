@@ -14,12 +14,25 @@ extension CameraModel {
         guard let previewCamera = lens.captureDevice() else { return }
         let previousLens = activeLens
         
+        // Save the current resolution before switching away from a rear lens
+        // so we can restore it if the user switches back.
+        let savedResolution: ResolutionOption? = !previousLens.isFront ? selectedResolution : resolutionBeforeSelfie
+        
         // 1. Instant UI update to trigger animations and selection state
         isSwitchingLens = true
         self.activeLens = lens
         self.flipRotation = 0
-        if !lens.isFront {
+        if lens.isFront {
+            // Stash the rear resolution for when we return
+            self.resolutionBeforeSelfie = savedResolution
+        } else {
             primeResolutionOptions(for: lens, device: previewCamera)
+            // Immediately apply the stashed resolution so the UI doesn't flash the wrong value
+            if let restoreRes = resolutionBeforeSelfie,
+               enabledResolutions.contains(where: { $0.id == restoreRes.id }) {
+                selectedResolution = restoreRes
+            }
+
         }
         
         // 2. Capture lens properties before crossing isolation boundary
@@ -86,6 +99,15 @@ extension CameraModel {
                 self.configureSubjectAreaMonitoring(for: cam)
                 
                 self.buildAvailableFormats()
+                
+                // Restore the resolution from before the selfie switch if applicable
+                if !lens.isFront, let restoreRes = self.resolutionBeforeSelfie,
+                   self.enabledResolutions.contains(where: { $0.id == restoreRes.id }) {
+                    self.selectedResolution = restoreRes
+                }
+                if !lens.isFront {
+                    self.resolutionBeforeSelfie = nil
+                }
                 let previousShutterDuration: CMTime? = (!self.isAutoExposure && self.shutterSpeeds.indices.contains(self.shutterIndex)) ? self.shutterSpeeds[self.shutterIndex] : nil
                 self.updateDeviceRanges()
                 self.normalizeFlashModeForCurrentDevice()

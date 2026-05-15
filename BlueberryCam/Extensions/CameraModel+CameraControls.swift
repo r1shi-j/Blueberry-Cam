@@ -30,8 +30,18 @@ extension CameraModel {
         }
         
         // Lens Picker
-        let availableLenses = Lens.allCases.filter { len in
+        let allHardwareLenses = Lens.allCases.filter { len in
             AVCaptureDevice.default(len.deviceType, for: .video, position: len.position) != nil
+        }
+        // Filter by mode compatibility (RAW/48MP) but always keep front lenses for selfie switching
+        let availableLenses = allHardwareLenses.filter { lens in
+            if lens == activeLens { return true }
+            if isDualCameraEnabled { return true }
+            var x = true
+            if captureMode == .raw { x = lens.preservesRawCaptureMode }
+            if captureMode == .proRaw { x = lens.preservesProRawCaptureMode }
+            if isHighResolutionSelected { x = lens.preservesHighResolutionCapture }
+            return x
         }
         if !availableLenses.isEmpty {
             let titles = availableLenses.map { "\($0.label)x" }
@@ -39,7 +49,18 @@ extension CameraModel {
             picker.setActionQueue(.main) { [weak self] index in
                 guard let self else { return }
                 guard index >= 0 && index < availableLenses.count else { return }
-                self.switchLens(to: availableLenses[index])
+                let targetLens = availableLenses[index]
+                
+                // Handle front ↔ back switching
+                if targetLens.isFront != self.activeLens.isFront {
+                    if self.isDualCameraEnabled {
+                        self.swapDualCameras()
+                    } else {
+                        self.switchLens(to: targetLens)
+                    }
+                } else {
+                    self.switchLens(to: targetLens)
+                }
             }
             if let activeIndex = availableLenses.firstIndex(of: activeLens) {
                 picker.selectedIndex = activeIndex

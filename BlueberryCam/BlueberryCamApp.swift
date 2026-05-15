@@ -55,9 +55,9 @@ struct BlueberryCamApp: App {
 // Add tips, welcome screen and tutorials
 
 // MARK: - FIXME
+// selfie switch animation with differnt bg cololr
+// grid corner ticks same thickness/clor as 3x3 lines
 
 // MARK: - Next Steps
 // smoother animations everywhere
 // Updated locked camera app pipeline (just update whole codebase)
-// selfie switch animation with differnt bg cololr
-// customise theme packs

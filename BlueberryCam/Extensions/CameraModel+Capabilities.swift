@@ -56,7 +56,21 @@ extension CameraModel {
         let hardwareLenses = baseLenses.filter { $0 == activeLens || $0.captureDevice() != nil }
         let compatibleLenses = isDualCameraEnabled ? hardwareLenses.filter { canUseDualCamera(mainLens: $0) } : hardwareLenses
         
-        return compatibleLenses
+        // In dual camera mode, skip mode filtering — dual cam already restricts to processed formats
+        guard !isDualCameraEnabled else { return compatibleLenses }
+        
+        // Filter out lenses incompatible with current capture mode / resolution
+        let modeFilteredLenses = compatibleLenses.filter { lens in
+            // Always keep the active lens visible
+            if lens == activeLens { return true }
+            // RAW requires lenses that preserve RAW capture
+            if captureMode == .raw { return lens.preservesRawCaptureMode }
+            // 48MP requires lenses that preserve high-resolution capture
+            if isHighResolutionSelected { return lens.preservesHighResolutionCapture }
+            return true
+        }
+        
+        return modeFilteredLenses
     }
     
     var hasSwitchableLenses: Bool {
@@ -240,9 +254,16 @@ extension CameraModel {
             enabledResolutions = enabledOptions
         }
         
-        if let current = selectedResolution,
-           enabledOptions.contains(where: { $0.id == current.id }) {
-            // Keep the user's current resolution when flash or other constraints only re-enable options.
+        // Try current selection first, then the cached selection for this lens, then default
+        let cachedSelection = cachedResolutionOptionsByLens[activeLens]?.selectedOption
+        let candidates = [selectedResolution, cachedSelection].compactMap { $0 }
+        
+        if let match = candidates.first(where: { candidate in
+            enabledOptions.contains(where: { $0.id == candidate.id })
+        }) {
+            if selectedResolution?.id != match.id {
+                selectedResolution = match
+            }
         } else {
             selectedResolution = defaultResolution == .max ? enabledOptions.last : enabledOptions.first
         }
@@ -289,12 +310,17 @@ extension CameraModel {
             enabledOptions = availableOptions
         }
         
+        // Try current selection first, then the cached selection for this lens, then default
+        let cachedSelection = cachedResolutionOptionsByLens[lens]?.selectedOption
+        let candidates = [selectedResolution, cachedSelection].compactMap { $0 }
+        
         let selectedOption: ResolutionOption?
         if enabledOptions.isEmpty {
             selectedOption = nil
-        } else if let current = selectedResolution,
-                  enabledOptions.contains(where: { $0.id == current.id }) {
-            selectedOption = current
+        } else if let match = candidates.first(where: { candidate in
+            enabledOptions.contains(where: { $0.id == candidate.id })
+        }) {
+            selectedOption = match
         } else {
             selectedOption = defaultResolution == .max ? enabledOptions.last : enabledOptions.first
         }

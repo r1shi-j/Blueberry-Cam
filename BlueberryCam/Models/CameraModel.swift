@@ -192,6 +192,7 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
     var availableCaptureAspectRatios: [CaptureAspectRatioOption] = [.defaultSelection]
     var isCaptureAspectRatioTransitioning = false
     var pendingCaptureModeAfterLensSwitch: CaptureMode?
+    var resolutionBeforeSelfie: ResolutionOption?
     var activeLens: Lens = .wide
     var isSwitchingLens = false
     @ObservationIgnored
