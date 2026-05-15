@@ -38,7 +38,8 @@ struct AppThemeSelectionView: View {
                     }
                 }
                 .scrollContentBackground(.hidden)
-                .scrollDisabled(true)
+                
+                Divider()
                 
                 AppThemePreview(theme: selectedTheme)
             }
@@ -86,12 +87,14 @@ private struct AppThemePreview: View {
         HStack(spacing: 12) {
             Button("Accent Color") { }
                 .font(.callout)
+                .fontWidth(.expanded)
                 .bold()
                 .tint(theme.accent)
                 .buttonStyle(.glassProminent)
             
             Button("Accent Text") { }
                 .font(.callout)
+                .fontWidth(.expanded)
                 .bold()
                 .foregroundStyle(theme.accent)
                 .buttonStyle(.glass)
@@ -157,6 +160,7 @@ private struct ThemeShutterPreviewButton: View {
             
             Text(desc)
                 .font(.caption)
+                .fontWidth(.expanded)
         }
     }
 }
