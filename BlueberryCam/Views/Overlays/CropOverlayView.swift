@@ -51,7 +51,7 @@ struct CropOverlayView: View {
                 
                 // Corner marks (inset slightly so they don't bleed off the screen edge)
                 CornerMarks(rect: cropRect.insetBy(dx: 0.4, dy: 0.5))
-                    .stroke(.white.opacity(0.75), lineWidth: 1.0)
+                    .stroke(.white.opacity(0.75), lineWidth: 0.75)
             }
             .allowsHitTesting(false)
         }
