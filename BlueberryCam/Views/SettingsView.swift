@@ -35,7 +35,7 @@ struct SettingsView: View {
                             }
                         }
                         .pickerStyle(.segmented)
-                        .frame(maxWidth: 240)
+                        .frame(maxWidth: 200)
                     }
                     
                     if cameraModel.saveLocation == .files {
@@ -152,7 +152,7 @@ struct SettingsView: View {
                                 }
                             }
                             .pickerStyle(.segmented)
-                            .frame(maxWidth: 240)
+                            .frame(maxWidth: 260)
                             .animation(Animations.easeInOut, value: cameraModel.defaultFileFormatOptions)
                         }
                         .transition(.opacity.combined(with: .move(edge: .top)))
@@ -166,7 +166,7 @@ struct SettingsView: View {
                             }
                         }
                         .pickerStyle(.segmented)
-                        .frame(maxWidth: 240)
+                        .frame(maxWidth: 200)
                     }
                     
                     LabeledContent("Filter ") {
@@ -280,7 +280,7 @@ struct SettingsView: View {
                     NavigationLink {
                         ZStack {
                             Color.black.ignoresSafeArea()
-                                .overlay(backgroundColors[appBackgroundColorIndex].opacity(0.5))
+                                .overlay(backgroundColors[appBackgroundColorIndex])
                             Form {
                                 ForEach(backgroundColors.indices, id: \.self) { index in
                                     Button {
@@ -323,9 +323,6 @@ struct SettingsView: View {
                                 .frame(width: 20, height: 20)
                         }
                     }
-                    
-                    // Text("Accent Color")
-                    // Text("App Icon")
                 } header: {
                     HStack {
                         Text("Customisation")

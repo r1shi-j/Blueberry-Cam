@@ -626,6 +626,14 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
         return ratio.widthToHeightRatio
     }
     
+    var gridAspectRatio: CGFloat {
+        if activeLens.isFront {
+            return 1 / captureAspectRatio
+        }
+        
+        return captureAspectRatio
+    }
+    
     func updateAnalysisPauseState() {
         shouldPauseAnalysis = showSimpleView || isDualCameraEnabled
     }

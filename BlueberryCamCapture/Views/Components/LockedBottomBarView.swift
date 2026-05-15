@@ -20,7 +20,14 @@ extension LockedBottomBarView {
     }
     
     private var shutterTint: Color {
-        cameraModel.captureMode.isRawLike ? .blue.mix(with: .mint, by: 0.5).opacity(0.4) : .white.opacity(0.2)
+        switch cameraModel.captureMode {
+            case .raw:
+                return .blue.mix(with: .mint, by: 0.5).opacity(0.4)
+            case .proRaw:
+                return .purple.mix(with: .pink, by: 0.35).opacity(0.45)
+            case .heif, .jpeg:
+                return .white.opacity(0.2)
+        }
     }
     
     // MARK: Subviews

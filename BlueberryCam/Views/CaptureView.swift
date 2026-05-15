@@ -386,10 +386,11 @@ extension CaptureView {
     
     // MARK: - Crop frame overlay
     @ViewBuilder
-    private func grid() -> some View {
+    private func grid(_ previewRect: CGRect) -> some View {
         if cameraModel.shouldShowGrid {
-            CropOverlayView(aspectRatio: cameraModel.captureAspectRatio)
-                .ignoresSafeArea()
+            CropOverlayView(aspectRatio: cameraModel.gridAspectRatio)
+                .frame(width: previewRect.width, height: previewRect.height)
+                .position(x: previewRect.midX, y: previewRect.midY)
         }
     }
     
@@ -862,7 +863,7 @@ extension CaptureView {
                         highlightClipping(previewRect)
                         focusPeaking(previewRect)
                         focusLoupe(previewRect)
-                        grid()
+                        grid(previewRect)
                         level()
                     }
                     qrCode(previewRect)
