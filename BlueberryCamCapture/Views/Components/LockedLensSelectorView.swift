@@ -158,8 +158,8 @@ extension LockedLensSelectorView {
 // MARK: - View
 struct LockedLensSelectorView: View {
     @Bindable var cameraModel: LockedCameraModel
-    let height: CGFloat
     let theme: AppTheme
+    let height: CGFloat
     
     @State private var isExpanded = false
     @State private var hapticTrigger = 0

@@ -59,4 +59,18 @@ struct BlueberryCamApp: App {
 // improve lens switching animation (particulary on selfie cameras)
 
 // MARK: - Next Steps
-// Updated locked camera app pipeline (just update whole codebase)
+// update app themes
+/// in app theme, lock tool bar button top right
+/// clicking on it opens an alert saying to change the app theme, requires 100 photos to be taken - shutter counter >= 100 and 100 burst count, or can enter a password to unlock
+/// in list rename default to classic
+/// keep deafult ticked, but add a capsule button called preview (matches the accent) on each row, tapping will show the preview below
+/// if device is iphone 17pro then show options for cosmic orange, deep blue, silver
+/// last option is "Custom", tapping opens a disclosure group with background, accent, shutter raw/proraw/burst
+/// readout colour is just accent.opacity0.8, standard hsutter is white opacity 0.2, burst capturing is related to burst
+/// custom is locked to 1000 shutter count and 1000 burst count
+/// make dividr in middle of screen, and bottom half scrollable as well
+
+/// Paid features: bursts, dualcam, histograms, zebras, clipping, filters, save to files, barcodes and app themes
+/// App themes £1.49 add on
+/// Full Unlock Subscription contains everything
+/// free 1 week trial, £2.99 per month, or £20 per year

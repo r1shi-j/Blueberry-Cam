@@ -248,13 +248,14 @@ extension LockedTopBarView {
                         .foregroundStyle(formatForeground(for: mode, isEnabled: isEnabled))
                 }
                 .disabled(!isEnabled)
+                .transition(.opacity.combined(with: .scale(scale: 0.86)))
             }
         }
         .clipShape(.rect(cornerRadius: Style.pickerCornerRadius))
         .overlay(RoundedRectangle(cornerRadius: Style.pickerCornerRadius).stroke(.white.opacity(0.2), lineWidth: 1))
         .animation(Animations.bouncy, value: cameraModel.enabledFormats)
+        .animation(Animations.bouncy, value: cameraModel.availableFormats)
         .animation(Animations.bouncy, value: cameraModel.captureMode)
-        
     }
     
     // MARK: - Flash
@@ -354,6 +355,7 @@ struct LockedTopBarView: View {
                 resolutionPicker()
                 formatPicker()
             }
+            .animation(.smooth(duration: 0.24), value: cameraModel.availableResolutions)
             .padding(.horizontal, Style.row2HPadding)
             
             // MARK: Row 3
@@ -364,6 +366,7 @@ struct LockedTopBarView: View {
             }
             .padding(.horizontal, Style.row3HPadding)
             .animation(Animations.bouncy, value: cameraModel.isAutoFocus)
+            .animation(Animations.bouncy, value: cameraModel.isSwitchingLens)
         }
         .sensoryFeedback(.impact, trigger: hapticTrigger)
         .sensoryFeedback(.impact(flexibility: .soft), trigger: hapticTriggerR)

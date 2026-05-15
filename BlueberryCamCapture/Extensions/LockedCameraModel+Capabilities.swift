@@ -17,17 +17,44 @@ extension LockedCameraModel {
     }
     
     var availableLensOptions: [Lens] {
-        let hardwareLenses = [Lens.ultraWide, .wide, .tele2x, .tele4x, .tele8x]
-            .filter { $0 == activeLens || $0.captureDevice() != nil }
+        let baseLenses: [Lens] = [.ultraWide, .wide, .tele2x, .tele4x, .tele8x]
         
-        return hardwareLenses
+        let hardwareLenses = baseLenses.filter { $0 == activeLens || $0.captureDevice() != nil }
+        
+        // Filter out lenses incompatible with current capture mode / resolution
+        let modeFilteredLenses = hardwareLenses.filter { lens in
+            // Always keep the active lens visible
+            if lens == activeLens { return true }
+            // RAW requires lenses that preserve RAW capture
+            if captureMode == .raw { return lens.preservesRawCaptureMode }
+            // 48MP requires lenses that preserve high-resolution capture
+            if isHighResolutionSelected { return lens.preservesHighResolutionCapture }
+            return true
+        }
+        
+        return modeFilteredLenses
+    }
+    
+    func shownAvailableFormats(includeRaw: Bool = true) -> [CaptureMode] {
+        let sourceFormats = availableFormats.isEmpty ? CaptureMode.allCases : availableFormats
+        return sourceFormats.filter { mode in
+            (includeRaw || !mode.isRawLike)
+        }
+    }
+    
+    func preferredProcessedCaptureMode(in modes: [CaptureMode]) -> CaptureMode? {
+        let processedModes = modes.filter(\.isProcessed)
+        if defaultFileFormat.isProcessed, processedModes.contains(defaultFileFormat) {
+            return defaultFileFormat
+        }
+        
+        return CaptureMode.processedFallbackOrder.first { processedModes.contains($0) }
     }
     
     func buildAvailableFormats() {
         // We only enforce this logic if the device is ready.
         guard device != nil else { return }
         
-        let isFront = activeLens.isFront
         let rawPixelFormatTypes = photoOutput.availableRawPhotoPixelFormatTypes
         
         var visibleModes: [CaptureMode] = []
@@ -49,7 +76,7 @@ extension LockedCameraModel {
         if isAutoExposure {
             modes = visibleModes.filter { mode in
                 switch mode {
-                    case .heif, .jpeg:
+                    case .jpeg, .heif:
                         return true
                     case .raw:
                         return canSelectBayerRawForCurrentState
@@ -65,51 +92,38 @@ extension LockedCameraModel {
         }
         
         // SMART SWITCH: Keep the current selection if valid, else fallback to preference, else base fallback.
-        let targetMode: CaptureMode
-        if modes.contains(captureMode) {
-            targetMode = captureMode
-        } else if modes.contains(defaultFileFormat) {
-            targetMode = defaultFileFormat
-        } else {
-            targetMode = modes.contains(.heif) ? .heif : .jpeg
-        }
-        
-        if captureMode != targetMode {
+        if let targetMode = preferredCaptureMode(in: modes), captureMode != targetMode {
             captureMode = targetMode
         }
         
         let isCropLens = activeLens == .tele2x || activeLens == .tele8x
         
         let visibleOptions: [ResolutionOption]
-        if isFront {
-            visibleOptions = []
-        } else {
-            let outputMax = photoOutput.maxPhotoDimensions
-            let allDims = (device?.activeFormat.supportedMaxPhotoDimensions ?? [])
-                .filter { $0.width <= outputMax.width && $0.height <= outputMax.height }
-                .sorted { Int($0.width) * Int($0.height) < Int($1.width) * Int($1.height) }
-            
-            var deduped: [ResolutionOption] = []
-            for dim in allDims {
-                let opt = ResolutionOption(width: dim.width, height: dim.height)
-                if !deduped.contains(where: { abs($0.id - opt.id) < 2_000_000 }) {
-                    deduped.append(opt)
-                }
-            }
-            // Always show 12MP + 48MP for back optical lenses
-            let smallest = deduped.first
-            let largest = deduped.last
-            if let s = smallest, let l = largest, s.id != l.id {
-                visibleOptions = [s, l]
-            } else {
-                visibleOptions = deduped
+        
+        let outputMax = photoOutput.maxPhotoDimensions
+        let allDims = (device?.activeFormat.supportedMaxPhotoDimensions ?? [])
+            .filter { $0.width <= outputMax.width && $0.height <= outputMax.height }
+            .sorted { Int($0.width) * Int($0.height) < Int($1.width) * Int($1.height) }
+        
+        var deduped: [ResolutionOption] = []
+        for dim in allDims {
+            let opt = ResolutionOption(width: dim.width, height: dim.height)
+            if !deduped.contains(where: { abs($0.id - opt.id) < 2_000_000 }) {
+                deduped.append(opt)
             }
         }
+        // Always show 12MP + 48MP for back optical lenses
+        let smallest = deduped.first
+        let largest = deduped.last
+        if let s = smallest, let l = largest, s.id != l.id {
+            visibleOptions = [s, l]
+        } else {
+            visibleOptions = deduped
+        }
+        
         
         let enabledOptions: [ResolutionOption]
-        if isFront {
-            enabledOptions = []
-        } else if requiresLowResolutionForCurrentState(isCropLens: isCropLens) {
+        if requiresLowResolutionForCurrentState(isCropLens: isCropLens) {
             enabledOptions = visibleOptions.first.map { [$0] } ?? []
         } else {
             enabledOptions = visibleOptions
@@ -127,62 +141,82 @@ extension LockedCameraModel {
             enabledResolutions = enabledOptions
         }
         
-        if let current = selectedResolution,
-           enabledOptions.contains(where: { $0.id == current.id }) {
-            // Keep the user's current resolution when flash or other constraints only re-enable options.
+        // Try current selection first, then the cached selection for this lens, then default
+        let cachedSelection = cachedResolutionOptionsByLens[activeLens]?.selectedOption
+        let candidates = [selectedResolution, cachedSelection].compactMap { $0 }
+        
+        if let match = candidates.first(where: { candidate in
+            enabledOptions.contains(where: { $0.id == candidate.id })
+        }) {
+            if selectedResolution?.id != match.id {
+                selectedResolution = match
+            }
         } else {
             selectedResolution = defaultResolution == .max ? enabledOptions.last : enabledOptions.first
         }
+        
+        cacheResolutionOptions(for: activeLens,
+                               availableOptions: visibleOptions,
+                               enabledOptions: enabledOptions)
     }
     
-    func primeResolutionOptions(for lens: Lens, device: AVCaptureDevice) {
-        let visibleOptions: [ResolutionOption]
-        if lens.isFront {
-            visibleOptions = []
-        } else {
-            let outputMax = device.activeFormat.supportedMaxPhotoDimensions.max(by: {
-                Int($0.width) * Int($0.height) < Int($1.width) * Int($1.height)
-            }) ?? photoOutput.maxPhotoDimensions
-            let allDims = device.activeFormat.supportedMaxPhotoDimensions
-                .filter { $0.width <= outputMax.width && $0.height <= outputMax.height }
-                .sorted { Int($0.width) * Int($0.height) < Int($1.width) * Int($1.height) }
-            
-            var deduped: [ResolutionOption] = []
-            for dim in allDims {
-                let opt = ResolutionOption(width: dim.width, height: dim.height)
-                if !deduped.contains(where: { abs($0.id - opt.id) < 2_000_000 }) {
-                    deduped.append(opt)
-                }
-            }
-            
-            let smallest = deduped.first
-            let largest = deduped.last
-            if let s = smallest, let l = largest, s.id != l.id {
-                visibleOptions = [s, l]
-            } else {
-                visibleOptions = deduped
-            }
-        }
-        
+    func primeResolutionOptions(for lens: Lens, device _: AVCaptureDevice) {
+        let cachedSnapshot = cachedResolutionOptionsByLens[lens]
+        let fallbackSnapshot = cachedResolutionOptionsByLens[.wide] ?? cachedResolutionOptionsByLens.values.first
+        guard let sourceSnapshot = cachedSnapshot ?? fallbackSnapshot else { return }
+        let snapshot = resolutionOptionsSnapshot(for: lens,
+                                                 availableOptions: sourceSnapshot.availableOptions)
+        applyResolutionOptionsSnapshot(snapshot)
+    }
+    
+    private func cacheResolutionOptions(for lens: Lens,
+                                        availableOptions: [ResolutionOption],
+                                        enabledOptions: [ResolutionOption]) {
+        guard !lens.isFront else { return }
+        cachedResolutionOptionsByLens[lens] = .init(availableOptions: availableOptions,
+                                                    enabledOptions: enabledOptions,
+                                                    selectedOption: selectedResolution)
+    }
+    
+    private func resolutionOptionsSnapshot(for lens: Lens,
+                                           availableOptions: [ResolutionOption]) -> ResolutionOptionsSnapshot {
         let isCropLens = lens == .tele2x || lens == .tele8x
         let enabledOptions: [ResolutionOption]
-        if lens.isFront {
-            enabledOptions = []
-        } else if requiresLowResolutionForCurrentState(isCropLens: isCropLens) {
-            enabledOptions = visibleOptions.first.map { [$0] } ?? []
+        if requiresLowResolutionForCurrentState(isCropLens: isCropLens) {
+            enabledOptions = availableOptions.first.map { [$0] } ?? []
         } else {
-            enabledOptions = visibleOptions
+            enabledOptions = availableOptions
         }
         
-        availableResolutions = visibleOptions
-        enabledResolutions = enabledOptions
+        // Try current selection first, then the cached selection for this lens, then default
+        let cachedSelection = cachedResolutionOptionsByLens[lens]?.selectedOption
+        let candidates = [selectedResolution, cachedSelection].compactMap { $0 }
         
+        let selectedOption: ResolutionOption?
         if enabledOptions.isEmpty {
-            selectedResolution = nil
-        } else if let current = selectedResolution, enabledOptions.contains(where: { $0.id == current.id }) {
-            return
+            selectedOption = nil
+        } else if let match = candidates.first(where: { candidate in
+            enabledOptions.contains(where: { $0.id == candidate.id })
+        }) {
+            selectedOption = match
         } else {
-            selectedResolution = defaultResolution == .max ? enabledOptions.last : enabledOptions.first
+            selectedOption = defaultResolution == .max ? enabledOptions.last : enabledOptions.first
+        }
+        
+        return .init(availableOptions: availableOptions,
+                     enabledOptions: enabledOptions,
+                     selectedOption: selectedOption)
+    }
+    
+    private func applyResolutionOptionsSnapshot(_ snapshot: ResolutionOptionsSnapshot) {
+        if availableResolutions != snapshot.availableOptions {
+            availableResolutions = snapshot.availableOptions
+        }
+        if enabledResolutions != snapshot.enabledOptions {
+            enabledResolutions = snapshot.enabledOptions
+        }
+        if selectedResolution != snapshot.selectedOption {
+            selectedResolution = snapshot.selectedOption
         }
     }
     
@@ -339,4 +373,15 @@ extension LockedCameraModel {
         highResolutionOption?.id == option.id
     }
     
+    private func preferredCaptureMode(in modes: [CaptureMode]) -> CaptureMode? {
+        if modes.contains(captureMode) {
+            return captureMode
+        }
+        
+        if modes.contains(defaultFileFormat) {
+            return defaultFileFormat
+        }
+        
+        return preferredProcessedCaptureMode(in: modes) ?? modes.first
+    }
 }

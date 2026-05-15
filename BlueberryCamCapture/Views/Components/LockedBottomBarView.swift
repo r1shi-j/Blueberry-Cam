@@ -59,25 +59,14 @@ extension LockedBottomBarView {
             tint: shutterTint,
             height: Style.buttonHeight,
             onPressBegan: {},
-            onPressEnded: capturePhoto,
+            onPressEnded: onShutterPressEnded,
             onPressCancelled: {}
         )
     }
     
-    private func capturePhoto() {
-        cameraModel.capturePhoto {
-            onShutterFeedback()
-            withAnimation { cameraModel.changeCapturingState(to: true) }
-            Task { @MainActor in
-                try? await Task.sleep(for: Durations.shutter)
-                withAnimation { cameraModel.changeCapturingState(to: false) }
-            }
-        }
-    }
-    
     // MARK: - Lens picker
     private func lensPicker() -> some View {
-        LockedLensSelectorView(cameraModel: cameraModel, height: Style.buttonHeight, theme: theme)
+        LockedLensSelectorView(cameraModel: cameraModel, theme: theme, height: Style.buttonHeight)
             .frame(height: Style.buttonHeight)
             .frame(maxWidth: .infinity)
             .transition(.opacity)
@@ -87,9 +76,9 @@ extension LockedBottomBarView {
 // MARK: - View
 struct LockedBottomBarView: View {
     @Bindable var cameraModel: LockedCameraModel
-    let theme: AppTheme
     let lockedSession: LockedCameraCaptureSession
-    let onShutterFeedback: () -> Void
+    let theme: AppTheme
+    let onShutterPressEnded: () -> Void
     
     var body: some View {
         VStack {

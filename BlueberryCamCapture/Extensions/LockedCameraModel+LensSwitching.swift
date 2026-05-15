@@ -3,7 +3,6 @@ import Foundation
 
 extension LockedCameraModel {
     func switchLens(to lens: Lens) {
-        let lens = switchableLens(for: lens)
         guard !isSwitchingLens else { return }
         guard lens != activeLens else { return }
         guard let previewCamera = lens.captureDevice() else { return }
@@ -12,7 +11,7 @@ extension LockedCameraModel {
         // 1. Instant UI update to trigger animations and selection state
         isSwitchingLens = true
         self.activeLens = lens
-        self.primeResolutionOptions(for: lens, device: previewCamera)
+        primeResolutionOptions(for: lens, device: previewCamera)
         
         // 2. Capture lens properties before crossing isolation boundary
         let previewCameraUniqueID = previewCamera.uniqueID
@@ -71,7 +70,6 @@ extension LockedCameraModel {
             // 4. Final synchronization back to UI state
             Task { @MainActor in
                 self.device = cam
-                self.lastKnownCaptureRotationAngle = rotationAngle
                 self.captureRotationCoordinator = AVCaptureDevice.RotationCoordinator(device: cam, previewLayer: nil)
                 self.lensSwitchCompletionCount += 1
                 self.configureSubjectAreaMonitoring(for: cam)
@@ -136,10 +134,6 @@ extension LockedCameraModel {
         pendingCaptureModeAfterLensSwitch = nil
         guard isFormatEnabled(pendingMode) else { return }
         captureMode = pendingMode
-    }
-    
-    private func switchableLens(for lens: Lens) -> Lens {
-        lens
     }
     
     func applyMacroMode() {

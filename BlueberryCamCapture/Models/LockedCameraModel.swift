@@ -14,14 +14,6 @@ class LockedCameraModel: NSObject {
     let _pendingCaptureModeBox = CaptureModeBox()
     nonisolated let _captureContextStore = LockedPhotoCaptureContextStore()
     nonisolated let _sessionContentURLBox = SessionURLBox()
-    @ObservationIgnored
-    var captureRotationCoordinator: AVCaptureDevice.RotationCoordinator?
-    @ObservationIgnored
-    var lastKnownCaptureRotationAngle: CGFloat?
-    @ObservationIgnored
-    let captureMotionManager = CMMotionManager()
-    @ObservationIgnored
-    var captureMotionRotationOffset: CGFloat?
     
     /// Whether the extension has sufficient Photos access to save captures.
     /// Checks both `.addOnly` and `.readWrite` — if either is granted, we can save.
@@ -32,15 +24,15 @@ class LockedCameraModel: NSObject {
         || readWrite == .authorized || readWrite == .limited
     }
     
-    // MARK: - Defaults (for settings)
-    let proRawFileFormat: ProRawFileFormat = .jpegXLLossy
+    // MARK: - Defaults
+    let proRawFileFormat: ProRawFileFormat = .jpegXLLossless
     let defaultFileFormat: CaptureMode = .heif
     let defaultResolution: ResolutionPreference = .efficient
     let detailedCountdownTimer = false
     let shouldHideUIWhileCountingDown = true
     
     // MARK: - Capture format
-    var captureMode: CaptureMode = .heif {
+    var captureMode: CaptureMode = .raw {
         didSet {
             if oldValue != captureMode {
                 buildAvailableFormats()
@@ -52,9 +44,16 @@ class LockedCameraModel: NSObject {
     var selectedResolution: ResolutionOption? = nil
     var availableResolutions: [ResolutionOption] = []
     var enabledResolutions: [ResolutionOption] = []
+    var cachedResolutionOptionsByLens: [Lens: ResolutionOptionsSnapshot] = [:]
     var pendingCaptureModeAfterLensSwitch: CaptureMode?
     var activeLens: Lens = .wide
     var isSwitchingLens = false
+    @ObservationIgnored
+    var captureRotationCoordinator: AVCaptureDevice.RotationCoordinator?
+    @ObservationIgnored
+    let captureMotionManager = CMMotionManager()
+    @ObservationIgnored
+    var captureMotionRotationOffset: CGFloat?
     
     // MARK: - UI State
     var isCapturing: Bool = false
@@ -122,10 +121,8 @@ class LockedCameraModel: NSObject {
     var exposureDebounceTask: Task<Void, Never>?
     var isAutoFocus: Bool = true {
         didSet {
-            if oldValue != isAutoFocus {
-                if !isAutoFocus, let d = device {
-                    self.lensPosition = d.lensPosition
-                }
+            if oldValue != isAutoFocus, !isAutoFocus, let d = device {
+                self.lensPosition = d.lensPosition
             }
         }
     }
@@ -218,7 +215,10 @@ class LockedCameraModel: NSObject {
     var tapFocusLensPositionMonitorTask: Task<Void, Never>?
     
     // MARK: - Other properties / methods
-    var captureAspectRatio: CGFloat { 3.0 / 4.0 }
+    var captureAspectRatio: CGFloat {
+        let ratio: CaptureAspectRatioOption = .portrait4x3
+        return ratio.widthToHeightRatio
+    }
     
     deinit {
         if let subjectAreaChangeObserver {

@@ -22,10 +22,10 @@ extension LockedCaptureView {
         let topInset = geo.safeAreaInsets.top
         let botInset = geo.safeAreaInsets.bottom
         let xHeight = (topInset - botInset) / 2
-        let aspect = cameraModel.captureAspectRatio
-        let previewW: CGFloat = aspect < size.width / size.height ? size.height * aspect : size.width
-        let previewH: CGFloat = aspect < size.width / size.height ? size.height : size.width / aspect
-        let previewX = (size.width - previewW) / 2
+        let aspect: CGFloat = CaptureAspectRatioOption.portrait4x3.widthToHeightRatio
+        let previewW = size.width
+        let previewH = size.width / aspect
+        let previewX: CGFloat = 0
         let previewY = (size.height - previewH) / 2
         return CGRect(x: previewX, y: previewY - xHeight, width: previewW, height: previewH)
     }
@@ -166,7 +166,7 @@ extension LockedCaptureView {
         CameraPreviewView(
             session: cameraModel.session,
             onCaptureBegan: {},
-            onCaptureEnded: capturePhoto,
+            onCaptureEnded: handleShutterPressEnded,
             onCaptureCancelled: {},
             proxy: previewProxy
         )
@@ -379,9 +379,9 @@ extension LockedCaptureView {
     private func bottomBarView() -> some View {
         LockedBottomBarView(
             cameraModel: cameraModel,
-            theme: appTheme,
             lockedSession: lockedSession,
-            onShutterFeedback: triggerShutterFeedback
+            theme: appTheme,
+            onShutterPressEnded: handleShutterPressEnded
         )
         .padding(.bottom, 30)
     }
@@ -529,7 +529,7 @@ extension LockedCaptureView {
         hapticTrigger += 1
     }
     
-    private func capturePhoto() {
+    private func handleShutterPressEnded() {
         cameraModel.capturePhoto {
             triggerShutterFeedback()
             withAnimation { cameraModel.changeCapturingState(to: true) }

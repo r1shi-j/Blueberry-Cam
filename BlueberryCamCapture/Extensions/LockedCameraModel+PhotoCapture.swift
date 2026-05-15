@@ -3,6 +3,10 @@ import CoreMotion
 import Foundation
 
 extension LockedCameraModel {
+    func changeCapturingState(to new: Bool) {
+        isCapturing = new
+    }
+    
     func startCaptureOrientationUpdates() {
         guard captureMotionManager.isDeviceMotionAvailable else { return }
         guard !captureMotionManager.isDeviceMotionActive else { return }
@@ -26,10 +30,6 @@ extension LockedCameraModel {
         guard captureMotionManager.isDeviceMotionActive else { return }
         
         captureMotionManager.stopDeviceMotionUpdates()
-    }
-    
-    func changeCapturingState(to new: Bool) {
-        isCapturing = new
     }
     
     func cancelTimerCountdown() {
@@ -111,16 +111,14 @@ extension LockedCameraModel {
             d.setExposureModeCustom(duration: duration, iso: isoValue) { [weak self] _ in
                 guard let self else { return }
                 Task { @MainActor in
-                    guard self.cameraModelCanCapture else { return }
-                    
-                    let settings = self.buildPhotoSettings(for: requestedCaptureMode)
+                    guard self.cameraModelCanCapture, let settings = self.buildPhotoSettings(for: requestedCaptureMode) else { return }
                     self.registerCaptureContext(for: settings, captureMode: requestedCaptureMode, onCapture: onCapture)
                     self.photoOutput.capturePhoto(with: settings, delegate: self)
                 }
             }
             d.unlockForConfiguration()
         } else {
-            let settings = buildPhotoSettings(for: requestedCaptureMode)
+            guard let settings = buildPhotoSettings(for: requestedCaptureMode) else { return }
             registerCaptureContext(for: settings, captureMode: requestedCaptureMode, onCapture: onCapture)
             photoOutput.capturePhoto(with: settings, delegate: self)
         }
@@ -130,9 +128,14 @@ extension LockedCameraModel {
         hasPhotosAccess && session.isRunning && device != nil && !isSwitchingLens
     }
     
-    private func buildPhotoSettings(for captureMode: CaptureMode) -> AVCapturePhotoSettings {
+    private func preferredProcessedCaptureModeForPhotoSettings() -> CaptureMode? {
+        preferredProcessedCaptureMode(in: enabledFormats) ??
+        preferredProcessedCaptureMode(in: shownAvailableFormats(includeRaw: false))
+    }
+    
+    private func buildPhotoSettings(for captureMode: CaptureMode) -> AVCapturePhotoSettings? {
         let zoomBlocksRAW = (device?.videoZoomFactor ?? 1.0) > 1.0
-        let dims = captureDimensions()
+        guard let dims = captureDimensions() else { return nil }
         
         switch captureMode {
             case .raw:
@@ -140,38 +143,18 @@ extension LockedCameraModel {
                    let settings = makeRawPhotoSettings(preferAppleProRAW: false, dimensions: dims) {
                     return settings
                 }
-                if photoOutput.availablePhotoCodecTypes.contains(.hevc) {
-                    let s = AVCapturePhotoSettings(format: [AVVideoCodecKey: AVVideoCodecType.hevc])
-                    s.maxPhotoDimensions = dims
-                    s.photoQualityPrioritization = .quality
-                    applyFlashModeIfSupported(to: s)
-                    return s
-                }
-                let s = AVCapturePhotoSettings()
-                s.maxPhotoDimensions = dims
-                s.photoQualityPrioritization = .quality
-                applyFlashModeIfSupported(to: s)
-                return s
+                guard let processedMode = preferredProcessedCaptureModeForPhotoSettings() else { return nil }
+                return makeProcessedPhotoSettings(for: processedMode, dimensions: dims)
             case .proRaw:
                 if let settings = makeRawPhotoSettings(preferAppleProRAW: true, dimensions: dims) {
                     return settings
                 }
-                fallthrough
+                guard let processedMode = preferredProcessedCaptureModeForPhotoSettings() else { return nil }
+                return makeProcessedPhotoSettings(for: processedMode, dimensions: dims)
             case .heif:
-                if photoOutput.availablePhotoCodecTypes.contains(.hevc) {
-                    let s = AVCapturePhotoSettings(format: [AVVideoCodecKey: AVVideoCodecType.hevc])
-                    s.maxPhotoDimensions = dims
-                    s.photoQualityPrioritization = .quality
-                    applyFlashModeIfSupported(to: s)
-                    return s
-                }
-                fallthrough
+                return makeProcessedPhotoSettings(for: .heif, dimensions: dims)
             case .jpeg:
-                let s = AVCapturePhotoSettings()
-                s.maxPhotoDimensions = dims
-                s.photoQualityPrioritization = .quality
-                applyFlashModeIfSupported(to: s)
-                return s
+                return makeProcessedPhotoSettings(for: .jpeg, dimensions: dims)
         }
     }
     
@@ -205,6 +188,19 @@ extension LockedCameraModel {
         settings.rawFileFormat = proRawFileFormat.rawFileFormat()
     }
     
+    private func makeProcessedPhotoSettings(for mode: CaptureMode, dimensions: CMVideoDimensions) -> AVCapturePhotoSettings {
+        let settings: AVCapturePhotoSettings
+        if mode == .heif, photoOutput.availablePhotoCodecTypes.contains(.hevc) {
+            settings = AVCapturePhotoSettings(format: [AVVideoCodecKey: AVVideoCodecType.hevc])
+        } else {
+            settings = AVCapturePhotoSettings()
+        }
+        settings.maxPhotoDimensions = dimensions
+        settings.photoQualityPrioritization = .quality
+        applyFlashModeIfSupported(to: settings)
+        return settings
+    }
+    
     func updateCaptureOrientation() {
         guard session.isRunning,
               let device,
@@ -224,7 +220,6 @@ extension LockedCameraModel {
         
         if let captureDegrees = requestedSupportedDegrees ?? preferredSupportedDegrees {
             photoConnection.videoRotationAngle = captureDegrees
-            lastKnownCaptureRotationAngle = captureDegrees
         }
         if photoConnection.isVideoMirroringSupported {
             photoConnection.isVideoMirrored = Lens.isMirrored(device, lens: activeLens)
@@ -312,14 +307,20 @@ extension LockedCameraModel {
         }
     }
     
-    private func captureDimensions() -> CMVideoDimensions {
-        if let selected = selectedResolution { return selected.dimensions }
-        guard let d = device else { return photoOutput.maxPhotoDimensions }
+    private func captureDimensions() -> CMVideoDimensions? {
+        guard let d = device else { return nil }
         let outputMax = photoOutput.maxPhotoDimensions
-        return d.activeFormat.supportedMaxPhotoDimensions
+        let supportedDimensions = d.activeFormat.supportedMaxPhotoDimensions
             .filter { $0.width <= outputMax.width && $0.height <= outputMax.height }
-            .max { Int($0.width) * Int($0.height) < Int($1.width) * Int($1.height) }
-        ?? outputMax
+        
+        if let selected = selectedResolution?.dimensions,
+           supportedDimensions.contains(where: { $0.width == selected.width && $0.height == selected.height }) {
+            return selected
+        }
+        
+        return supportedDimensions.max {
+            Int($0.width) * Int($0.height) < Int($1.width) * Int($1.height)
+        }
     }
     
     private func registerCaptureContext(for settings: AVCapturePhotoSettings,

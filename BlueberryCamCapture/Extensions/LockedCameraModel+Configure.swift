@@ -5,7 +5,6 @@ import LockedCameraCapture
 extension LockedCameraModel {
     func configure(with lockedSession: LockedCameraCaptureSession) {
         _sessionContentURLBox.value = lockedSession.sessionContentURL
-        
         setupSession()
     }
     
@@ -18,6 +17,7 @@ extension LockedCameraModel {
     }
     
     func stopSession() {
+        cancelTimerCountdown()
         sessionQueue.async {
             if self.session.isRunning {
                 self.session.stopRunning()
@@ -30,7 +30,7 @@ extension LockedCameraModel {
             guard let self else { return }
             
             self.session.beginConfiguration()
-            self.session.sessionPreset = .photo
+            self.configureSupportedPhotoSessionPreset()
             
             guard let initialCamera = Lens.initialCaptureDevice(),
                   let input = try? AVCaptureDeviceInput(device: initialCamera.device),
@@ -57,8 +57,8 @@ extension LockedCameraModel {
             // Keep analysis output orientation aligned with preview from first launch.
             let rotationAngle = Lens.rotationAngle(for: cam, lens: initialLens)
             let isMirrored = Lens.isMirrored(cam, lens: initialLens)
-            for conn in [photoOutput.connection(with: .video),
-                         videoOutput.connection(with: .video)].compactMap({ $0 }) {
+            for conn in [self.photoOutput.connection(with: .video),
+                         self.videoOutput.connection(with: .video)].compactMap({ $0 }) {
                 if conn.isVideoRotationAngleSupported(rotationAngle) {
                     conn.videoRotationAngle = rotationAngle
                 }
@@ -76,7 +76,6 @@ extension LockedCameraModel {
             Task { @MainActor in
                 self.activeLens = initialLens
                 self.device = cam
-                self.lastKnownCaptureRotationAngle = rotationAngle
                 self.captureRotationCoordinator = AVCaptureDevice.RotationCoordinator(device: cam, previewLayer: nil)
                 self.configureSubjectAreaMonitoring(for: cam)
                 self.buildAvailableFormats()
@@ -85,6 +84,18 @@ extension LockedCameraModel {
                 self.enforceExposureModeConstraints()
                 self.startSession()
             }
+        }
+    }
+    
+    nonisolated func configureSupportedPhotoSessionPreset() {
+        configureSupportedPhotoSessionPreset(for: session)
+    }
+    
+    nonisolated func configureSupportedPhotoSessionPreset(for captureSession: AVCaptureSession) {
+        if captureSession.canSetSessionPreset(.photo) {
+            captureSession.sessionPreset = .photo
+        } else if captureSession.canSetSessionPreset(.inputPriority) {
+            captureSession.sessionPreset = .inputPriority
         }
     }
     
