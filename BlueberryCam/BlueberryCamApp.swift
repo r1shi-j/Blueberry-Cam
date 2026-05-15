@@ -59,4 +59,5 @@ struct BlueberryCamApp: App {
 // MARK: - Next Steps
 // smoother animations everywhere
 // Updated locked camera app pipeline (just update whole codebase)
-// lens picker back to camera control
+// selfie switch animation with differnt bg cololr
+// customise theme packs

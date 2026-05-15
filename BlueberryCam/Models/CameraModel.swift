@@ -35,8 +35,8 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
     
     // MARK: - Camera Control
     var cleanUIControl: AVCaptureIndexPicker?
-    var filterControl: AVCaptureIndexPicker?
     var lensControl: AVCaptureIndexPicker?
+    var filterControl: AVCaptureIndexPicker?
     var evControl: AVCaptureSlider?
     var isoControl: AVCaptureIndexPicker?
     var ssControl: AVCaptureIndexPicker?
