@@ -35,7 +35,7 @@ extension CameraModel {
     }
     
     var dualCameraPipAspectRatio: CGFloat {
-        captureAspectRatio
+        CaptureAspectRatioOption.portrait4x3.widthToHeightRatio
     }
     
     var shouldShowDualCameraTransitionCurtain: Bool {

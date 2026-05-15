@@ -56,9 +56,8 @@ struct BlueberryCamApp: App {
 
 // MARK: - FIXME
 // improve selfie switch animation with differnt bg colour
+// improve lens switching animation (particulary on selfie cameras)
 
 // MARK: - Next Steps
-// smoother animations everywhere
 // Updated locked camera app pipeline (just update whole codebase)
-
-// dual cam selfie, uses wrong aspect for back cam pip
+// big ctr i

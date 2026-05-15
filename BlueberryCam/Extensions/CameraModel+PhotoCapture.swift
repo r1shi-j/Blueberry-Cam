@@ -731,11 +731,23 @@ extension CameraModel {
         return remainder >= 0 ? remainder : remainder + 360
     }
     
-    private func updateDualCameraPipRotationAngle(from captureAngle: CGFloat,
-                                                  device: AVCaptureDevice) {
+    private func updateDualCameraPipRotationAngle(from captureAngle: CGFloat, device: AVCaptureDevice) {
         let mainPreviewAngle = Lens.rotationAngle(for: device, lens: activeLens)
         let delta = normalizedRotationAngle(captureAngle - mainPreviewAngle)
-        dualCameraPipRotationAngle = nearestRightAngle(delta)
+        let pipRotationAngle = nearestRightAngle(delta)
+        
+        if activeLens.isFront, secondaryLens?.isFront == false {
+            if pipRotationAngle == 90 {
+                dualCameraPipRotationAngle = pipRotationAngle + 180
+            } else if pipRotationAngle == 270 {
+                dualCameraPipRotationAngle = pipRotationAngle - 180
+            } else {
+                dualCameraPipRotationAngle = pipRotationAngle
+            }
+            return
+        }
+        
+        dualCameraPipRotationAngle = pipRotationAngle
     }
     
     private func nearestRightAngle(_ degrees: CGFloat) -> CGFloat {
