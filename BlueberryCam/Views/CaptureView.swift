@@ -52,7 +52,7 @@ extension CaptureView {
         let topInset = geo.safeAreaInsets.top
         let botInset = geo.safeAreaInsets.bottom
         let xHeight = (topInset - botInset) / 2
-        let aspect: CGFloat = 3.0 / 4.0
+        let aspect: CGFloat = CaptureAspectRatioOption.portrait4x3.widthToHeightRatio
         let previewW = size.width
         let previewH = size.width / aspect
         let previewX: CGFloat = 0
@@ -887,8 +887,10 @@ extension CaptureView {
                     qrCode(previewRect)
                     lensCleaning(previewRect)
                     burstFeedback(previewRect)
-                    focusLock(previewRect)
-                    focusBox()
+                    if !(cameraModel.isTimerCountingDown && cameraModel.shouldHideUIWhileCountingDown) && !$cameraModel.isBurstCapturing.wrappedValue {
+                        focusLock(previewRect)
+                        focusBox()
+                    }
                     manualControlOverlays(in: previewRect)
                 }
                 .blur(radius: scenePhase != .active ? 20 : 0)

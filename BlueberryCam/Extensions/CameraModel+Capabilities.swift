@@ -73,10 +73,6 @@ extension CameraModel {
         return modeFilteredLenses
     }
     
-    var hasSwitchableLenses: Bool {
-        availableLensOptions.contains { $0 != activeLens }
-    }
-    
     var preferredFilteredCaptureMode: CaptureMode? {
         preferredProcessedCaptureMode(in: shownAvailableFormats(includeRaw: false))
     }

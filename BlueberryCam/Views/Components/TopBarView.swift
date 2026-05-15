@@ -459,7 +459,6 @@ extension TopBarView {
         .animation(Animations.bouncy, value: cameraModel.shownCaptureFormats)
         .animation(Animations.bouncy, value: cameraModel.shouldUseDualCameraFormatSet)
         .animation(Animations.bouncy, value: cameraModel.captureMode)
-        
     }
     
     // MARK: - Flash

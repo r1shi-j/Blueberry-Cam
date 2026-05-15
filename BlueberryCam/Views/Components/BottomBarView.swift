@@ -82,7 +82,7 @@ extension BottomBarView {
     
     // MARK: - Lens picker
     private func lensPicker() -> some View {
-        LensSelectorView(cameraModel: cameraModel, height: Style.buttonHeight, theme: theme)
+        LensSelectorView(cameraModel: cameraModel, theme: theme, height: Style.buttonHeight)
             .frame(maxWidth: .infinity)
             .transition(.opacity)
     }
