@@ -10,7 +10,7 @@ extension LockedTopBarView {
         static let buttonHeight: CGFloat = 18
         static let horizontalButtonPadding: CGFloat = 8
         static let verticalButtonPadding: CGFloat = 5
-        static let horizontalPickerPadding: CGFloat = 10
+        static let horizontalPickerPadding: CGFloat = 8
         static let pickerCornerRadius: CGFloat = 6
         static let rowSpacing: CGFloat = 14
         static let row1Spacing: CGFloat = 12

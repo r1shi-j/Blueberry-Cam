@@ -79,6 +79,7 @@ extension CameraModel {
             if self.session.canAddOutput(self.photoOutput) {
                 self.session.addOutput(self.photoOutput)
             }
+            self.configurePhotoOutputCapabilities()
             
             self.videoOutput.alwaysDiscardsLateVideoFrames = true
             self.videoOutput.videoSettings = [
@@ -161,11 +162,17 @@ extension CameraModel {
             setShownCaptureFormats(CaptureMode.defaultShownFormats)
         }
         
+        if let proRawFormat = defaults.string(forKey: "proRawFileFormat"),
+           let fileFormat = ProRawFileFormat(rawValue: proRawFormat) {
+            self.proRawFileFormat = fileFormat
+        }
+        
         if let format = defaults.string(forKey: "defaultFileFormat"), let mode = CaptureMode(rawValue: format) {
             self.defaultFileFormat = mode
             // Prime the active mode immediately so the UI reflects the saved state during launch.
             self.captureMode = mode
         }
+        
         if !shownCaptureFormats.contains(defaultFileFormat) {
             defaultFileFormat = .raw
         }
@@ -213,11 +220,18 @@ extension CameraModel {
         }
     }
     
+    nonisolated func configurePhotoOutputCapabilities() {
+        photoOutput.maxPhotoQualityPrioritization = .quality
+        guard photoOutput.isAppleProRAWSupported else { return }
+        photoOutput.isAppleProRAWEnabled = true
+    }
+    
     func resetToDefaults() {
         let defaults = UserDefaults.standard
         [
             "saveLocation",
             "shownCaptureFormats",
+            "proRawFileFormat",
             "defaultFileFormat",
             "defaultResolution",
             "defaultPhotoFilter",
@@ -239,6 +253,7 @@ extension CameraModel {
         saveLocation = .photos
         resetFileSaveLocationToDefault()
         setShownCaptureFormats(CaptureMode.defaultShownFormats)
+        proRawFileFormat = .jpegXLLossless
         defaultFileFormat = .raw
         defaultResolution = .max
         defaultPhotoFilter = .off

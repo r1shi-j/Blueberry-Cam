@@ -35,7 +35,7 @@ struct SettingsView: View {
                             }
                         }
                         .pickerStyle(.segmented)
-                        .frame(maxWidth: 200)
+                        .frame(maxWidth: 240)
                     }
                     
                     if cameraModel.saveLocation == .files {
@@ -108,6 +108,41 @@ struct SettingsView: View {
                         }
                     }
                     
+                    if cameraModel.isShownCaptureFormat(.proRaw) {
+                        DisclosureGroup {
+                            ForEach(ProRawFileFormat.allCases) { fileFormat in
+                                let isSelected = cameraModel.proRawFileFormat == fileFormat
+                                Button {
+                                    selectProRawFileFormat(fileFormat)
+                                } label: {
+                                    HStack {
+                                        Image(systemName: "checkmark")
+                                            .foregroundStyle(.blue)
+                                            .opacity(isSelected ? 1 : 0)
+                                            .contentTransition(.symbolEffect(.replace))
+                                            .symbolEffect(.bounce, value: isSelected)
+                                            .frame(width: 24)
+                                        
+                                        Text(fileFormat.rawValue)
+                                            .foregroundStyle(.primary)
+                                        
+                                        Spacer()
+                                    }
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .contentShape(.rect)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        } label: {
+                            LabeledContent("ProRAW Format") {
+                                Text(cameraModel.proRawFileFormat.rawValue)
+                                    .contentTransition(.opacity)
+                                    .animation(Animations.easeInOut, value: cameraModel.proRawFileFormat)
+                            }
+                        }
+                        .transition(.opacity.combined(with: .move(edge: .top)))
+                    }
+                    
                     if cameraModel.shouldShowDefaultFileFormatPicker {
                         LabeledContent("Format ") {
                             Picker("", selection: defaultFileFormatSelection) {
@@ -117,7 +152,7 @@ struct SettingsView: View {
                                 }
                             }
                             .pickerStyle(.segmented)
-                            .frame(maxWidth: 200)
+                            .frame(maxWidth: 240)
                             .animation(Animations.easeInOut, value: cameraModel.defaultFileFormatOptions)
                         }
                         .transition(.opacity.combined(with: .move(edge: .top)))
@@ -131,7 +166,7 @@ struct SettingsView: View {
                             }
                         }
                         .pickerStyle(.segmented)
-                        .frame(maxWidth: 200)
+                        .frame(maxWidth: 240)
                     }
                     
                     LabeledContent("Filter ") {
@@ -176,6 +211,7 @@ struct SettingsView: View {
                 .animation(Animations.easeInOut, value: cameraModel.saveLocation)
                 .animation(Animations.easeInOut, value: cameraModel.isFileSaveLocationAvailable)
                 .animation(Animations.easeInOut, value: cameraModel.shownCaptureFormats)
+                .animation(Animations.easeInOut, value: cameraModel.proRawFileFormat)
                 .animation(Animations.easeInOut, value: cameraModel.shouldShowDefaultFileFormatPicker)
                 
                 Section {
@@ -532,6 +568,14 @@ struct SettingsView: View {
         guard index != appBackgroundColorIndex else { return }
         triggerSettingsSelectionHaptic()
         appBackgroundColorIndex = index
+    }
+    
+    private func selectProRawFileFormat(_ fileFormat: ProRawFileFormat) {
+        guard fileFormat != cameraModel.proRawFileFormat else { return }
+        triggerSettingsSelectionHaptic()
+        withAnimation(Animations.easeInOut) {
+            cameraModel.proRawFileFormat = fileFormat
+        }
     }
     
     private func triggerSettingsSelectionHaptic() {

@@ -56,14 +56,6 @@ extension CameraModel {
         let hardwareLenses = baseLenses.filter { $0 == activeLens || $0.captureDevice() != nil }
         let compatibleLenses = isDualCameraEnabled ? hardwareLenses.filter { canUseDualCamera(mainLens: $0) } : hardwareLenses
         
-        if captureMode == .raw {
-            return compatibleLenses.filter(\.preservesRawCaptureMode)
-        }
-        
-        if isHighResolutionSelected, !activeLens.isFront {
-            return compatibleLenses.filter(\.preservesHighResolutionCapture)
-        }
-        
         return compatibleLenses
     }
     
@@ -78,8 +70,8 @@ extension CameraModel {
     var formatPreferenceOptions: [CaptureMode] {
         let sourceFormats = availableFormats.isEmpty ? CaptureMode.allCases : availableFormats
         return CaptureMode.allCases.filter { mode in
-            if mode == .raw {
-                return sourceFormats.contains(.raw) || shownCaptureFormats.contains(.raw)
+            if mode.isRawLike {
+                return sourceFormats.contains(mode) || shownCaptureFormats.contains(mode)
             }
             
             return sourceFormats.contains(mode)
@@ -133,7 +125,7 @@ extension CameraModel {
     func shownAvailableFormats(includeRaw: Bool = true) -> [CaptureMode] {
         let sourceFormats = availableFormats.isEmpty ? CaptureMode.allCases : availableFormats
         return sourceFormats.filter { mode in
-            (includeRaw || mode != .raw) && shownCaptureFormats.contains(mode)
+            (includeRaw || !mode.isRawLike) && shownCaptureFormats.contains(mode)
         }
     }
     
@@ -150,16 +142,19 @@ extension CameraModel {
         // We only enforce this logic if the device is ready.
         guard device != nil else { return }
         
-        let zoomBlocksRAW = (device?.videoZoomFactor ?? 1.0) > 1.0
         let isFront = activeLens.isFront
+        let rawPixelFormatTypes = photoOutput.availableRawPhotoPixelFormatTypes
         
         var visibleModes: [CaptureMode] = []
         if photoOutput.availablePhotoCodecTypes.contains(.hevc) {
             visibleModes.append(.heif)
         }
         visibleModes.append(.jpeg)
-        if !isDualCameraEnabled, !photoOutput.availableRawPhotoPixelFormatTypes.isEmpty {
+        if !isDualCameraEnabled, rawPixelFormatTypes.contains(where: AVCapturePhotoOutput.isBayerRAWPixelFormat) {
             visibleModes.append(.raw)
+        }
+        if !isDualCameraEnabled, rawPixelFormatTypes.contains(where: AVCapturePhotoOutput.isAppleProRAWPixelFormat) {
+            visibleModes.append(.proRaw)
         }
         if availableFormats != visibleModes {
             availableFormats = visibleModes
@@ -170,16 +165,18 @@ extension CameraModel {
         
         let modes: [CaptureMode]
         if isDualCameraEnabled {
-            modes = visibleUserModes.filter { $0 != .raw }
+            modes = visibleUserModes.filter { !$0.isRawLike }
         } else if isFilterRestrictingCaptureOptions {
-            modes = visibleUserModes.filter { $0 != .raw }
+            modes = visibleUserModes.filter { !$0.isRawLike }
         } else if isAutoExposure {
             modes = visibleUserModes.filter { mode in
                 switch mode {
                     case .jpeg, .heif:
                         return true
                     case .raw:
-                        return !zoomBlocksRAW && !isMacroEnabled
+                        return canSelectBayerRawForCurrentState
+                    case .proRaw:
+                        return canSelectAppleProRawForCurrentState
                 }
             }
         } else {
@@ -225,7 +222,7 @@ extension CameraModel {
         let enabledOptions: [ResolutionOption]
         if isFront {
             enabledOptions = []
-        } else if isCropLens || isMacroEnabled || captureMode == .raw {
+        } else if requiresLowResolutionForCurrentState(isCropLens: isCropLens) {
             enabledOptions = visibleOptions.first.map { [$0] } ?? []
         } else {
             enabledOptions = visibleOptions
@@ -243,11 +240,10 @@ extension CameraModel {
             enabledResolutions = enabledOptions
         }
         
-        if !sameEnabledOptions {
-            // Options change (Format or Lens switch): re-apply resolution preference
-            selectedResolution = defaultResolution == .max ? enabledOptions.last : enabledOptions.first
-        } else if let current = selectedResolution, !enabledOptions.contains(where: { $0.id == current.id }) {
-            // Current selection became invalid
+        if let current = selectedResolution,
+           enabledOptions.contains(where: { $0.id == current.id }) {
+            // Keep the user's current resolution when flash or other constraints only re-enable options.
+        } else {
             selectedResolution = defaultResolution == .max ? enabledOptions.last : enabledOptions.first
         }
         
@@ -287,7 +283,7 @@ extension CameraModel {
                                            availableOptions: [ResolutionOption]) -> ResolutionOptionsSnapshot {
         let isCropLens = lens == .tele2x || lens == .tele8x
         let enabledOptions: [ResolutionOption]
-        if isCropLens || isMacroEnabled || captureMode == .raw {
+        if requiresLowResolutionForCurrentState(isCropLens: isCropLens) {
             enabledOptions = availableOptions.first.map { [$0] } ?? []
         } else {
             enabledOptions = availableOptions
@@ -340,7 +336,7 @@ extension CameraModel {
                 isMacroEnabled = false
             }
             if captureMode != .raw || !activeLens.preservesRawCaptureMode {
-                switchToRawCaptureMode()
+                switchToRawCaptureMode(.raw)
             }
         }
     }
@@ -413,6 +409,11 @@ extension CameraModel {
             return canSelectRawCaptureMode
         }
         
+        if mode == .proRaw {
+            guard !isFilterRestrictingCaptureOptions else { return false }
+            return canSelectAppleProRawCaptureMode
+        }
+        
         return enabledFormats.contains(mode)
     }
     
@@ -421,19 +422,30 @@ extension CameraModel {
         guard !isFilterRestrictingCaptureOptions else { return false }
         guard availableFormats.contains(.raw) else { return false }
         guard !isHighResolutionSelected else { return false }
-        if !isAutoExposure {
-            return hasRawCapableLensForCurrentFacing
-        }
-        guard isAutoExposure, !isMacroEnabled else { return enabledFormats.contains(.raw) }
-        return hasRawCapableLensForCurrentFacing
+        return canSelectBayerRawForCurrentState
     }
     
-    private var hasRawCapableLensForCurrentFacing: Bool {
-        Lens.allCases.contains { lens in
-            lens.isFront == activeLens.isFront &&
-            lens.preservesRawCaptureMode &&
-            lens.captureDevice() != nil
+    var canSelectAppleProRawCaptureMode: Bool {
+        guard !isDualCameraEnabled else { return false }
+        guard !isFilterRestrictingCaptureOptions else { return false }
+        guard availableFormats.contains(.proRaw) else { return false }
+        if isHighResolutionSelected {
+            guard canSelectHighResolution else { return false }
         }
+        return canSelectAppleProRawForCurrentState
+    }
+    
+    private var canSelectBayerRawForCurrentState: Bool {
+        guard activeLens.preservesRawCaptureMode else { return false }
+        if !isAutoExposure { return true }
+        guard !isMacroEnabled else { return false }
+        return (device?.videoZoomFactor ?? 1.0) == 1.0
+    }
+    
+    private var canSelectAppleProRawForCurrentState: Bool {
+        guard isAutoExposure else { return false }
+        guard activeLens.preservesProRawCaptureMode else { return false }
+        return true
     }
     
     func isResolutionEnabled(_ option: ResolutionOption) -> Bool {
@@ -452,9 +464,13 @@ extension CameraModel {
     var canSelectHighResolution: Bool {
         guard !activeLens.isFront,
               captureMode != .raw,
+              isAutoExposure,
               !isMacroEnabled,
               highResolutionOption != nil else { return false }
-        return hasHighResolutionCapableBackLens
+        if captureMode == .proRaw, flashMode != .off {
+            return false
+        }
+        return activeLens.preservesHighResolutionCapture
     }
     
     private var highResolutionOption: ResolutionOption? {
@@ -462,16 +478,16 @@ extension CameraModel {
         return availableResolutions.last
     }
     
-    func isHighResolutionOption(_ option: ResolutionOption) -> Bool {
-        highResolutionOption?.id == option.id
+    private func requiresLowResolutionForCurrentState(isCropLens: Bool) -> Bool {
+        isCropLens ||
+        isMacroEnabled ||
+        (captureMode == .proRaw && flashMode != .off) ||
+        !isAutoExposure ||
+        captureMode == .raw
     }
     
-    private var hasHighResolutionCapableBackLens: Bool {
-        Lens.allCases.contains { lens in
-            !lens.isFront &&
-            lens.preservesHighResolutionCapture &&
-            lens.captureDevice() != nil
-        }
+    func isHighResolutionOption(_ option: ResolutionOption) -> Bool {
+        highResolutionOption?.id == option.id
     }
     
     private func preferredCaptureMode(in modes: [CaptureMode]) -> CaptureMode? {
@@ -501,6 +517,9 @@ extension CameraModel {
             normalizedFormats.append(contentsOf: selectedProcessedFormats)
         }
         normalizedFormats.append(.raw)
+        if formats.contains(.proRaw) {
+            normalizedFormats.append(.proRaw)
+        }
         
         let orderedFormats = CaptureMode.allCases.filter { normalizedFormats.contains($0) }
         if shownCaptureFormats != orderedFormats {

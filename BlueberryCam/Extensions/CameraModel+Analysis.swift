@@ -16,7 +16,7 @@ extension CameraModel: AVCaptureVideoDataOutputSampleBufferDelegate {
     
     nonisolated func processFrame(pixelBuffer: CVPixelBuffer) {
         let liveFilter = _livePhotoFilterBox.value
-        let isLiveFilterPreviewActive = liveFilter != .off && _liveCaptureModeBox.value != .raw
+        let isLiveFilterPreviewActive = liveFilter != .off && !_liveCaptureModeBox.value.isRawLike
         if isLiveFilterPreviewActive {
             liveFilterPreviewOutput.render(
                 pixelBuffer: pixelBuffer,

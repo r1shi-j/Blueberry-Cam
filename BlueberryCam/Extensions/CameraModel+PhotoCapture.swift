@@ -249,12 +249,12 @@ extension CameraModel {
     }
     
     private var burstCaptureCompletionGate: BurstCaptureCompletionGate {
-        guard shouldPrioritizeBurstSpeed, captureMode != .raw else { return .processing }
+        guard shouldPrioritizeBurstSpeed, !captureMode.isRawLike else { return .processing }
         return .sensorCapture
     }
     
     private var burstProcessingLimit: Int {
-        guard shouldPrioritizeBurstSpeed, captureMode != .raw else { return 1 }
+        guard shouldPrioritizeBurstSpeed, !captureMode.isRawLike else { return 1 }
         return 4
     }
     
@@ -487,7 +487,7 @@ extension CameraModel {
     
     func refreshFastCapturePrioritizationForBurstMode() {
         guard photoOutput.isFastCapturePrioritizationSupported else { return }
-        photoOutput.isFastCapturePrioritizationEnabled = isBurstModeEnabled && shouldPrioritizeBurstSpeed && captureMode != .raw
+        photoOutput.isFastCapturePrioritizationEnabled = isBurstModeEnabled && shouldPrioritizeBurstSpeed && !captureMode.isRawLike
     }
     
     // MARK: Capturing
@@ -592,13 +592,14 @@ extension CameraModel {
         switch captureMode {
             case .raw:
                 if !zoomBlocksRAW,
-                   let fmt = photoOutput.availableRawPhotoPixelFormatTypes.first(where: {
-                       !AVCapturePhotoOutput.isAppleProRAWPixelFormat($0)
-                   }) ?? photoOutput.availableRawPhotoPixelFormatTypes.first {
-                    let s = AVCapturePhotoSettings(rawPixelFormatType: fmt)
-                    s.maxPhotoDimensions = dims
-                    applyFlashModeIfSupported(to: s)
-                    return s
+                   let settings = makeRawPhotoSettings(preferAppleProRAW: false, dimensions: dims) {
+                    return settings
+                }
+                guard let processedMode = preferredProcessedCaptureModeForPhotoSettings() else { return nil }
+                return makeProcessedPhotoSettings(for: processedMode, dimensions: dims)
+            case .proRaw:
+                if let settings = makeRawPhotoSettings(preferAppleProRAW: true, dimensions: dims) {
+                    return settings
                 }
                 guard let processedMode = preferredProcessedCaptureModeForPhotoSettings() else { return nil }
                 return makeProcessedPhotoSettings(for: processedMode, dimensions: dims)
@@ -614,6 +615,36 @@ extension CameraModel {
         preferredProcessedCaptureMode(in: shownAvailableFormats(includeRaw: false))
     }
     
+    private func makeRawPhotoSettings(preferAppleProRAW: Bool, dimensions: CMVideoDimensions) -> AVCapturePhotoSettings? {
+        let rawPixelFormatTypes = photoOutput.availableRawPhotoPixelFormatTypes
+        let predicate = preferAppleProRAW ? AVCapturePhotoOutput.isAppleProRAWPixelFormat : AVCapturePhotoOutput.isBayerRAWPixelFormat
+        guard let format = rawPixelFormatTypes.first(where: predicate) else { return nil }
+        
+        let settings = AVCapturePhotoSettings(rawPixelFormatType: format)
+        settings.maxPhotoDimensions = dimensions
+        if AVCapturePhotoOutput.isBayerRAWPixelFormat(format) {
+            settings.photoQualityPrioritization = .speed
+        } else {
+            settings.photoQualityPrioritization = .quality
+            applyProRawFileFormat(to: settings, rawPixelFormatType: format)
+        }
+        applyFlashModeIfSupported(to: settings)
+        return settings
+    }
+    
+    private func applyProRawFileFormat(to settings: AVCapturePhotoSettings, rawPixelFormatType: OSType) {
+        guard photoOutput.availableRawPhotoFileTypes.contains(.dng),
+              photoOutput.availableRawPhotoCodecTypes.contains(proRawFileFormat.codecType) else { return }
+        
+        let supportedCodecs = photoOutput.supportedRawPhotoCodecTypes(
+            forRawPhotoPixelFormatType: rawPixelFormatType,
+            fileType: .dng
+        )
+        guard supportedCodecs.contains(proRawFileFormat.codecType) else { return }
+        
+        settings.rawFileFormat = proRawFileFormat.rawFileFormat()
+    }
+    
     private func makeProcessedPhotoSettings(for mode: CaptureMode, dimensions: CMVideoDimensions) -> AVCapturePhotoSettings {
         let settings: AVCapturePhotoSettings
         if mode == .heif, photoOutput.availablePhotoCodecTypes.contains(.hevc) {
@@ -622,6 +653,7 @@ extension CameraModel {
             settings = AVCapturePhotoSettings()
         }
         settings.maxPhotoDimensions = dimensions
+        settings.photoQualityPrioritization = .quality
         applyFlashModeIfSupported(to: settings)
         return settings
     }
@@ -643,7 +675,7 @@ extension CameraModel {
         
         guard let settings = buildPhotoSettings() else { return nil }
         settings.flashMode = .off
-        if shouldPrioritizeBurstSpeed, captureMode != .raw {
+        if shouldPrioritizeBurstSpeed, !captureMode.isRawLike {
             settings.photoQualityPrioritization = .speed
         }
         return settings

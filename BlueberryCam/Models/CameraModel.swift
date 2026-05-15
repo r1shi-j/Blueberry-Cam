@@ -60,6 +60,11 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
             UserDefaults.standard.set(shownCaptureFormats.map(\.rawValue), forKey: "shownCaptureFormats")
         }
     }
+    var proRawFileFormat: ProRawFileFormat = .jpegXLLossless {
+        didSet {
+            UserDefaults.standard.set(proRawFileFormat.rawValue, forKey: "proRawFileFormat")
+        }
+    }
     var defaultFileFormat: CaptureMode = .raw {
         didSet {
             UserDefaults.standard.set(defaultFileFormat.rawValue, forKey: "defaultFileFormat")
@@ -163,7 +168,7 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
         didSet {
             if oldValue != captureMode {
                 _liveCaptureModeBox.value = captureMode
-                if captureMode == .raw, selectedPhotoFilter != .off {
+                if captureMode.isRawLike, selectedPhotoFilter != .off {
                     selectedPhotoFilter = .off
                 }
                 buildAvailableFormats()
@@ -413,7 +418,13 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
     }
     
     // MARK: - Flash
-    var flashMode: AVCaptureDevice.FlashMode = .off
+    var flashMode: AVCaptureDevice.FlashMode = .off {
+        didSet {
+            if oldValue != flashMode {
+                buildAvailableFormats()
+            }
+        }
+    }
     
     // MARK: - Macro
     var isMacroEnabled: Bool = false {

@@ -219,7 +219,7 @@ extension CameraModel {
     
     func updateCameraControlsMode() {
         cleanUIControl?.isEnabled = true
-        filterControl?.isEnabled = !isDualCameraEnabled && captureMode != .raw
+        filterControl?.isEnabled = !isDualCameraEnabled && !captureMode.isRawLike
         evControl?.isEnabled = !isDualCameraEnabled && isAutoExposure
         isoControl?.isEnabled = !isDualCameraEnabled && !isFilterRestrictingCaptureOptions && !isAutoExposure
         ssControl?.isEnabled = !isDualCameraEnabled && !isFilterRestrictingCaptureOptions && !isAutoExposure

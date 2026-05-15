@@ -33,6 +33,7 @@ class LockedCameraModel: NSObject {
     }
     
     // MARK: - Defaults (for settings)
+    let proRawFileFormat: ProRawFileFormat = .jpegXLLossy
     let defaultFileFormat: CaptureMode = .heif
     let defaultResolution: ResolutionPreference = .efficient
     let detailedCountdownTimer = false
@@ -157,7 +158,13 @@ class LockedCameraModel: NSObject {
     }
     
     // MARK: - Flash
-    var flashMode: AVCaptureDevice.FlashMode = .off
+    var flashMode: AVCaptureDevice.FlashMode = .off {
+        didSet {
+            if oldValue != flashMode {
+                buildAvailableFormats()
+            }
+        }
+    }
     
     // MARK: - Macro
     var isMacroEnabled: Bool = false {

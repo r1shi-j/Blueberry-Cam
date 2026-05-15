@@ -137,19 +137,31 @@ extension LockedCameraModel {
         switch captureMode {
             case .raw:
                 if !zoomBlocksRAW,
-                   let fmt = photoOutput.availableRawPhotoPixelFormatTypes.first(where: {
-                       !AVCapturePhotoOutput.isAppleProRAWPixelFormat($0)
-                   }) ?? photoOutput.availableRawPhotoPixelFormatTypes.first {
-                    let s = AVCapturePhotoSettings(rawPixelFormatType: fmt)
+                   let settings = makeRawPhotoSettings(preferAppleProRAW: false, dimensions: dims) {
+                    return settings
+                }
+                if photoOutput.availablePhotoCodecTypes.contains(.hevc) {
+                    let s = AVCapturePhotoSettings(format: [AVVideoCodecKey: AVVideoCodecType.hevc])
                     s.maxPhotoDimensions = dims
+                    s.photoQualityPrioritization = .quality
                     applyFlashModeIfSupported(to: s)
                     return s
+                }
+                let s = AVCapturePhotoSettings()
+                s.maxPhotoDimensions = dims
+                s.photoQualityPrioritization = .quality
+                applyFlashModeIfSupported(to: s)
+                return s
+            case .proRaw:
+                if let settings = makeRawPhotoSettings(preferAppleProRAW: true, dimensions: dims) {
+                    return settings
                 }
                 fallthrough
             case .heif:
                 if photoOutput.availablePhotoCodecTypes.contains(.hevc) {
                     let s = AVCapturePhotoSettings(format: [AVVideoCodecKey: AVVideoCodecType.hevc])
                     s.maxPhotoDimensions = dims
+                    s.photoQualityPrioritization = .quality
                     applyFlashModeIfSupported(to: s)
                     return s
                 }
@@ -157,9 +169,40 @@ extension LockedCameraModel {
             case .jpeg:
                 let s = AVCapturePhotoSettings()
                 s.maxPhotoDimensions = dims
+                s.photoQualityPrioritization = .quality
                 applyFlashModeIfSupported(to: s)
                 return s
         }
+    }
+    
+    private func makeRawPhotoSettings(preferAppleProRAW: Bool, dimensions: CMVideoDimensions) -> AVCapturePhotoSettings? {
+        let rawPixelFormatTypes = photoOutput.availableRawPhotoPixelFormatTypes
+        let predicate = preferAppleProRAW ? AVCapturePhotoOutput.isAppleProRAWPixelFormat : AVCapturePhotoOutput.isBayerRAWPixelFormat
+        guard let format = rawPixelFormatTypes.first(where: predicate) else { return nil }
+        
+        let settings = AVCapturePhotoSettings(rawPixelFormatType: format)
+        settings.maxPhotoDimensions = dimensions
+        if AVCapturePhotoOutput.isBayerRAWPixelFormat(format) {
+            settings.photoQualityPrioritization = .speed
+        } else {
+            settings.photoQualityPrioritization = .quality
+            applyProRawFileFormat(to: settings, rawPixelFormatType: format)
+        }
+        applyFlashModeIfSupported(to: settings)
+        return settings
+    }
+    
+    private func applyProRawFileFormat(to settings: AVCapturePhotoSettings, rawPixelFormatType: OSType) {
+        guard photoOutput.availableRawPhotoFileTypes.contains(.dng),
+              photoOutput.availableRawPhotoCodecTypes.contains(proRawFileFormat.codecType) else { return }
+        
+        let supportedCodecs = photoOutput.supportedRawPhotoCodecTypes(
+            forRawPhotoPixelFormatType: rawPixelFormatType,
+            fileType: .dng
+        )
+        guard supportedCodecs.contains(proRawFileFormat.codecType) else { return }
+        
+        settings.rawFileFormat = proRawFileFormat.rawFileFormat()
     }
     
     func updateCaptureOrientation() {

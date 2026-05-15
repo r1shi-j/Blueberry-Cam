@@ -10,7 +10,7 @@ extension TopBarView {
         static let buttonHeight: CGFloat = 18
         static let horizontalButtonPadding: CGFloat = 8
         static let verticalButtonPadding: CGFloat = 5
-        static let horizontalPickerPadding: CGFloat = 10
+        static let horizontalPickerPadding: CGFloat = 8
         static let pickerCornerRadius: CGFloat = 6
         static let verticalPadding: CGFloat = 0
         static let expandedVerticalPadding: CGFloat = 10
@@ -70,7 +70,7 @@ extension TopBarView {
     
     private var displayedCaptureMode: CaptureMode {
         guard cameraModel.shouldUseDualCameraFormatSet,
-              cameraModel.captureMode == .raw else {
+              cameraModel.captureMode.isRawLike else {
             return cameraModel.captureMode
         }
         

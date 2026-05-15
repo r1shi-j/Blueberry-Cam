@@ -44,6 +44,7 @@ extension CameraModel {
                 return
             }
             self.session.addInput(input)
+            self.configurePhotoOutputCapabilities()
             
             // Internal state that is non-observable can be set here
             // But 'device' and others are @Observable, so move to MainActor Task
@@ -138,15 +139,9 @@ extension CameraModel {
         }
     }
     
-    func switchToRawCaptureMode() {
-        guard canSelectRawCaptureMode else { return }
-        
-        if !activeLens.preservesRawCaptureMode {
-            pendingCaptureModeAfterLensSwitch = .raw
-            switchLens(to: activeLens.rawFallbackLens)
-            return
-        }
-        captureMode = .raw
+    func switchToRawCaptureMode(_ mode: CaptureMode = .raw) {
+        guard mode.isRawLike, isFormatEnabled(mode) else { return }
+        captureMode = mode
     }
     
     private func applyPendingCaptureModeAfterLensSwitch() {
@@ -157,15 +152,7 @@ extension CameraModel {
     }
     
     private func switchableLens(for lens: Lens) -> Lens {
-        if captureMode == .raw {
-            return lens.rawFallbackLens
-        }
-        
-        if isHighResolutionSelected {
-            return lens.highResolutionFallbackLens
-        }
-        
-        return lens
+        lens
     }
     
     func applyMacroMode() {

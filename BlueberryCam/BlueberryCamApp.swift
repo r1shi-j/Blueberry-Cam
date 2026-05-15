@@ -55,13 +55,12 @@ struct BlueberryCamApp: App {
 // MARK: - FIXME
 
 // MARK: - Next Steps
+// control i
 // smoother animations everywhere
+// grid wrong way to selfie aspect
+// lens switcher back to camera control
 
 // ProRaw
 // Updated locked camera app to add proraw, maybe remove jpeg option for locked cam
 // Updated locked camera app pipeline (just update whole codebase)
 // update shared models features albumn
-
-// control i
-
-// grid wrong way fo selfie aspect

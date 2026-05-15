@@ -75,7 +75,7 @@ extension CameraModel {
     }
     
     private func refreshSmartSelfieCenterStage(for camera: AVCaptureDevice) {
-        guard captureMode != .raw else {
+        guard !captureMode.isRawLike else {
             stopSmartSelfieCenterStage()
             return
         }
@@ -234,10 +234,10 @@ extension CameraModel {
             
             if shouldApplyAspectRatio {
                 self.selectCaptureAspectRatio(recommendation.aspectRatio,
-                                              zoomFactor: self.captureMode == .raw ? nil : recommendation.zoomFactor)
+                                              zoomFactor: self.captureMode.isRawLike ? nil : recommendation.zoomFactor)
             }
             
-            if self.captureMode != .raw, shouldApplyZoom {
+            if !self.captureMode.isRawLike, shouldApplyZoom {
                 if shouldApplyAspectRatio {
                     try? await Task.sleep(for: .milliseconds(140))
                 }
@@ -251,7 +251,7 @@ extension CameraModel {
     }
     
     private func shouldApplySmartSelfieZoom(_ zoomFactor: CGFloat) -> Bool {
-        guard captureMode != .raw,
+        guard !captureMode.isRawLike,
               let camera = device else { return false }
         
         let targetLens = smartSelfieLens(for: zoomFactor)
@@ -259,7 +259,7 @@ extension CameraModel {
     }
     
     private func applySmartSelfieZoom(_ zoomFactor: CGFloat) {
-        guard captureMode != .raw,
+        guard !captureMode.isRawLike,
               activeLens.isFront,
               let camera = device else { return }
         

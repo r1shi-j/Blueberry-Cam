@@ -30,17 +30,13 @@ extension LockedCameraModel {
     
     func selectResolution(_ opt: ResolutionOption) {
         guard isResolutionEnabled(opt) else { return }
-        if isHighResolutionOption(opt), !activeLens.preservesHighResolutionCapture {
-            switchLens(to: activeLens.highResolutionFallbackLens)
-        }
-        
         selectedResolution = opt
     }
     
     func changeCaptureFormat(to mode: CaptureMode) {
         guard isFormatEnabled(mode) else { return }
-        if mode == .raw {
-            switchToRawCaptureMode()
+        if mode.isRawLike {
+            switchToRawCaptureMode(mode)
             return
         }
         

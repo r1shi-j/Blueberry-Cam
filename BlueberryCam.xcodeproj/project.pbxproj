@@ -92,6 +92,7 @@
 				Models/Shared/FloatExtension.swift,
 				Models/Shared/Lens.swift,
 				Models/Shared/ManualControl.swift,
+				Models/Shared/ProRawFileFormat.swift,
 				Models/Shared/ResolutionOption.swift,
 				Models/Shared/ThreadSafe.swift,
 				Models/Shared/TimerMode.swift,

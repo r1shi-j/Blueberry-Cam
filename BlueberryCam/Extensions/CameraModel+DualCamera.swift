@@ -351,6 +351,7 @@ extension CameraModel {
             if self.session.canAddOutput(self.photoOutput) {
                 self.session.addOutput(self.photoOutput)
             }
+            self.configurePhotoOutputCapabilities()
             if self.session.canAddOutput(self.videoOutput) {
                 self.session.addOutput(self.videoOutput)
                 self.videoOutput.setSampleBufferDelegate(self, queue: self.analysisQueue)
@@ -437,10 +438,6 @@ extension CameraModel {
     private func switchableLensForDualCamera(_ lens: Lens) -> Lens {
         if lens.isFront {
             return lens
-        }
-        
-        if isHighResolutionSelected {
-            return lens.highResolutionFallbackLens
         }
         
         switch lens {

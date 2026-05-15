@@ -46,6 +46,7 @@ extension LockedCameraModel {
             if self.session.canAddOutput(self.photoOutput) {
                 self.session.addOutput(self.photoOutput)
             }
+            self.configurePhotoOutputCapabilities()
             
             self.videoOutput.setSampleBufferDelegate(self, queue: DispatchQueue(label: "\(BundleIDs.appID).locked.videoQueue"))
             self.videoOutput.alwaysDiscardsLateVideoFrames = true
@@ -85,5 +86,11 @@ extension LockedCameraModel {
                 self.startSession()
             }
         }
+    }
+    
+    nonisolated func configurePhotoOutputCapabilities() {
+        photoOutput.maxPhotoQualityPrioritization = .quality
+        guard photoOutput.isAppleProRAWSupported else { return }
+        photoOutput.isAppleProRAWEnabled = true
     }
 }
