@@ -3,6 +3,7 @@ import SwiftUI
 extension SettingsView {
     struct DetectedCodesSettingsSection: View {
         let cameraModel: CameraModel
+        let clearCodes: () -> Void
         
         private var codeCountText: String {
             cameraModel.detectedCodes.count.formatted()
@@ -11,47 +12,72 @@ extension SettingsView {
         var body: some View {
             Section {
                 NavigationLink {
-                    DetectedCodesView(cameraModel: cameraModel)
+                    DetectedCodesView(cameraModel: cameraModel, clearCodes: clearCodes)
                 } label: {
                     LabeledContent {
                         Text(codeCountText)
                     } label: {
-                        Label("Session Codes", systemImage: "barcode.viewfinder")
+                        Label("Session Codes", systemImage: "barcode")
                             .symbolEffect(.wiggle, options: .repeat(.periodic(delay: 1)).speed(0.7))
                     }
                 }
             } header: {
-                Text("Detected Codes")
+                HStack {
+                    Text("Detected Codes")
+                    Spacer()
+                    Image(systemName: "qrcode.viewfinder")
+                        .symbolEffect(.bounce, options: .repeat(.periodic(delay: 1)).speed(0.7))
+                }
             } footer: {
-                Text("Codes are kept only until the app closes. Tap a code to copy its content.")
+                Text("Detected codes are kept while the app remains open.")
             }
         }
     }
     
     private struct DetectedCodesView: View {
         @Environment(\.openURL) private var openURL
+        @Environment(\.dismiss) private var dismiss
         
         let cameraModel: CameraModel
+        let clearCodes: () -> Void
         
         @State private var copiedCodeID: DetectedCode.ID?
         @State private var copyMessageTask: Task<Void, Never>?
         
         var body: some View {
             List {
-                ForEach(cameraModel.detectedCodes) { code in
-                    Button {
-                        copy(code)
-                    } label: {
-                        DetectedCodeRow(code: code, isCopied: copiedCodeID == code.id)
-                    }
-                    .buttonStyle(.plain)
-                    .contextMenu {
-                        if let linkURL = code.linkURL {
-                            Button("Open Link", systemImage: "safari") {
-                                openURL(linkURL)
+                Section {
+                    ForEach(cameraModel.detectedCodes) { code in
+                        Button {
+                            copy(code)
+                        } label: {
+                            DetectedCodeRow(code: code, isCopied: copiedCodeID == code.id)
+                        }
+                        .buttonStyle(.plain)
+                        .contextMenu {
+                            if let linkURL = code.linkURL {
+                                Button("Open Link", systemImage: "safari") {
+                                    openURL(linkURL)
+                                }
                             }
                         }
                     }
+                } footer: {
+                    if cameraModel.detectedCodes.count(where: { $0.linkURL != nil }) > 0 {
+                        Text("Tap a code to copy its content. Hold on a link to open it.")
+                    } else {
+                        Text("Tap a code to copy its content.")
+                    }
+                }
+                
+                Section {
+                    Button("Clear Detected Codes") {
+                        clearCodes()
+                        dismiss()
+                    }
+                    .tint(.red)
+                } footer: {
+                    Text("Quitting the app automatically clears detected codes.")
                 }
             }
             .navigationTitle("Detected Codes")

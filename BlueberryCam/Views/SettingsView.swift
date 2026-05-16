@@ -24,7 +24,9 @@ struct SettingsView: View {
         NavigationStack {
             List {
                 if !cameraModel.detectedCodes.isEmpty {
-                    DetectedCodesSettingsSection(cameraModel: cameraModel)
+                    DetectedCodesSettingsSection(cameraModel: cameraModel) {
+                        cameraModel.detectedCodes.removeAll()
+                    }
                 }
                 
                 Section {
