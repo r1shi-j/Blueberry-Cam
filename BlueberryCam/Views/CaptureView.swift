@@ -949,6 +949,7 @@ struct CaptureView: View {
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.openURL) private var openURL
     
+    @Binding var hasUnlockedThemes: Bool
     @Binding var selectedAppThemeID: String
     @Binding var usesAppThemeReadouts: Bool
     @Binding var shutterCount: Int
@@ -1018,6 +1019,7 @@ struct CaptureView: View {
             })) {
                 SettingsView(
                     cameraModel: cameraModel,
+                    hasUnlockedThemes: $hasUnlockedThemes,
                     selectedAppThemeID: $selectedAppThemeID,
                     usesAppThemeReadouts: $usesAppThemeReadouts,
                     shutterCount: $shutterCount,

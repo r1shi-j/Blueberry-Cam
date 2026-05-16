@@ -1,6 +1,6 @@
 import SwiftUI
 
-struct AppTheme: Identifiable {
+struct AppTheme: Equatable, Identifiable {
     let id: String
     let name: String
     let background: Color
@@ -9,75 +9,119 @@ struct AppTheme: Identifiable {
     let shutterRaw: Color
     let shutterProRaw: Color
     let shutterBurst: Color
-    let shutterBurstCapturing: Color
     let readoutColor: Color
     
-    static let defaultID = "default"
+    static let defaultID = "classic"
+    static let customID = "custom"
     
-    static let all: [AppTheme] = [
-        AppTheme(
-            id: defaultID,
-            name: "Default",
-            background: .black,
-            accent: .yellow,
-            shutterProcessed: .white.opacity(0.2),
-            shutterRaw: .blue.mix(with: .mint, by: 0.5).opacity(0.4),
-            shutterProRaw: .purple.mix(with: .pink, by: 0.35).opacity(0.4),
-            shutterBurst: .yellow.opacity(0.8),
-            shutterBurstCapturing: .yellow.mix(with: .orange, by: 0.2).opacity(0.6),
-            readoutColor: .yellow.opacity(0.88)
-        ),
+    init(id: String, name: String, background: Color, accent: Color, shutterRaw: Color, shutterProRaw: Color, shutterBurst: Color) {
+        self.id = id
+        self.name = name
+        self.background = background
+        self.accent = accent
+        self.shutterProcessed = .white.opacity(0.2)
+        self.shutterRaw = shutterRaw
+        self.shutterProRaw = shutterProRaw
+        self.shutterBurst = shutterBurst
+        self.readoutColor = accent.opacity(0.88)
+    }
+    
+    static let classic: AppTheme = AppTheme(
+        id: defaultID,
+        name: "Classic",
+        background: .black,
+        accent: .yellow,
+        shutterRaw: .blue.mix(with: .mint, by: 0.5).opacity(0.4),
+        shutterProRaw: .purple.mix(with: .pink, by: 0.35).opacity(0.4),
+        shutterBurst: .yellow.opacity(0.8),
+    )
+    
+    static let standard: [AppTheme] = [
         AppTheme(
             id: "blueberry",
             name: "Blueberry",
             background: .blue.opacity(0.3),
             accent: .cyan,
-            shutterProcessed: .white.opacity(0.2),
-            shutterRaw: .blue.mix(with: .blue, by: 0.28).opacity(0.46),
-            shutterProRaw: .blue.mix(with: .pink, by: 0.36).opacity(0.5),
-            shutterBurst: .teal.mix(with: .mint, by: 0.22).opacity(0.84),
-            shutterBurstCapturing: .teal.mix(with: .mint, by: 0.32).opacity(0.56),
-            readoutColor: .cyan.opacity(0.88)
+            shutterRaw: .blue.opacity(0.5),
+            shutterProRaw: .teal.mix(with: .mint, by: 0.42).opacity(0.5),
+            shutterBurst: .blue.mix(with: .pink, by: 0.36).opacity(0.65)
         ),
         AppTheme(
             id: "forest",
             name: "Forest",
             background: .green.opacity(0.3),
             accent: .mint,
-            shutterProcessed: .white.opacity(0.2),
-            shutterRaw: .green.mix(with: .mint, by: 0.68).opacity(0.46),
-            shutterProRaw: .green.mix(with: .pink, by: 0.38).opacity(0.48),
-            shutterBurst: .purple.mix(with: .mint, by: 0.52).opacity(0.84),
-            shutterBurstCapturing: .purple.mix(with: .mint, by: 0.34).opacity(0.66),
-            readoutColor: .mint.opacity(0.88)
+            shutterRaw: .green.mix(with: .mint, by: 0.68).opacity(0.5),
+            shutterProRaw: .green.mix(with: .pink, by: 0.38).opacity(0.5),
+            shutterBurst: .purple.mix(with: .mint, by: 0.52).opacity(0.65)
         ),
         AppTheme(
             id: "rose",
             name: "Rose",
             background: .pink.opacity(0.3),
             accent: .pink,
-            shutterProcessed: .white.opacity(0.2),
-            shutterRaw: .pink.mix(with: .purple, by: 0.38).opacity(0.52),
-            shutterProRaw: .blue.mix(with: .pink, by: 0.34).opacity(0.54),
-            shutterBurst: .pink.mix(with: .orange, by: 0.36).opacity(0.84),
-            shutterBurstCapturing: .pink.mix(with: .yellow, by: 0.32).opacity(0.66),
-            readoutColor: .pink.opacity(0.88)
+            shutterRaw: .pink.mix(with: .purple, by: 0.38).opacity(0.5),
+            shutterProRaw: .pink.mix(with: .orange, by: 0.66).opacity(0.65),
+            shutterBurst: .blue.mix(with: .pink, by: 0.36).opacity(0.5)
         ),
         AppTheme(
-            id: "sunrise",
-            name: "Sunrise",
+            id: "fall",
+            name: "Fall",
             background: .orange.opacity(0.3),
             accent: .orange,
-            shutterProcessed: .white.opacity(0.2),
-            shutterRaw: .orange.mix(with: .pink, by: 0.44).opacity(0.50),
-            shutterProRaw: .orange.mix(with: .purple, by: 0.58).opacity(0.42),
-            shutterBurst: .blue.mix(with: .brown, by: 0.46).opacity(0.74),
-            shutterBurstCapturing: .blue.mix(with: .orange, by: 0.46).opacity(0.74),
-            readoutColor: .orange.opacity(0.88)
+            shutterRaw: .orange.mix(with: .pink, by: 0.44).opacity(0.5),
+            shutterProRaw: .orange.mix(with: .purple, by: 0.48).opacity(0.5),
+            shutterBurst: .blue.mix(with: .brown, by: 0.46).opacity(0.65)
         )
     ]
     
+    static let iphone17pro: [AppTheme] = [
+        AppTheme(
+            id: "cosmicOrange",
+            name: "Cosmic Orange",
+            // F77E2D
+            background: Color(uiColor: UIColor(red: 247/255, green: 126/255, blue: 45/255, alpha: 1)).opacity(0.3),
+            accent: Color(uiColor: UIColor(red: 247/255, green: 126/255, blue: 45/255, alpha: 1)),
+            shutterRaw: .mint.mix(with: .orange, by: 0.3).opacity(0.5),
+            shutterProRaw: .yellow.mix(with: .purple, by: 0.4).opacity(0.5),
+            shutterBurst: .yellow.mix(with: .blue, by: 0.2).opacity(0.65)
+        ),
+        AppTheme(
+            id: "deepBlue",
+            name: "Deep Blue",
+            // 32374A
+            background: Color(uiColor: UIColor(red: 50/255, green: 55/255, blue: 74/255, alpha: 1)).opacity(0.4),
+            accent: Color(uiColor: UIColor(red: 50/255, green: 55/255, blue: 74/255, alpha: 1)).mix(with: .white, by: 0.35),
+            shutterRaw: .blue.mix(with: .black, by: 0.4).opacity(0.5),
+            shutterProRaw: .blue.mix(with: .purple, by: 0.36).mix(with: .black, by: 0.2).opacity(0.5),
+            shutterBurst: .red.mix(with: .black, by: 0.4).opacity(0.65)
+        ),
+        AppTheme(
+            id: "silver",
+            name: "Silver",
+            // F5F5F5
+            background: Color(uiColor: UIColor(red: 245/255, green: 245/255, blue: 245/255, alpha: 1)).opacity(0.2),
+            accent: Color(uiColor: UIColor(red: 245/255, green: 245/255, blue: 245/255, alpha: 1)),
+            shutterRaw: .mint.mix(with: .blue, by: 0.2).mix(with: .black, by: 0.2).opacity(0.5),
+            shutterProRaw: .purple.mix(with: .mint, by: 0.45).opacity(0.5),
+            shutterBurst: .yellow.mix(with: .black, by: 0.5).opacity(0.65)
+        )
+    ]
+    
+    static let custom: AppTheme = AppTheme(
+        id: customID,
+        name: "Custom",
+        background: .black,
+        accent: .yellow,
+        shutterRaw: .blue.mix(with: .mint, by: 0.5).opacity(0.4),
+        shutterProRaw: .purple.mix(with: .pink, by: 0.35).opacity(0.4),
+        shutterBurst: .yellow.opacity(0.8)
+    )
+    
+    static private let main: [AppTheme] = [classic] + standard + [custom]
+    static private let all: [AppTheme] = main + iphone17pro
+    
     static func theme(for id: String) -> AppTheme {
-        all.first { $0.id == id } ?? all[0]
+        all.first { $0.id == id } ?? classic
     }
 }

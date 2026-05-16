@@ -30,7 +30,6 @@ extension BottomBarView {
     }
     
     private var shutterTint: Color {
-        if cameraModel.isBurstCapturing { return theme.shutterBurstCapturing }
         if cameraModel.isBurstModeEnabled { return theme.shutterBurst }
         
         switch cameraModel.captureMode {

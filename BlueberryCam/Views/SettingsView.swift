@@ -7,6 +7,7 @@ struct SettingsView: View {
     @Environment(\.openURL) private var openURL
     
     @Bindable var cameraModel: CameraModel
+    @Binding var hasUnlockedThemes: Bool
     @Binding var selectedAppThemeID: String
     @Binding var usesAppThemeReadouts: Bool
     @Binding var shutterCount: Int
@@ -255,7 +256,7 @@ struct SettingsView: View {
                 
                 Section {
                     NavigationLink {
-                        AppThemeSelectionView(selectedThemeID: $selectedAppThemeID)
+                        AppThemeSelectionView(hasUnlockedThemes: $hasUnlockedThemes, selectedThemeID: $selectedAppThemeID)
                     } label: {
                         LabeledContent("App Theme") {
                             Text(AppTheme.theme(for: selectedAppThemeID).name)
@@ -416,6 +417,8 @@ struct SettingsView: View {
                         case nil:
                             break
                     }
+                    hasUnlockedThemes = false
+                    selectedAppThemeID = AppTheme.defaultID
                     countResetTarget = nil
                 }
             }
@@ -612,12 +615,14 @@ private enum ShutterCountResetTarget {
 
 #Preview {
     @Previewable @State var cameraModel = CameraModel()
+    @Previewable @State var hasUnlockedThemes = false
     @Previewable @State var selectedAppThemeID = AppTheme.defaultID
     @Previewable @State var usesAppThemeReadouts = false
     @Previewable @State var shutterCount = 0
     @Previewable @State var shutterCountBurst = 0
     SettingsView(
         cameraModel: cameraModel,
+        hasUnlockedThemes: $hasUnlockedThemes,
         selectedAppThemeID: $selectedAppThemeID,
         usesAppThemeReadouts: $usesAppThemeReadouts,
         shutterCount: $shutterCount,

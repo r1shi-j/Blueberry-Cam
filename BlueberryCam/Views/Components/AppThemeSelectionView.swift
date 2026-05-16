@@ -1,61 +1,164 @@
 import SwiftUI
 
 struct AppThemeSelectionView: View {
+    @Binding var hasUnlockedThemes: Bool
     @Binding var selectedThemeID: String
+    @State private var previewingThemeID: String
+    @State private var isShowingLockedAlert = false
+    @State private var isShowingUnlockedAlert = false
+    @State private var unlockThemesGuess = ""
+    private let unlockThemesKey = "BlueberryCam_08052026"
+    
     @State private var selectionHapticTrigger = 0
     
-    private var selectedTheme: AppTheme {
-        AppTheme.theme(for: selectedThemeID)
+    init(hasUnlockedThemes: Binding<Bool>, selectedThemeID: Binding<String>) {
+        self._hasUnlockedThemes = hasUnlockedThemes
+        self._selectedThemeID = selectedThemeID
+        self._previewingThemeID = State(initialValue: selectedThemeID.wrappedValue)
+    }
+    
+    private var themesToShow: [AppTheme] {
+        var themes: [AppTheme] = [.classic]
+        themes += AppTheme.standard
+        if DeviceModel.isIphone17ProSeries {
+            themes += AppTheme.iphone17pro
+        }
+        themes += [AppTheme.custom]
+        return themes
     }
     
     var body: some View {
         ZStack {
             Color.black.ignoresSafeArea()
-                .overlay(selectedTheme.background)
+                .overlay(AppTheme.theme(for: previewingThemeID).background)
             
-            VStack(spacing: 0) {
-                Form {
-                    ForEach(AppTheme.all) { theme in
-                        Button {
-                            selectTheme(theme)
-                        } label: {
-                            HStack {
-                                Text(theme.name)
-                                    .foregroundStyle(.primary)
-                                
-                                Spacer()
-                                
-                                if selectedThemeID == theme.id {
-                                    Image(systemName: "checkmark")
-                                        .foregroundStyle(selectedTheme.accent)
-                                        .contentTransition(.symbolEffect(.replace))
-                                        .symbolEffect(.bounce, value: selectedThemeID)
-                                }
-                            }
-                            .contentShape(.rect)
-                        }
-                        .buttonStyle(.plain)
+            ScrollView {
+                VStack(spacing: 0) {
+                    themeList()
+                    Divider().padding(.vertical)
+                    Text("Theme Preview")
+                        .font(.caption)
+                        .fontWidth(.expanded)
+                        .fontWeight(.bold)
+                    AppThemePreview(theme: AppTheme.theme(for: previewingThemeID))
+                }
+                .padding()
+            }
+            .scrollIndicators(.hidden)
+        }
+        .sensoryFeedback(.selection, trigger: selectionHapticTrigger)
+        .environment(\.colorScheme, .dark)
+        .navigationTitle("")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .principal) {
+                Text("App Theme")
+                    .font(.system(size: 18, weight: .bold, design: .serif))
+                    .foregroundStyle(.white)
+            }
+            ToolbarItem(placement: .topBarTrailing) {
+                Button("Debug", systemImage: "hammer.fill") {
+                    selectedThemeID = AppTheme.defaultID
+                    previewingThemeID = AppTheme.defaultID
+                    hasUnlockedThemes.toggle()
+                }
+            }
+            ToolbarItem(placement: .topBarTrailing) {
+                if !hasUnlockedThemes {
+                    Button("Locked", systemImage: "lock.fill") {
+                        isShowingLockedAlert = true
+                    }
+                } else {
+                    Button("Unlocked", systemImage: "lock.open.fill") {
+                        isShowingUnlockedAlert = true
                     }
                 }
-                .scrollContentBackground(.hidden)
-                
-                Divider()
-                
-                AppThemePreview(theme: selectedTheme)
             }
         }
-        .environment(\.colorScheme, .dark)
-        .navigationTitle("App Theme")
-        .toolbarColorScheme(.dark, for: .navigationBar)
-        .tint(.white)
-        .sensoryFeedback(.selection, trigger: selectionHapticTrigger)
+        .onChange(of: unlockThemesGuess) { oldValue, newValue in
+            if newValue == unlockThemesKey {
+                selectedThemeID = previewingThemeID
+                hasUnlockedThemes = true
+            }
+        }
+        .alert("Requirements not met to unlock app themes.", isPresented: $isShowingLockedAlert) {
+            SecureField("Unlock Themes Key", text: $unlockThemesGuess)
+        } message: {
+            Text("To unlock app themes, your standard shutter count must be at least 100, and burst count at least 500.\nYou can check your statistics at the bottom of settings, or below the photos link shortcut to the left of the shutter button.\nAlternatively, if you have an unlock key enter it below.")
+        }
+        .alert("All themes are unlocked!", isPresented: $isShowingUnlockedAlert) { }
+    }
+    
+    private func themeList() -> some View {
+        VStack(spacing: 0) {
+            ForEach(themesToShow) { theme in
+                themeRow(theme)
+                if let last = themesToShow.last, theme != last {
+                    Divider()
+                }
+            }
+        }
+        .ignoresSafeArea(.keyboard)
+        .padding(.horizontal)
+        .glassEffect(.regular.tint(.black.opacity(0.18)), in: .rect(cornerRadius: 24))
+    }
+    
+    private func themeRow(_ theme: AppTheme) -> some View {
+        Button {
+            if hasUnlockedThemes {
+                selectTheme(theme)
+            } else {
+                if theme.id != AppTheme.defaultID {
+                    isShowingLockedAlert = true
+                }
+            }
+        } label: {
+            HStack {
+                if !hasUnlockedThemes && theme.id != selectedThemeID {
+                    Image(systemName: "lock.fill")
+                }
+                Text(theme.name)
+                    .foregroundStyle(.primary)
+                    .padding(.vertical, 4)
+                
+                Spacer()
+                
+                if !hasUnlockedThemes && theme.id != previewingThemeID && theme.id != AppTheme.customID {
+                    Button("Preview") {
+                        selectTheme(theme)
+                    }
+                    .font(.caption)
+                    .fontWidth(.expanded)
+                    .bold()
+                    .tint(AppTheme.theme(for: theme.id).accent)
+                    .buttonStyle(.glassProminent)
+                }
+                
+                if selectedThemeID == theme.id || !hasUnlockedThemes {
+                    Image(systemName: "checkmark")
+                        .foregroundStyle(AppTheme.theme(for: theme.id).accent)
+                        .contentTransition(.symbolEffect(.replace))
+                        .symbolEffect(.bounce, value: selectedThemeID)
+                        .opacity(!hasUnlockedThemes && theme.id != AppTheme.defaultID ? 0 : 1)
+                        .padding(.leading)
+                }
+            }
+            .contentShape(.rect)
+        }
+        .padding(.horizontal)
+        .padding(.vertical, 14)
+        .buttonStyle(.plain)
+        .disabled(/*!hasUnlockedThemes && */theme.id == AppTheme.customID)
     }
     
     private func selectTheme(_ theme: AppTheme) {
-        guard selectedThemeID != theme.id else { return }
+        guard previewingThemeID != theme.id else { return }
         selectionHapticTrigger += 1
         withAnimation(Animations.easeInOut) {
-            selectedThemeID = theme.id
+            previewingThemeID = theme.id
+            if hasUnlockedThemes {
+                selectedThemeID = theme.id
+            }
         }
     }
 }
@@ -69,12 +172,11 @@ private struct AppThemePreview: View {
                 readoutsColor()
             }
             previewButtons()
-            lensPreview()
             shutterPreview()
+            lensPreview()
         }
-        .padding(.vertical, 24)
-        .padding(.horizontal, 18)
-        .frame(maxWidth: .infinity)
+        .padding()
+        .allowsHitTesting(false)
     }
     
     private func readoutsColor() -> some View {
@@ -99,7 +201,6 @@ private struct AppThemePreview: View {
                 .foregroundStyle(theme.accent)
                 .buttonStyle(.glass)
         }
-        .allowsHitTesting(false)
     }
     
     private func lensPreview() -> some View {
@@ -113,29 +214,25 @@ private struct AppThemePreview: View {
                     .contentShape(.circle)
             }
             .buttonStyle(.plain)
-            .glassEffect(
-                .regular
-                    .interactive()
-                    .tint(theme.accent.opacity(0.86)),
-                in: .circle
-            )
+            .glassEffect(.regular.interactive().tint(theme.accent.opacity(0.86)), in: .circle)
         }
-        .allowsHitTesting(false)
     }
     
     private func shutterPreview() -> some View {
-        VStack(spacing: 8) {
-            HStack(spacing: 28) {
-                ThemeShutterPreviewButton(tint: theme.shutterProcessed, desc: "Standard")
-                ThemeShutterPreviewButton(tint: theme.shutterRaw, desc: "RAW")
-                ThemeShutterPreviewButton(tint: theme.shutterProRaw, desc: "ProRAW")
-            }
-            HStack(spacing: 28) {
-                ThemeShutterPreviewButton(tint: theme.shutterBurst, desc: "Burst")
-                ThemeShutterPreviewButton(tint: theme.shutterBurstCapturing, desc: "Burst Capturing")
+        GlassEffectContainer {
+            
+            
+            VStack(spacing: 8) {
+                HStack(spacing: 28) {
+                    ThemeShutterPreviewButton(tint: theme.shutterProcessed, desc: "Standard")
+                    ThemeShutterPreviewButton(tint: theme.shutterRaw, desc: "RAW")
+                    ThemeShutterPreviewButton(tint: theme.shutterProRaw, desc: "ProRAW")
+                }
+                HStack(spacing: 28) {
+                    ThemeShutterPreviewButton(tint: theme.shutterBurst, desc: "Burst")
+                }
             }
         }
-        .allowsHitTesting(false)
     }
 }
 
@@ -166,8 +263,9 @@ private struct ThemeShutterPreviewButton: View {
 }
 
 #Preview {
-    @Previewable @State var selectedThemeID = AppTheme.defaultID
+    @Previewable @State var hasUnlockedThemes = true
+    @Previewable @State var selectedThemeID = "blueberry"
     NavigationStack {
-        AppThemeSelectionView(selectedThemeID: $selectedThemeID)
+        AppThemeSelectionView(hasUnlockedThemes: $hasUnlockedThemes, selectedThemeID: $selectedThemeID)
     }
 }
