@@ -110,12 +110,12 @@ struct BlueberryCamApp: App {
 // Add tips, welcome screen and tutorials
 
 // FIXME: - Bugs
-// improve selfie switch animation with differnt bg colour
+// improve selfie switch animation with differnt bg color
 // improve lens switching animation (particulary on selfie cameras)
-// [PRIORITY] theme preview still has incorrect shutter colours
+// [PRIORITY] theme preview still has incorrect shutter colors
 
 // TODO: - Next Steps
-// add shutter animation, when proraw taking long to capture add spin animating, or colour leak into the white
+// add shutter animation, when proraw taking long to capture add spin animating, or color leak into the white
 // when tap burst (not holding), keep white circle enlarged to hide outer circle like when hold
 // add confetti when permissions granted
 // use a different theme in locked app if available, maybe choose random each time

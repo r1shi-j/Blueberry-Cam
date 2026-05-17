@@ -91,7 +91,7 @@ struct AppTheme: Equatable, Identifiable {
         )
     ]
     
-    private enum iphone17ProColours: String {
+    private enum iphone17ProColors: String {
         case cosmicOrange, deepBlue, silver
         
         var name: String {
@@ -116,28 +116,28 @@ struct AppTheme: Equatable, Identifiable {
     
     static let iphone17pro: [AppTheme] = [
         AppTheme(
-            id: iphone17ProColours.cosmicOrange.rawValue,
-            name: iphone17ProColours.cosmicOrange.name,
-            background: iphone17ProColours.cosmicOrange.color.opacity(0.3),
-            accent: iphone17ProColours.cosmicOrange.color,
+            id: iphone17ProColors.cosmicOrange.rawValue,
+            name: iphone17ProColors.cosmicOrange.name,
+            background: iphone17ProColors.cosmicOrange.color.opacity(0.3),
+            accent: iphone17ProColors.cosmicOrange.color,
             shutterRaw: .mint.mix(with: .orange, by: 0.3).opacity(0.5),
             shutterProRaw: .yellow.mix(with: .purple, by: 0.4).opacity(0.5),
             shutterBurst: .yellow.mix(with: .blue, by: 0.2).opacity(0.65)
         ),
         AppTheme(
-            id: iphone17ProColours.deepBlue.rawValue,
-            name: iphone17ProColours.deepBlue.name,
-            background: iphone17ProColours.deepBlue.color.opacity(0.4),
-            accent: iphone17ProColours.deepBlue.color.mix(with: .blue, by: 0.14).mix(with: .white, by: 0.24),
+            id: iphone17ProColors.deepBlue.rawValue,
+            name: iphone17ProColors.deepBlue.name,
+            background: iphone17ProColors.deepBlue.color.opacity(0.4),
+            accent: iphone17ProColors.deepBlue.color.mix(with: .blue, by: 0.14).mix(with: .white, by: 0.24),
             shutterRaw: .blue.mix(with: .black, by: 0.4).opacity(0.5),
             shutterProRaw: .blue.mix(with: .purple, by: 0.36).mix(with: .black, by: 0.2).opacity(0.5),
             shutterBurst: .red.mix(with: .black, by: 0.4).opacity(0.65)
         ),
         AppTheme(
-            id: iphone17ProColours.silver.rawValue,
-            name: iphone17ProColours.silver.name,
-            background: iphone17ProColours.silver.color.opacity(0.2),
-            accent: iphone17ProColours.silver.color,
+            id: iphone17ProColors.silver.rawValue,
+            name: iphone17ProColors.silver.name,
+            background: iphone17ProColors.silver.color.opacity(0.2),
+            accent: iphone17ProColors.silver.color,
             shutterRaw: .mint.mix(with: .blue, by: 0.2).mix(with: .black, by: 0.2).opacity(0.5),
             shutterProRaw: .purple.mix(with: .mint, by: 0.45).opacity(0.5),
             shutterBurst: .yellow.mix(with: .black, by: 0.5).opacity(0.65)

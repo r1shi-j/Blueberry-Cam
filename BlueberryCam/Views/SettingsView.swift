@@ -272,9 +272,9 @@ struct SettingsView: View {
                     }
                 } footer: {
                     if appSettings.selectedThemeID == AppTheme.defaultID {
-                        Text("For the default theme, readout colours are restricted to the standard colour palette")
+                        Text("For the default theme, readout colors are restricted to the standard color palette")
                     } else {
-                        Text("Use the default colour palette or use a single colour defined in the app theme for the live readouts.")
+                        Text("Use the default color palette or use a single color defined in the app theme for the live readouts.")
                     }
                 }
                 
