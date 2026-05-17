@@ -245,15 +245,17 @@ extension CaptureView {
         let shouldMaskAspectRatioTransition = shouldMaskCaptureAspectRatioTransition
         
         return ZStack {
-            CameraPreviewView(session: cameraModel.isDetachingPreviewForReconfiguration ? nil : cameraModel.previewSession,
-                              onCaptureBegan: handleShutterPressBegan,
-                              onCaptureEnded: handleShutterPressEnded,
-                              onCaptureCancelled: handleShutterPressCancelled,
-                              proxy: previewProxy,
-                              deviceUniqueID: cameraModel.isDualCameraEnabled ? cameraModel.mainPreviewDeviceUniqueID : nil,
-                              rotationAngle: cameraModel.mainPreviewRotationAngle,
-                              isMirrored: cameraModel.isMainPreviewMirrored,
-                              handlesCaptureEvents: cameraModel.canUseShutterButton)
+            CameraPreviewView(
+                session: cameraModel.isDetachingPreviewForReconfiguration ? nil : cameraModel.previewSession,
+                onCaptureBegan: handleShutterPressBegan,
+                onCaptureEnded: handleShutterPressEnded,
+                onCaptureCancelled: handleShutterPressCancelled,
+                proxy: previewProxy,
+                deviceUniqueID: cameraModel.isDualCameraEnabled ? cameraModel.mainPreviewDeviceUniqueID : nil,
+                rotationAngle: cameraModel.mainPreviewRotationAngle,
+                isMirrored: cameraModel.isMainPreviewMirrored,
+                handlesCaptureEvents: cameraModel.canUseShutterButton
+            )
             
             if cameraModel.isLiveFilterPreviewActive {
                 FilteredCameraPreviewView(output: cameraModel.liveFilterPreviewOutput)
@@ -1198,13 +1200,13 @@ extension CaptureView {
             let opacity: CGFloat
             let blur: CGFloat
             
-            // if switching to a digital crop on the same physical lens eg 1->2, 4->8 or vice versa, or front lens 1->1.5
+            // Digital crop on the same physical lens (no hardware switch)
             if newLens.zoomFactor != oldLens.zoomFactor && oldLens.deviceType == newLens.deviceType {
                 scale = isZoomIn ? 1.01 : 0.99
                 opacity = 0.8
                 blur = 0
             } else {
-                // For back lens switching
+                // back lens where old and new are different physical lens
                 scale = isZoomIn ? 1.035 : 0.965
                 opacity = 0.62
                 blur = 6
