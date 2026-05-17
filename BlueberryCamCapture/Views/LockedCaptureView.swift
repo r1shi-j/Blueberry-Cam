@@ -507,7 +507,7 @@ struct LockedCaptureView: View {
     
     var body: some View {
         appContent()
-            .sensoryFeedback(.impact, trigger: hapticTrigger)
+            .sensoryFeedback(.impact(weight: .heavy), trigger: hapticTrigger)
             .sensoryFeedback(.selection, trigger: countdownHapticTrigger)
             .sensoryFeedback(.impact(flexibility: .soft), trigger: cameraModel.tap​Focus​Lock​Haptic​Trigger)
             .onAppear(perform: handleOnAppear)

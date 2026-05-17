@@ -958,6 +958,7 @@ struct CaptureView: View {
     
     // Haptics
     @State private var hapticTrigger = 0
+    @State private var captureHapticTrigger = 0
     @State private var hapticTriggerR = 0
     @State private var countdownHapticTrigger = 0
     
@@ -986,6 +987,7 @@ struct CaptureView: View {
             .animation(Animations.permissionsShown, value: permissionModel.allGranted)
             .animation(Animations.permissionsShown, value: permissionModel.anyDenied)
             .sensoryFeedback(.impact, trigger: hapticTrigger)
+            .sensoryFeedback(.impact(weight: .heavy), trigger: captureHapticTrigger)
             .sensoryFeedback(.impact(flexibility: .soft), trigger: hapticTriggerR)
             .sensoryFeedback(.selection, trigger: countdownHapticTrigger)
             .sensoryFeedback(.impact(flexibility: .soft), trigger: cameraModel.detectedCodeURL)
@@ -1028,7 +1030,7 @@ extension CaptureView {
     }
     
     private func triggerStandardCaptureFeedback() {
-        triggerShutterFeedback()
+        captureHapticTrigger += 1
         withAnimation { cameraModel.changeCapturingState(to: true) }
         Task { @MainActor in
             try? await Task.sleep(for: Durations.shutter)
