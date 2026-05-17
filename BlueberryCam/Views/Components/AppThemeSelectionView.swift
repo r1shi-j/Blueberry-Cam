@@ -351,7 +351,7 @@ private struct AppThemePreview: View {
     private var restrictedBackgroundColor: Binding<Color> {
         Binding {
             // Always display with 0.3 opacity
-            return Color(hex: appSettings.customTheme.backgroundHex).opacity(0.3)
+            return Color(hex: appSettings.customTheme.backgroundHex)
         } set: { newColor in
             // Preserve the hue/saturation/brightness but force opacity to 0.3
             let forcedOpacityColor = newColor.opacity(0.3)
@@ -362,7 +362,7 @@ private struct AppThemePreview: View {
     private var restrictedBurstColor: Binding<Color> {
         Binding {
             // Always display with 0.65 opacity
-            return Color(hex: appSettings.customTheme.shutterBurstHex).opacity(0.65)
+            return Color(hex: appSettings.customTheme.shutterBurstHex)
         } set: { newColor in
             // Preserve the hue/saturation/brightness but force opacity to 0.65
             let forcedOpacityColor = newColor.opacity(0.65)
@@ -373,7 +373,7 @@ private struct AppThemePreview: View {
     private var restrictedRawColor: Binding<Color> {
         Binding {
             // Always display with 0.5 opacity
-            return Color(hex: appSettings.customTheme.shutterRawHex).opacity(0.5)
+            return Color(hex: appSettings.customTheme.shutterRawHex)
         } set: { newColor in
             // Preserve the hue/saturation/brightness but force opacity to 0.5
             let forcedOpacityColor = newColor.opacity(0.5)
@@ -384,7 +384,7 @@ private struct AppThemePreview: View {
     private var restrictedProRawColor: Binding<Color> {
         Binding {
             // Always display with 0.5 opacity
-            return Color(hex: appSettings.customTheme.shutterProRawHex).opacity(0.5)
+            return Color(hex: appSettings.customTheme.shutterProRawHex)
         } set: { newColor in
             // Preserve the hue/saturation/brightness but force opacity to 0.5
             let forcedOpacityColor = newColor.opacity(0.5)
@@ -511,17 +511,15 @@ private struct AppThemePreview: View {
     }
     
     private func shutterPreview() -> some View {
-        GlassEffectContainer {
-            VStack(spacing: 24) {
-                HStack(spacing: 28) {
-                    ThemeShutterPreviewButton(isCustom: isCustom, tint: isCustom ? restrictedRawColor : .constant(activeTheme.shutterRaw), desc: "RAW")
-                    ThemeShutterPreviewButton(isCustom: isCustom, tint: isCustom ? restrictedProRawColor : .constant(activeTheme.shutterProRaw), desc: "ProRAW")
-                    ThemeShutterPreviewButton(isCustom: isCustom, tint: isCustom ? restrictedBurstColor : .constant(activeTheme.shutterBurst), desc: "Burst")
-                }
-                HStack(alignment: .bottom, spacing: 28) {
-                    ThemeShutterPreviewButton(isCustom: false, tint: activeTheme.shutterProcessed, desc: "Standard")
-                    lensPreview()
-                }
+        VStack(spacing: 24) {
+            HStack(spacing: 28) {
+                ThemeShutterPreviewButton(isCustom: isCustom, tint: isCustom ? restrictedRawColor : .constant(activeTheme.shutterRaw), desc: "RAW")
+                ThemeShutterPreviewButton(isCustom: isCustom, tint: isCustom ? restrictedProRawColor : .constant(activeTheme.shutterProRaw), desc: "ProRAW")
+                ThemeShutterPreviewButton(isCustom: isCustom, tint: isCustom ? restrictedBurstColor : .constant(activeTheme.shutterBurst), desc: "Burst")
+            }
+            HStack(alignment: .bottom, spacing: 28) {
+                ThemeShutterPreviewButton(isCustom: false, tint: activeTheme.shutterProcessed, desc: "Standard")
+                lensPreview()
             }
         }
     }
@@ -557,7 +555,6 @@ private struct ThemeShutterPreviewButton: View {
                     .frame(width: height*0.84, height: height*0.84)
                     .glassEffect(.regular.interactive())
             }
-            .frame(width: height, height: height)
             
             HStack {
                 Text(desc)
