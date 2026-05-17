@@ -112,7 +112,6 @@ struct BlueberryCamApp: App {
 // FIXME: - Bugs
 // improve selfie switch animation with differnt bg colour
 // improve lens switching animation (particulary on selfie cameras)
-// [PRIORITY] restrict custom theme colours so that UI is visible
 // [PRIORITY] theme preview still has incorrect shutter colours
 
 // TODO: - Next Steps

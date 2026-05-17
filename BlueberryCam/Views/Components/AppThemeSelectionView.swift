@@ -159,8 +159,9 @@ struct AppThemeSelectionView: View {
                     customBadge(theme.accent)
                         .padding(.trailing)
                 }
-                if !appSettings.hasUnlockedThemes && theme.id != previewingThemeID && theme.id != AppTheme.customID {
+                if !appSettings.hasUnlockedThemes && theme.id != AppTheme.customID {
                     previewButton(theme)
+                        .opacity(theme.id == previewingThemeID ? 0 : 1)
                 }
                 tickOrLockIndicator(theme)
                     .padding(.leading)
@@ -259,8 +260,6 @@ struct AppThemeSelectionView: View {
     }
     
     private func handleThemeClicked(_ theme: AppTheme) {
-        guard previewingThemeID != theme.id else { return }
-        
         if hasUnlockedTheme(theme) {
             selectionHapticTrigger += 1
             withAnimation(Animations.easeInOut) {
@@ -418,32 +417,74 @@ private struct AppThemePreview: View {
     }
     
     private func previewButtons() -> some View {
-        HStack(spacing: 12) {
-            VStack(spacing: 10) {
-                Button("Accent Color") { }
-                    .font(.callout)
-                    .fontWidth(.expanded)
-                    .bold()
-                    .tint(activeTheme.accent)
-                    .buttonStyle(.glassProminent)
+        VStack(spacing: 24) {
+            HStack(spacing: 12) {
+                Image(systemName: "bolt.fill")
+                    .font(.system(size: 12, weight: .bold))
+                    .frame(height: 18)
+                    .foregroundStyle(.white.opacity(0.7))
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 5)
+                    .background(.white.opacity(0.15))
+                    .clipShape(.capsule)
                 
-                if isCustom {
-                    ColorPicker("", selection: restrictedAccentColor, supportsOpacity: false)
-                        .labelsHidden()
+                Image(systemName: "camera.macro")
+                    .font(.system(size: 12, weight: .bold))
+                    .frame(height: 18)
+                    .foregroundStyle(.black)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 5)
+                    .background(activeTheme.accent)
+                    .clipShape(.capsule)
+                
+                HStack(spacing: 0) {
+                    Text("HEIF")
+                        .font(.system(size: 12, weight: .medium))
+                        .fontWidth(.expanded)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 5)
+                        .background(activeTheme.accent)
+                        .foregroundStyle(.black)
+                    
+                    Text("RAW")
+                        .font(.system(size: 12, weight: .medium))
+                        .fontWidth(.expanded)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 5)
+                        .background(.white.opacity(0.15))
+                        .foregroundStyle(.white)
                 }
+                .clipShape(.rect(cornerRadius: 6))
+                .overlay(RoundedRectangle(cornerRadius: 6).stroke(.white.opacity(0.2), lineWidth: 1))
             }
             
-            VStack(spacing: 10) {
-                Button("Background") { }
-                    .font(.callout)
-                    .fontWidth(.expanded)
-                    .bold()
-                    .foregroundStyle(.white)
-                    .buttonStyle(.glass)
+            HStack(spacing: 12) {
+                VStack(spacing: 10) {
+                    Button("Accent Color") { }
+                        .font(.callout)
+                        .fontWidth(.expanded)
+                        .bold()
+                        .tint(activeTheme.accent)
+                        .buttonStyle(.glassProminent)
+                    
+                    if isCustom {
+                        ColorPicker("", selection: restrictedAccentColor, supportsOpacity: false)
+                            .labelsHidden()
+                    }
+                }
                 
-                if isCustom {
-                    ColorPicker("", selection: restrictedBackgroundColor, supportsOpacity: false)
-                        .labelsHidden()
+                VStack(spacing: 10) {
+                    Button("Background") { }
+                        .font(.callout)
+                        .fontWidth(.expanded)
+                        .bold()
+                        .foregroundStyle(activeTheme.accent)
+                        .buttonStyle(.glass)
+                    
+                    if isCustom {
+                        ColorPicker("", selection: restrictedBackgroundColor, supportsOpacity: false)
+                            .labelsHidden()
+                    }
                 }
             }
         }
