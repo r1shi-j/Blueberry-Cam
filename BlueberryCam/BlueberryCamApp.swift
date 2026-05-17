@@ -116,4 +116,3 @@ struct BlueberryCamApp: App {
 
 // TODO: - Next Steps
 // when tap burst (not holding), keep white circle enlarged to hide outer circle like when hold
-// add confetti when permissions granted

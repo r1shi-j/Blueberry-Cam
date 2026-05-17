@@ -1101,6 +1101,7 @@ extension CaptureView {
     private func handleOnChangeOfPermissionsGranted(_: Bool, new: Bool) {
         if new {
             configureCameraIfPermitted()
+            cameraModel.confettiCannonTrigger += 1
         } else {
             cameraModel.stopBurstCapture()
             cameraModel.stopSession()
