@@ -32,7 +32,7 @@ class LockedCameraModel: NSObject {
     let shouldHideUIWhileCountingDown = true
     
     // MARK: - Capture format
-    var captureMode: CaptureMode = .raw {
+    var captureMode: CaptureMode = .heif {
         didSet {
             if oldValue != captureMode {
                 buildAvailableFormats()
