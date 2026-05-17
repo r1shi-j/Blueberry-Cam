@@ -13,7 +13,6 @@ struct BlueberryCamApp: App {
     @Environment(\.scenePhase) private var scenePhase
     @State private var appSettings = AppSettings()
     @State private var permissionModel = PermissionModel()
-    @State private var lockedCaptureHapticTrigger = 0
     @State private var isShowingUnlockedThemesAlert = false
     @State private var isShowingUnlockedThemesCustomAlert = false
     @State private var confettiCannonsTrigger = 0
@@ -37,18 +36,13 @@ struct BlueberryCamApp: App {
         }
     }
     
-    func recordLockedCaptureCount(_ count: Int) {
-        appSettings.shutterCount += count
-        lockedCaptureHapticTrigger += 1
-    }
-    
     var body: some Scene {
         WindowGroup {
             ZStack {
                 CaptureView(appSettings: appSettings, permissionModel: permissionModel)
                 confettiCannons()
             }
-            .sensoryFeedback(.impact, trigger: lockedCaptureHapticTrigger)
+            .sensoryFeedback(.impact, trigger: appSettings.lockedCaptureHapticTrigger)
             .alert("You have reached the criteria to unlock app themes!", isPresented: $isShowingUnlockedThemesAlert, actions: { }, message: {
                 Text("Go to settings, and scroll down to app themes to customise the app!")
             })
@@ -59,19 +53,19 @@ struct BlueberryCamApp: App {
                 //                printUserDefaultsData()
                 checkThemesUnlock()
                 await permissionModel.checkAndRequest()
-                await scanExistingSessions()
-                await detectLockedCaptureSessions()
+                await scanExistingSessions(appSettings: appSettings)
+                await detectLockedCaptureSessions(appSettings: appSettings)
             }
             .onChange(of: scenePhase) { _, newPhase in
                 if newPhase == .active {
                     Task { await permissionModel.checkAndRequest() }
-                    Task { await scanExistingSessions() }
+                    Task { await scanExistingSessions(appSettings: appSettings) }
                 }
             }
             .onChange(of: appSettings.shutterCount, checkThemesUnlock)
             .onChange(of: appSettings.shutterCountBurst, checkThemesUnlock)
             .onContinueUserActivity("\(BundleIDs.fullBundleID).opencamera") { _ in
-                Task { await scanExistingSessions() }
+                Task { await scanExistingSessions(appSettings: appSettings) }
             }
         }
         .handlesExternalEvents(matching: ["*"])
@@ -118,11 +112,11 @@ struct BlueberryCamApp: App {
 // FIXME: - Bugs
 // improve selfie switch animation with differnt bg colour
 // improve lens switching animation (particulary on selfie cameras)
+// [PRIORITY] restrict custom theme colours so that UI is visible
+// [PRIORITY] theme preview still has incorrect shutter colours
 
 // TODO: - Next Steps
 // add shutter animation, when proraw taking long to capture add spin animating, or colour leak into the white
 // when tap burst (not holding), keep white circle enlarged to hide outer circle like when hold
-
-// [PRIORITY] issues with photos taken on locked camera not being detected
-// [PRIORITY] restrict custom theme colours so that UI is visible
-// [PRIORITY] theme preview still has incorrect shutter colours
+// add confetti when permissions granted
+// use a different theme in locked app if available, maybe choose random each time

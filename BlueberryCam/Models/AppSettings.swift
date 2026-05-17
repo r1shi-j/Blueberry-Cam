@@ -45,6 +45,8 @@ final class AppSettings {
     
     private let defaults: UserDefaults
     
+    var lockedCaptureHapticTrigger = 0
+    
     var selectedThemeID: String {
         didSet {
             defaults.set(selectedThemeID, forKey: Keys.selectedThemeID)

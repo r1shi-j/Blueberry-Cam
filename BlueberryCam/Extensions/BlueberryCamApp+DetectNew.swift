@@ -7,15 +7,15 @@ extension BlueberryCamApp {
     /// and the snapshot scan don't double-count the same session.
     private static let processedURLs = ProcessedURLSet()
     
-    func detectLockedCaptureSessions() async {
+    func detectLockedCaptureSessions(appSettings: AppSettings) async {
         for await update in LockedCameraCaptureManager.shared.sessionContentUpdates {
             switch update {
                 case .initial(let urls):
                     for url in urls {
-                        await processLockedCaptureSession(at: url)
+                        await processLockedCaptureSession(at: url, appSettings: appSettings)
                     }
                 case .added(let url):
-                    await processLockedCaptureSession(at: url)
+                    await processLockedCaptureSession(at: url, appSettings: appSettings)
                 case .removed:
                     break
                 @unknown default:
@@ -24,23 +24,23 @@ extension BlueberryCamApp {
         }
     }
     
-    func scanExistingSessions() async {
+    func scanExistingSessions(appSettings: AppSettings) async {
         for url in LockedCameraCaptureManager.shared.sessionContentURLs {
-            await processLockedCaptureSession(at: url)
+            await processLockedCaptureSession(at: url, appSettings: appSettings)
         }
     }
     
-    private func processLockedCaptureSession(at sessionURL: URL) async {
+    private func processLockedCaptureSession(at sessionURL: URL, appSettings: AppSettings) async {
         guard Self.processedURLs.insert(sessionURL) else { return }
         
-        let didHandle = await addSessionPhotosToAlbum(at: sessionURL)
+        let didHandle = await addSessionPhotosToAlbum(at: sessionURL, appSettings: appSettings)
         if !didHandle {
             Self.processedURLs.remove(sessionURL)
         }
     }
     
     @discardableResult
-    func addSessionPhotosToAlbum(at sessionURL: URL) async -> Bool {
+    func addSessionPhotosToAlbum(at sessionURL: URL, appSettings: AppSettings) async -> Bool {
         let content = await waitForSessionContent(at: sessionURL)
         guard content.hasContent else {
             return false
@@ -71,7 +71,7 @@ extension BlueberryCamApp {
             
             // Increment and invalidate — we confirmed the photos exist (or we have add-only access
             // and trust the manifest).
-            await recordLockedCaptures(photoCount)
+            await recordLockedCaptures(photoCount, appSettings: appSettings)
             try? await LockedCameraCaptureManager.shared.invalidateSessionContent(at: sessionURL)
             return true
         }
@@ -88,16 +88,17 @@ extension BlueberryCamApp {
         }
         
         await addAssetsToBlueberryAlbum(assets)
-        await recordLockedCaptures(assets.count)
+        await recordLockedCaptures(assets.count, appSettings: appSettings)
         try? await LockedCameraCaptureManager.shared.invalidateSessionContent(at: sessionURL)
         return true
     }
     
-    private func recordLockedCaptures(_ count: Int) async {
+    private func recordLockedCaptures(_ count: Int, appSettings: AppSettings) async {
         guard count > 0 else { return }
         
         await MainActor.run {
-            self.recordLockedCaptureCount(count)
+            appSettings.shutterCount += count
+            appSettings.lockedCaptureHapticTrigger += 1
         }
     }
     
