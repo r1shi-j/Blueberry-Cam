@@ -939,6 +939,7 @@ extension CaptureView {
                     requiresPhotos: permissionModel.requiresPhotos
                 )
                 .transition(.opacity)
+                .onAppear { didShowPermissionDeniedOverlay = true }
             } else {
                 Color.black.ignoresSafeArea()
             }
@@ -956,6 +957,7 @@ struct CaptureView: View {
     @State private var levelModel = LevelMotionModel()
     @State private var selectedControl: ManualControl?
     @State private var hasConfiguredCamera = false
+    @State private var didShowPermissionDeniedOverlay = false
     
     // Haptics
     @State private var hapticTrigger = 0
@@ -1113,7 +1115,10 @@ extension CaptureView {
     private func handleOnChangeOfPermissionsGranted(_: Bool, new: Bool) {
         if new {
             configureCameraIfPermitted()
-            cameraModel.confettiCannonTrigger += 1
+            if didShowPermissionDeniedOverlay {
+                didShowPermissionDeniedOverlay = false
+                cameraModel.confettiCannonTrigger += 1
+            }
         } else {
             cameraModel.stopBurstCapture()
             cameraModel.stopSession()

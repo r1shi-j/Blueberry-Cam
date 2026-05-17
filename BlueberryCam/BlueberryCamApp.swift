@@ -115,4 +115,3 @@ struct BlueberryCamApp: App {
 // improve shutter progress view when processing photo
 
 // TODO: - Next Steps
-// when tap burst (not holding), keep white circle enlarged to hide outer circle like when hold
