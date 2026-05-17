@@ -110,7 +110,9 @@ struct BlueberryCamApp: App {
 // Add tips, welcome screen and tutorials
 
 // FIXME: - Bugs
-// improve selfie switch animation with differnt bg color
-// improve lens switching animation (particulary on selfie cameras)
+// improve selfie switch animation; when background colour not black the switch is more noticable
+// improve aspect ratio switch when in selfie 1.5x
+// improve lens switching animation when going to different physical cameras lens
+/// I want to improve lens switching, so for exmaple if i am switching to a lens which has greater zoom, then the old lens should zoom in until it reaches the same zoom level as the new lens, and the new lens should be underneth this already int eh correct position, then they animete with blur and opacity. Eg if going from 1x to 4x, the 1x view digitally zooms 4x then they swap. Vice versa for zoom out, the old lens will zoom out...
 
 // TODO: - Next Steps
