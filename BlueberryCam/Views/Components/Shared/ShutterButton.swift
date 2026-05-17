@@ -61,12 +61,12 @@ struct ShutterButton: View {
         .onDisappear(perform: cancelPressIfNeeded)
         .onChange(of: isProcessing) { _, new in
             switch (arcPhase, new) {
-            case (.hidden, true):
-                arcPhase = .rotating
-            case (.rotating, false):
-                arcPhase = .collapsing
-            default:
-                break
+                case (.hidden, true):
+                    arcPhase = .rotating
+                case (.rotating, false):
+                    arcPhase = .collapsing
+                default:
+                    break
             }
         }
     }
@@ -130,12 +130,12 @@ private struct ShutterProgressArc: View {
             .animation(.easeInOut(duration: 0.2), value: phase == .hidden)
             .onChange(of: phase) { _, new in
                 switch new {
-                case .rotating:
-                    startRotating()
-                case .collapsing:
-                    startCollapsing()
-                case .hidden:
-                    break
+                    case .rotating:
+                        startRotating()
+                    case .collapsing:
+                        startCollapsing()
+                    case .hidden:
+                        break
                 }
             }
     }

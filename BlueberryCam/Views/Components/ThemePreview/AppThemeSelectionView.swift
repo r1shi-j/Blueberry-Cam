@@ -312,7 +312,7 @@ struct AppThemeSelectionView: View {
         selectedThemeBeforeUnlock = nil
     }
 }
- 
+
 #Preview {
     @Previewable @State var appSettings = AppSettings()
     NavigationStack {
