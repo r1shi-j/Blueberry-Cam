@@ -112,6 +112,5 @@ struct BlueberryCamApp: App {
 // FIXME: - Bugs
 // improve selfie switch animation with differnt bg color
 // improve lens switching animation (particulary on selfie cameras)
-// improve shutter progress view when processing photo
 
 // TODO: - Next Steps

@@ -1,5 +1,11 @@
 import SwiftUI
 
+enum ShutterArcPhase {
+    case hidden
+    case rotating
+    case collapsing
+}
+
 struct ShutterButton: View {
     let tint: Color
     let height: CGFloat
@@ -10,6 +16,7 @@ struct ShutterButton: View {
     let onPressCancelled: () -> Void
     @Binding var isForcePressed: Bool
     @State private var isPressed = false
+    @State private var arcPhase: ShutterArcPhase = .hidden
     
     init(tint: Color, height: CGFloat, isEnabled: Bool = true, isProcessing: Bool, onPressBegan: @escaping () -> Void, onPressEnded: @escaping () -> Void, onPressCancelled: @escaping () -> Void, isForcePressed: Binding<Bool> = .constant(false)) {
         self.tint = tint
@@ -32,16 +39,13 @@ struct ShutterButton: View {
                 .frame(width: height*0.84, height: height*0.84)
                 .glassEffect(.regular.interactive())
                 .scaleEffect(!isPressed && isForcePressed ? 1.2 : 1)
-            if isProcessing {
-                ProgressView()
-                    .controlSize(.large)
-                    .tint(.black.opacity(0.6))
-            }
+            
+            ShutterProgressArc(height: height, phase: $arcPhase)
+                .allowsHitTesting(false)
         }
         .frame(maxWidth: .infinity)
         .transition(.opacity)
         .animation(.easeInOut(duration: 0.15), value: isPressed)
-        .animation(.easeInOut(duration: 0.2), value: isProcessing)
         .animation(.bouncy(duration: 0.5, extraBounce: 0.3), value: isForcePressed)
         .contentShape(.rect)
         .gesture(pressGesture)
@@ -55,6 +59,16 @@ struct ShutterButton: View {
             onPressEnded()
         }
         .onDisappear(perform: cancelPressIfNeeded)
+        .onChange(of: isProcessing) { _, new in
+            switch (arcPhase, new) {
+            case (.hidden, true):
+                arcPhase = .rotating
+            case (.rotating, false):
+                arcPhase = .collapsing
+            default:
+                break
+            }
+        }
     }
     
     private var pressGesture: some Gesture {
@@ -75,5 +89,79 @@ struct ShutterButton: View {
         guard isPressed else { return }
         isPressed = false
         onPressCancelled()
+    }
+}
+
+private struct ShutterProgressArc: View {
+    let height: CGFloat
+    @Binding var phase: ShutterArcPhase
+    
+    @State private var rotation: Double = 0
+    @State private var trimStart: CGFloat = 0
+    @State private var isRotating = false
+    
+    private let lineWidth: CGFloat = 5
+    private let arcFraction: CGFloat = 0.5
+    private let duration: Double = 1.0
+    
+    var body: some View {
+        let arcSize = height * 0.84 * 0.74
+        
+        Circle()
+            .trim(from: trimStart, to: arcFraction)
+            .stroke(
+                AngularGradient(
+                    gradient: Gradient(colors: [
+                        Color(white: 0.80, opacity: 0.05),
+                        Color(white: 0.80, opacity: 0.15),
+                        Color(white: 0.80, opacity: 0.25),
+                        Color(white: 0.80, opacity: 0.40),
+                        Color(white: 0.80, opacity: 0.25),
+                        Color(white: 0.80, opacity: 0.15),
+                        Color(white: 0.80, opacity: 0.05),
+                    ]),
+                    center: .center
+                ),
+                style: StrokeStyle(lineWidth: lineWidth, lineCap: .round)
+            )
+            .frame(width: arcSize, height: arcSize)
+            .rotationEffect(.degrees(rotation))
+            .opacity(phase == .hidden ? 0 : 1)
+            .animation(.easeInOut(duration: 0.2), value: phase == .hidden)
+            .onChange(of: phase) { _, new in
+                switch new {
+                case .rotating:
+                    startRotating()
+                case .collapsing:
+                    startCollapsing()
+                case .hidden:
+                    break
+                }
+            }
+    }
+    
+    private func startRotating() {
+        trimStart = 0
+        rotation = 0
+        isRotating = true
+        rotate()
+    }
+    
+    private func startCollapsing() {
+        isRotating = false
+        withAnimation(.easeInOut(duration: 0.3)) {
+            trimStart = arcFraction
+        } completion: {
+            phase = .hidden
+        }
+    }
+    
+    private func rotate() {
+        withAnimation(.linear(duration: duration)) {
+            rotation += 360
+        } completion: {
+            guard isRotating else { return }
+            rotate()
+        }
     }
 }
