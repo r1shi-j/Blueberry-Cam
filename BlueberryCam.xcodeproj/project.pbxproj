@@ -99,7 +99,7 @@
 				Models/Shared/ResolutionOption.swift,
 				Models/Shared/ThreadSafe.swift,
 				Models/Shared/TimerMode.swift,
-				Views/Components/CameraPreviewView.swift,
+				"Views/Components/Camera Previews/CameraPreviewView.swift",
 				Views/Components/Shared/ManualRulerView.swift,
 				Views/Components/Shared/ShutterButton.swift,
 				Views/Overlays/FocusReticleView.swift,
