@@ -48,4 +48,46 @@ extension Color {
         
         self.init(red: r, green: g, blue: b, opacity: a)
     }
+    
+    func isTooLight() -> Bool {
+        let uiColor = UIColor(self)
+        var red: CGFloat = 0, green: CGFloat = 0, blue: CGFloat = 0, alpha: CGFloat = 0
+        uiColor.getRed(&red, green: &green, blue: &blue, alpha: &alpha)
+        
+        // Calculate luminance (perceived brightness)
+        let luminance = 0.299 * red + 0.587 * green + 0.114 * blue
+        return luminance > 0.7 // Threshold for "too light"
+    }
+    
+    func isTooDark() -> Bool {
+        let uiColor = UIColor(self)
+        var red: CGFloat = 0, green: CGFloat = 0, blue: CGFloat = 0, alpha: CGFloat = 0
+        uiColor.getRed(&red, green: &green, blue: &blue, alpha: &alpha)
+        
+        // Calculate luminance (perceived brightness)
+        let luminance = 0.299 * red + 0.587 * green + 0.114 * blue
+        return luminance < 0.3 // Threshold for "too dark"
+    }
+    
+    func darken(by amount: Double = 0.3) -> Color {
+        let uiColor = UIColor(self)
+        var hue: CGFloat = 0, saturation: CGFloat = 0, brightness: CGFloat = 0, alpha: CGFloat = 0
+        
+        uiColor.getHue(&hue, saturation: &saturation, brightness: &brightness, alpha: &alpha)
+        
+        // Reduce brightness to darken the color but not below a minimum
+        let newBrightness = max(0.3, brightness - CGFloat(amount))
+        return Color(hue: Double(hue), saturation: Double(saturation), brightness: Double(newBrightness), opacity: Double(alpha))
+    }
+    
+    func lighten(by amount: Double = 0.3) -> Color {
+        let uiColor = UIColor(self)
+        var hue: CGFloat = 0, saturation: CGFloat = 0, brightness: CGFloat = 0, alpha: CGFloat = 0
+        
+        uiColor.getHue(&hue, saturation: &saturation, brightness: &brightness, alpha: &alpha)
+        
+        // Increase brightness to lighten the color but not above a maximum
+        let newBrightness = min(0.7, brightness + CGFloat(amount))
+        return Color(hue: Double(hue), saturation: Double(saturation), brightness: Double(newBrightness), opacity: Double(alpha))
+    }
 }

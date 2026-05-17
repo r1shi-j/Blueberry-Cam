@@ -318,14 +318,6 @@ private struct AppThemePreview: View {
     let theme: AppTheme
     @Bindable var appSettings: AppSettings
     
-    private func colorBinding(for keyPath: WritableKeyPath<CustomThemePalette, String>) -> Binding<Color> {
-        Binding {
-            Color(hex: appSettings.customTheme[keyPath: keyPath])
-        } set: { newColor in
-            appSettings.updateCustomThemeColor(newColor, for: keyPath)
-        }
-    }
-    
     private var isCustom: Bool {
         theme.id == AppTheme.customID
     }
@@ -334,6 +326,74 @@ private struct AppThemePreview: View {
         isCustom ? appSettings.theme(for: AppTheme.customID) : theme
     }
     
+    // MARK: - Restricted Color Bindings
+    private var restrictedAccentColor: Binding<Color> {
+        Binding {
+            var color = Color(hex: appSettings.customTheme.accentHex)
+            // Ensure accent color is neither too light nor too dark for readability
+            if color.isTooLight() {
+                color = color.darken()
+            } else if color.isTooDark() {
+                color = color.lighten()
+            }
+            return color
+        } set: { newColor in
+            // Enforce color constraints for readability
+            var adjustedColor = newColor
+            if newColor.isTooLight() {
+                adjustedColor = newColor.darken()
+            } else if newColor.isTooDark() {
+                adjustedColor = newColor.lighten()
+            }
+            appSettings.updateCustomThemeColor(adjustedColor, for: \.accentHex)
+        }
+    }
+    
+    private var restrictedBackgroundColor: Binding<Color> {
+        Binding {
+            // Always display with 0.3 opacity
+            return Color(hex: appSettings.customTheme.backgroundHex).opacity(0.3)
+        } set: { newColor in
+            // Preserve the hue/saturation/brightness but force opacity to 0.3
+            let forcedOpacityColor = newColor.opacity(0.3)
+            appSettings.updateCustomThemeColor(forcedOpacityColor, for: \.backgroundHex)
+        }
+    }
+    
+    private var restrictedBurstColor: Binding<Color> {
+        Binding {
+            // Always display with 0.65 opacity
+            return Color(hex: appSettings.customTheme.shutterBurstHex).opacity(0.65)
+        } set: { newColor in
+            // Preserve the hue/saturation/brightness but force opacity to 0.65
+            let forcedOpacityColor = newColor.opacity(0.65)
+            appSettings.updateCustomThemeColor(forcedOpacityColor, for: \.shutterBurstHex)
+        }
+    }
+    
+    private var restrictedRawColor: Binding<Color> {
+        Binding {
+            // Always display with 0.5 opacity
+            return Color(hex: appSettings.customTheme.shutterRawHex).opacity(0.5)
+        } set: { newColor in
+            // Preserve the hue/saturation/brightness but force opacity to 0.5
+            let forcedOpacityColor = newColor.opacity(0.5)
+            appSettings.updateCustomThemeColor(forcedOpacityColor, for: \.shutterRawHex)
+        }
+    }
+    
+    private var restrictedProRawColor: Binding<Color> {
+        Binding {
+            // Always display with 0.5 opacity
+            return Color(hex: appSettings.customTheme.shutterProRawHex).opacity(0.5)
+        } set: { newColor in
+            // Preserve the hue/saturation/brightness but force opacity to 0.5
+            let forcedOpacityColor = newColor.opacity(0.5)
+            appSettings.updateCustomThemeColor(forcedOpacityColor, for: \.shutterProRawHex)
+        }
+    }
+    
+    // MARK: View
     var body: some View {
         VStack(spacing: 24) {
             if theme.id != AppTheme.defaultID {
@@ -350,6 +410,7 @@ private struct AppThemePreview: View {
         .allowsHitTesting(isCustom)
     }
     
+    // MARK: Subviews
     private func readoutsColor() -> some View {
         Text("Readouts font color if enabled")
             .foregroundStyle(activeTheme.readoutColor)
@@ -367,7 +428,7 @@ private struct AppThemePreview: View {
                     .buttonStyle(.glassProminent)
                 
                 if isCustom {
-                    ColorPicker("", selection: colorBinding(for: \.accentHex), supportsOpacity: true)
+                    ColorPicker("", selection: restrictedAccentColor, supportsOpacity: false)
                         .labelsHidden()
                 }
             }
@@ -381,7 +442,7 @@ private struct AppThemePreview: View {
                     .buttonStyle(.glass)
                 
                 if isCustom {
-                    ColorPicker("", selection: colorBinding(for: \.backgroundHex), supportsOpacity: true)
+                    ColorPicker("", selection: restrictedBackgroundColor, supportsOpacity: false)
                         .labelsHidden()
                 }
             }
@@ -412,9 +473,9 @@ private struct AppThemePreview: View {
         GlassEffectContainer {
             VStack(spacing: 24) {
                 HStack(spacing: 28) {
-                    ThemeShutterPreviewButton(isCustom: isCustom, tint: isCustom ? colorBinding(for: \.shutterRawHex) : .constant(activeTheme.shutterRaw), desc: "RAW")
-                    ThemeShutterPreviewButton(isCustom: isCustom, tint: isCustom ? colorBinding(for: \.shutterProRawHex) : .constant(activeTheme.shutterProRaw), desc: "ProRAW")
-                    ThemeShutterPreviewButton(isCustom: isCustom, tint: isCustom ? colorBinding(for: \.shutterBurstHex) : .constant(activeTheme.shutterBurst), desc: "Burst")
+                    ThemeShutterPreviewButton(isCustom: isCustom, tint: isCustom ? restrictedRawColor : .constant(activeTheme.shutterRaw), desc: "RAW")
+                    ThemeShutterPreviewButton(isCustom: isCustom, tint: isCustom ? restrictedProRawColor : .constant(activeTheme.shutterProRaw), desc: "ProRAW")
+                    ThemeShutterPreviewButton(isCustom: isCustom, tint: isCustom ? restrictedBurstColor : .constant(activeTheme.shutterBurst), desc: "Burst")
                 }
                 HStack(alignment: .bottom, spacing: 28) {
                     ThemeShutterPreviewButton(isCustom: false, tint: activeTheme.shutterProcessed, desc: "Standard")
@@ -462,7 +523,7 @@ private struct ThemeShutterPreviewButton: View {
                     .font(.caption)
                     .fontWidth(.expanded)
                 if isCustom {
-                    ColorPicker("", selection: $tint, supportsOpacity: true)
+                    ColorPicker("", selection: $tint, supportsOpacity: false)
                         .font(.caption)
                         .fontWidth(.expanded)
                         .labelsHidden()
