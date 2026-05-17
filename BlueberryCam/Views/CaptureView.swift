@@ -776,6 +776,7 @@ extension CaptureView {
             theme: appTheme,
             shutterCount: $appSettings.shutterCount,
             shutterCountBurst: $appSettings.shutterCountBurst,
+            isForcePressed: forcePressedBinding,
             onShutterPressBegan: handleShutterPressBegan,
             onShutterPressEnded: handleShutterPressEnded,
             onShutterPressCancelled: handleShutterPressCancelled
@@ -959,6 +960,7 @@ struct CaptureView: View {
     // Haptics
     @State private var hapticTrigger = 0
     @State private var captureHapticTrigger = 0
+    @State private var hardwarePressedOverride = false
     @State private var hapticTriggerR = 0
     @State private var countdownHapticTrigger = 0
     
@@ -981,6 +983,13 @@ struct CaptureView: View {
     @State private var displayedBurstFeedbackMessage: String?
     @State private var isBurstFeedbackVisible = false
     @State private var burstFeedbackFadeTask: Task<Void, Never>?
+    
+    private var forcePressedBinding: Binding<Bool> {
+        Binding(
+            get: { cameraModel.isBurstCapturing || hardwarePressedOverride },
+            set: { _ in }
+        )
+    }
     
     var body: some View {
         appContent()
@@ -1044,10 +1053,12 @@ extension CaptureView {
     }
     
     private func handleShutterPressBegan() {
+        hardwarePressedOverride = true
         cameraModel.handleShutterPressBegan(onBurstPhotoCaptured: handleBurstPhotoCaptured)
     }
     
     private func handleShutterPressEnded() {
+        hardwarePressedOverride = false
         cameraModel.handleShutterPressEnded(
             onCapture: triggerStandardCaptureFeedback,
             onBurstPhotoCaptured: handleBurstPhotoCaptured
@@ -1055,6 +1066,7 @@ extension CaptureView {
     }
     
     private func handleShutterPressCancelled() {
+        hardwarePressedOverride = false
         cameraModel.handleShutterPressCancelled()
     }
     

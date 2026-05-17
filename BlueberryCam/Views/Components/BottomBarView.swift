@@ -76,7 +76,8 @@ extension BottomBarView {
             isProcessing: cameraModel.isProcessingPhoto && !cameraModel.isBurstCapturing,
             onPressBegan: onShutterPressBegan,
             onPressEnded: onShutterPressEnded,
-            onPressCancelled: onShutterPressCancelled
+            onPressCancelled: onShutterPressCancelled,
+            isForcePressed: $isForcePressed
         )
     }
     
@@ -96,6 +97,7 @@ struct BottomBarView: View {
     let theme: AppTheme
     @Binding var shutterCount: Int
     @Binding var shutterCountBurst: Int
+    @Binding var isForcePressed: Bool
     let onShutterPressBegan: () -> Void
     let onShutterPressEnded: () -> Void
     let onShutterPressCancelled: () -> Void

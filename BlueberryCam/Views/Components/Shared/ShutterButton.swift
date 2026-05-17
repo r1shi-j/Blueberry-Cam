@@ -8,7 +8,19 @@ struct ShutterButton: View {
     let onPressBegan: () -> Void
     let onPressEnded: () -> Void
     let onPressCancelled: () -> Void
+    @Binding var isForcePressed: Bool
     @State private var isPressed = false
+    
+    init(tint: Color, height: CGFloat, isEnabled: Bool = true, isProcessing: Bool, onPressBegan: @escaping () -> Void, onPressEnded: @escaping () -> Void, onPressCancelled: @escaping () -> Void, isForcePressed: Binding<Bool> = .constant(false)) {
+        self.tint = tint
+        self.height = height
+        self.isEnabled = isEnabled
+        self.isProcessing = isProcessing
+        self.onPressBegan = onPressBegan
+        self.onPressEnded = onPressEnded
+        self.onPressCancelled = onPressCancelled
+        self._isForcePressed = isForcePressed
+    }
     
     var body: some View {
         ZStack {
@@ -19,7 +31,7 @@ struct ShutterButton: View {
                 .fill(.white)
                 .frame(width: height*0.84, height: height*0.84)
                 .glassEffect(.regular.interactive())
-                
+                .scaleEffect(!isPressed && isForcePressed ? 1.2 : 1)
             if isProcessing {
                 ProgressView()
                     .controlSize(.large)
@@ -30,6 +42,7 @@ struct ShutterButton: View {
         .transition(.opacity)
         .animation(.easeInOut(duration: 0.15), value: isPressed)
         .animation(.easeInOut(duration: 0.2), value: isProcessing)
+        .animation(.bouncy(duration: 0.5, extraBounce: 0.3), value: isForcePressed)
         .contentShape(.rect)
         .gesture(pressGesture)
         .allowsHitTesting(isEnabled)
