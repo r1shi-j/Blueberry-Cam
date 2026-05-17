@@ -97,8 +97,7 @@ extension BlueberryCamApp {
         guard count > 0 else { return }
         
         await MainActor.run {
-            self.shutterCount += count
-            self.lockedCaptureHapticTrigger += 1
+            self.recordLockedCaptureCount(count)
         }
     }
     

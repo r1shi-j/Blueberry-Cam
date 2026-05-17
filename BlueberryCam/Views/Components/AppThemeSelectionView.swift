@@ -1,20 +1,22 @@
 import SwiftUI
 
 struct AppThemeSelectionView: View {
-    @Binding var hasUnlockedThemes: Bool
-    @Binding var selectedThemeID: String
+    @Bindable var appSettings: AppSettings
+    
     @State private var previewingThemeID: String
     @State private var isShowingLockedAlert = false
+    @State private var isShowingLockedCustomAlert = false
     @State private var isShowingUnlockedAlert = false
+    @State private var isShowingIncorrectUnlockAlert = false
+    @State private var isShowingIncorrectCustomUnlockAlert = false
     @State private var unlockThemesGuess = ""
-    private let unlockThemesKey = "BlueberryCam_08052026"
-    
+    @State private var unlockThemesCustomGuess = ""
+    @State private var selectedThemeBeforeUnlock: String?
     @State private var selectionHapticTrigger = 0
     
-    init(hasUnlockedThemes: Binding<Bool>, selectedThemeID: Binding<String>) {
-        self._hasUnlockedThemes = hasUnlockedThemes
-        self._selectedThemeID = selectedThemeID
-        self._previewingThemeID = State(initialValue: selectedThemeID.wrappedValue)
+    init(appSettings: AppSettings) {
+        self.appSettings = appSettings
+        self._previewingThemeID = State(initialValue: appSettings.selectedThemeID)
     }
     
     private var themesToShow: [AppTheme] {
@@ -23,14 +25,18 @@ struct AppThemeSelectionView: View {
         if DeviceModel.isIphone17ProSeries {
             themes += AppTheme.iphone17pro
         }
-        themes += [AppTheme.custom]
+        themes += [appSettings.theme(for: AppTheme.customID)]
         return themes
+    }
+    
+    private var previewingTheme: AppTheme {
+        appSettings.theme(for: previewingThemeID)
     }
     
     var body: some View {
         ZStack {
             Color.black.ignoresSafeArea()
-                .overlay(AppTheme.theme(for: previewingThemeID).background)
+                .overlay(previewingTheme.background)
             
             ScrollView {
                 VStack(spacing: 0) {
@@ -40,7 +46,7 @@ struct AppThemeSelectionView: View {
                         .font(.caption)
                         .fontWidth(.expanded)
                         .fontWeight(.bold)
-                    AppThemePreview(theme: AppTheme.theme(for: previewingThemeID))
+                    AppThemePreview(theme: previewingTheme, appSettings: appSettings)
                 }
                 .padding()
             }
@@ -56,39 +62,74 @@ struct AppThemeSelectionView: View {
                     .font(.system(size: 18, weight: .bold, design: .serif))
                     .foregroundStyle(.white)
             }
+            //            ToolbarItem(placement: .topBarTrailing) {
+            //                Button("Debug", systemImage: "hammer.fill") {
+            //                    appSettings.selectedThemeID = AppTheme.defaultID
+            //                    previewingThemeID = AppTheme.defaultID
+            //                    appSettings.manuallyUnlockedThemes.toggle()
+            //                    appSettings.manuallyUnlockedCustomThemes = appSettings.manuallyUnlockedThemes
+            //                    appSettings.didShowCustomThemeUnlockMilestone = appSettings.manuallyUnlockedThemes
+            //                    appSettings.didShowThemeUnlockMilestone = appSettings.didShowCustomThemeUnlockMilestone
+            //                }
+            //            }
             ToolbarItem(placement: .topBarTrailing) {
-                Button("Debug", systemImage: "hammer.fill") {
-                    selectedThemeID = AppTheme.defaultID
-                    previewingThemeID = AppTheme.defaultID
-                    hasUnlockedThemes.toggle()
-                }
-            }
-            ToolbarItem(placement: .topBarTrailing) {
-                if !hasUnlockedThemes {
+                if !appSettings.hasUnlockedThemes {
                     Button("Locked", systemImage: "lock.fill") {
                         isShowingLockedAlert = true
                     }
                 } else {
-                    Button("Unlocked", systemImage: "lock.open.fill") {
-                        isShowingUnlockedAlert = true
+                    if !appSettings.hasUnlockedCustomThemes {
+                        Button("Locked", systemImage: "lock.fill") {
+                            isShowingLockedCustomAlert = true
+                        }
+                    } else {
+                        Button("Unlocked", systemImage: "lock.open.fill") {
+                            isShowingUnlockedAlert = true
+                        }
                     }
                 }
             }
         }
-        .onChange(of: unlockThemesGuess) { oldValue, newValue in
-            if newValue == unlockThemesKey {
-                selectedThemeID = previewingThemeID
-                hasUnlockedThemes = true
-            }
-        }
         .alert("Requirements not met to unlock app themes.", isPresented: $isShowingLockedAlert) {
             SecureField("Unlock Themes Key", text: $unlockThemesGuess)
+                .onSubmit {
+                    submitThemeUnlockKey()
+                }
+            Button("Cancel", role: .cancel, action: resetUnlockState)
+            Button("Unlock", action: submitThemeUnlockKey)
         } message: {
             Text("To unlock app themes, your standard shutter count must be at least 100, and burst count at least 500.\nYou can check your statistics at the bottom of settings, or below the photos link shortcut to the left of the shutter button.\nAlternatively, if you have an unlock key enter it below.")
+        }
+        .alert("Requirements not met to unlock custom app themes.", isPresented: $isShowingLockedCustomAlert) {
+            SecureField("Unlock Custom Themes Key", text: $unlockThemesCustomGuess)
+                .onSubmit {
+                    submitCustomThemeUnlockKey()
+                }
+            Button("Cancel", role: .cancel, action: resetUnlockState)
+            Button("Unlock", action: submitCustomThemeUnlockKey)
+        } message: {
+            Text("To unlock custom app themes, your standard shutter count must be at least 1000, and burst count at least 1000.\nYou can check your statistics at the bottom of settings, or below the photos link shortcut to the left of the shutter button.\nAlternatively, if you have an unlock key enter it below.")
+        }
+        .alert("Incorrect unlock key", isPresented: $isShowingIncorrectUnlockAlert) {
+            Button("Cancel", role: .cancel, action: resetUnlockState)
+            Button("Try Again") {
+                isShowingLockedAlert = true
+            }
+        } message: {
+            Text("Check the unlock key and try again.")
+        }
+        .alert("Incorrect custom unlock key", isPresented: $isShowingIncorrectCustomUnlockAlert) {
+            Button("Cancel", role: .cancel, action: resetUnlockState)
+            Button("Try Again") {
+                isShowingLockedCustomAlert = true
+            }
+        } message: {
+            Text("Check the custom unlock key and try again.")
         }
         .alert("All themes are unlocked!", isPresented: $isShowingUnlockedAlert) { }
     }
     
+    // MARK: - Subviews
     private func themeList() -> some View {
         VStack(spacing: 0) {
             ForEach(themesToShow) { theme in
@@ -105,66 +146,193 @@ struct AppThemeSelectionView: View {
     
     private func themeRow(_ theme: AppTheme) -> some View {
         Button {
-            if hasUnlockedThemes {
-                selectTheme(theme)
-            } else {
-                if theme.id != AppTheme.defaultID {
-                    isShowingLockedAlert = true
-                }
-            }
+            handleThemeClicked(theme)
         } label: {
             HStack {
-                if !hasUnlockedThemes && theme.id != selectedThemeID {
-                    Image(systemName: "lock.fill")
-                }
-                Text(theme.name)
-                    .foregroundStyle(.primary)
-                    .padding(.vertical, 4)
-                
+                themeName(theme)
                 Spacer()
-                
-                if !hasUnlockedThemes && theme.id != previewingThemeID && theme.id != AppTheme.customID {
-                    Button("Preview") {
-                        selectTheme(theme)
-                    }
-                    .font(.caption)
-                    .fontWidth(.expanded)
-                    .bold()
-                    .tint(AppTheme.theme(for: theme.id).accent)
-                    .buttonStyle(.glassProminent)
+                if theme.isThemeSpecificToDevice() {
+                    iphone17ProBadge(theme.accent)
+                        .padding(.trailing)
                 }
-                
-                if selectedThemeID == theme.id || !hasUnlockedThemes {
-                    Image(systemName: "checkmark")
-                        .foregroundStyle(AppTheme.theme(for: theme.id).accent)
-                        .contentTransition(.symbolEffect(.replace))
-                        .symbolEffect(.bounce, value: selectedThemeID)
-                        .opacity(!hasUnlockedThemes && theme.id != AppTheme.defaultID ? 0 : 1)
-                        .padding(.leading)
+                if theme.id == AppTheme.customID {
+                    customBadge(theme.accent)
+                        .padding(.trailing)
                 }
+                if !appSettings.hasUnlockedThemes && theme.id != previewingThemeID && theme.id != AppTheme.customID {
+                    previewButton(theme)
+                }
+                tickOrLockIndicator(theme)
+                    .padding(.leading)
             }
             .contentShape(.rect)
+            .animation(Animations.easeInOut, value: appSettings.hasUnlockedThemes)
+            .animation(Animations.easeInOut, value: appSettings.hasUnlockedCustomThemes)
         }
-        .padding(.horizontal)
+        .padding(.horizontal, 4)
         .padding(.vertical, 14)
         .buttonStyle(.plain)
-        .disabled(/*!hasUnlockedThemes && */theme.id == AppTheme.customID)
+        .disabled(!appSettings.hasUnlockedThemes && theme.id == AppTheme.customID)
     }
     
-    private func selectTheme(_ theme: AppTheme) {
-        guard previewingThemeID != theme.id else { return }
-        selectionHapticTrigger += 1
-        withAnimation(Animations.easeInOut) {
-            previewingThemeID = theme.id
-            if hasUnlockedThemes {
-                selectedThemeID = theme.id
+    private func themeName(_ theme: AppTheme) -> some View {
+        Text(theme.name)
+            .foregroundStyle(.primary)
+            .padding(.vertical, 10)
+    }
+    
+    private func iphone17ProBadge(_ accent: Color) -> some View {
+        ZStack {
+            Image(systemName: "iphone.gen3.sizes")
+                .font(.system(size: 16))
+                .foregroundStyle(accent)
+            
+            let text = "  IPHONE 17 PRO SERIES •"
+            let characters = Array(text)
+            let totalAngle: Double = 360
+            let radius: CGFloat = 17
+            
+            ForEach(0..<characters.count, id: \.self) { index in
+                let angle = -totalAngle/2 + (totalAngle / Double(characters.count - 1)) * Double(index)
+                Text(String(characters[index]))
+                    .font(.system(size: 6.5, weight: .bold, design: .rounded))
+                    .offset(y: -radius)
+                    .rotationEffect(.degrees(angle))
             }
         }
+        .foregroundStyle(.secondary)
+        .frame(width: 40, height: 40)
+    }
+    
+    private func customBadge(_ accent: Color) -> some View {
+        Image(systemName: "iphone.pattern.diagonalline.on.rectangle.portrait.dashed")
+            .font(.system(size: 18))
+            .foregroundStyle(accent)
+            .frame(width: 40, height: 40)
+    }
+    
+    private func previewButton(_ theme: AppTheme) -> some View {
+        Button("Preview") {
+            guard previewingThemeID != theme.id else { return }
+            selectionHapticTrigger += 1
+            withAnimation(Animations.easeInOut) {
+                previewingThemeID = theme.id
+            }
+        }
+        .font(.caption)
+        .fontWidth(.expanded)
+        .bold()
+        .tint(theme.accent)
+        .buttonStyle(.glassProminent)
+        .transition(.opacity.combined(with: .scale(scale: 0.92)))
+    }
+    
+    private func tickOrLockIndicator(_ theme: AppTheme) -> some View {
+        Group {
+            if appSettings.selectedThemeID == theme.id {
+                Image(systemName: "checkmark")
+                    .foregroundStyle(theme.accent)
+                    .contentTransition(.symbolEffect(.replace))
+                    .symbolEffect(.bounce, value: appSettings.selectedThemeID)
+            } else {
+                if !appSettings.hasUnlockedCustomThemes && theme.id == AppTheme.customID {
+                    Image(systemName: "lock")
+                        .transition(.opacity.combined(with: .scale(scale: 0.85)))
+                } else if !appSettings.hasUnlockedThemes {
+                    Image(systemName: "lock.fill")
+                        .transition(.opacity.combined(with: .scale(scale: 0.85)))
+                } else {
+                    Image(systemName: "checkmark")
+                        .opacity(0)
+                }
+            }
+        }
+    }
+    
+    // MARK: - Functions
+    private func hasUnlockedTheme(_ theme: AppTheme) -> Bool {
+        if theme.id == AppTheme.defaultID { return true }
+        guard appSettings.hasUnlockedThemes else { return false }
+        if theme.id == AppTheme.customID { return appSettings.hasUnlockedCustomThemes }
+        if AppTheme.iphone17pro.map(\.id).contains(theme.id) { return DeviceModel.isIphone17ProSeries }
+        return true
+    }
+    
+    private func handleThemeClicked(_ theme: AppTheme) {
+        guard previewingThemeID != theme.id else { return }
+        
+        if hasUnlockedTheme(theme) {
+            selectionHapticTrigger += 1
+            withAnimation(Animations.easeInOut) {
+                previewingThemeID = theme.id
+                if appSettings.hasUnlockedThemes {
+                    appSettings.selectedThemeID = theme.id
+                }
+            }
+        } else {
+            selectedThemeBeforeUnlock = theme.id
+            if theme.id == AppTheme.customID {
+                isShowingLockedCustomAlert = true
+            } else {
+                isShowingLockedAlert = true
+            }
+        }
+    }
+    
+    private func submitThemeUnlockKey() {
+        if appSettings.unlockThemes(with: unlockThemesGuess) {
+            applyUnlockedThemeSelection()
+        } else {
+            unlockThemesGuess = ""
+            isShowingIncorrectUnlockAlert = true
+        }
+    }
+    
+    private func submitCustomThemeUnlockKey() {
+        if appSettings.unlockCustomThemes(with: unlockThemesCustomGuess) {
+            applyUnlockedThemeSelection()
+        } else {
+            unlockThemesCustomGuess = ""
+            isShowingIncorrectCustomUnlockAlert = true
+        }
+    }
+    
+    private func applyUnlockedThemeSelection() {
+        withAnimation(Animations.easeInOut) {
+            if let selectedThemeBeforeUnlock {
+                previewingThemeID = selectedThemeBeforeUnlock
+            }
+            appSettings.selectedThemeID = previewingThemeID
+        }
+        resetUnlockState()
+    }
+    
+    private func resetUnlockState() {
+        unlockThemesGuess = ""
+        unlockThemesCustomGuess = ""
+        selectedThemeBeforeUnlock = nil
     }
 }
 
 private struct AppThemePreview: View {
     let theme: AppTheme
+    @Bindable var appSettings: AppSettings
+    
+    private func colorBinding(for keyPath: WritableKeyPath<CustomThemePalette, String>) -> Binding<Color> {
+        Binding {
+            Color(hex: appSettings.customTheme[keyPath: keyPath])
+        } set: { newColor in
+            appSettings.updateCustomThemeColor(newColor, for: keyPath)
+        }
+    }
+    
+    private var isCustom: Bool {
+        theme.id == AppTheme.customID
+    }
+    
+    private var activeTheme: AppTheme {
+        isCustom ? appSettings.theme(for: AppTheme.customID) : theme
+    }
     
     var body: some View {
         VStack(spacing: 24) {
@@ -172,64 +340,85 @@ private struct AppThemePreview: View {
                 readoutsColor()
             }
             previewButtons()
+            Text("Shutter Types")
+                .font(.caption)
+                .fontWidth(.expanded)
+                .fontWeight(.light)
             shutterPreview()
-            lensPreview()
         }
         .padding()
-        .allowsHitTesting(false)
+        .allowsHitTesting(isCustom)
     }
     
     private func readoutsColor() -> some View {
         Text("Readouts font color if enabled")
-            .foregroundStyle(theme.readoutColor)
+            .foregroundStyle(activeTheme.readoutColor)
             .font(.system(size: 14, weight: .regular, design: .monospaced))
     }
     
     private func previewButtons() -> some View {
         HStack(spacing: 12) {
-            Button("Accent Color") { }
-                .font(.callout)
-                .fontWidth(.expanded)
-                .bold()
-                .tint(theme.accent)
-                .buttonStyle(.glassProminent)
+            VStack(spacing: 10) {
+                Button("Accent Color") { }
+                    .font(.callout)
+                    .fontWidth(.expanded)
+                    .bold()
+                    .tint(activeTheme.accent)
+                    .buttonStyle(.glassProminent)
+                
+                if isCustom {
+                    ColorPicker("", selection: colorBinding(for: \.accentHex), supportsOpacity: true)
+                        .labelsHidden()
+                }
+            }
             
-            Button("Accent Text") { }
-                .font(.callout)
-                .fontWidth(.expanded)
-                .bold()
-                .foregroundStyle(theme.accent)
-                .buttonStyle(.glass)
+            VStack(spacing: 10) {
+                Button("Background") { }
+                    .font(.callout)
+                    .fontWidth(.expanded)
+                    .bold()
+                    .foregroundStyle(.white)
+                    .buttonStyle(.glass)
+                
+                if isCustom {
+                    ColorPicker("", selection: colorBinding(for: \.backgroundHex), supportsOpacity: true)
+                        .labelsHidden()
+                }
+            }
         }
     }
     
     private func lensPreview() -> some View {
-        GlassEffectContainer(spacing: 8) {
-            Button { } label: {
-                Text("1")
-                    .font(.system(.callout, design: .monospaced))
-                    .bold()
-                    .foregroundStyle(.black)
-                    .frame(width: 54, height: 54)
-                    .contentShape(.circle)
+        VStack(spacing: 12) {
+            GlassEffectContainer(spacing: 8) {
+                Button { } label: {
+                    Text("1")
+                        .font(.system(.callout, design: .monospaced))
+                        .bold()
+                        .foregroundStyle(.black)
+                        .frame(width: 54, height: 54)
+                        .contentShape(.circle)
+                }
+                .buttonStyle(.plain)
+                .glassEffect(.regular.interactive().tint(activeTheme.accent.opacity(0.86)), in: .circle)
             }
-            .buttonStyle(.plain)
-            .glassEffect(.regular.interactive().tint(theme.accent.opacity(0.86)), in: .circle)
+            Text("Lens Picker")
+                .font(.caption)
+                .fontWidth(.expanded)
         }
     }
     
     private func shutterPreview() -> some View {
         GlassEffectContainer {
-            
-            
-            VStack(spacing: 8) {
+            VStack(spacing: 24) {
                 HStack(spacing: 28) {
-                    ThemeShutterPreviewButton(tint: theme.shutterProcessed, desc: "Standard")
-                    ThemeShutterPreviewButton(tint: theme.shutterRaw, desc: "RAW")
-                    ThemeShutterPreviewButton(tint: theme.shutterProRaw, desc: "ProRAW")
+                    ThemeShutterPreviewButton(isCustom: isCustom, tint: isCustom ? colorBinding(for: \.shutterRawHex) : .constant(activeTheme.shutterRaw), desc: "RAW")
+                    ThemeShutterPreviewButton(isCustom: isCustom, tint: isCustom ? colorBinding(for: \.shutterProRawHex) : .constant(activeTheme.shutterProRaw), desc: "ProRAW")
+                    ThemeShutterPreviewButton(isCustom: isCustom, tint: isCustom ? colorBinding(for: \.shutterBurstHex) : .constant(activeTheme.shutterBurst), desc: "Burst")
                 }
-                HStack(spacing: 28) {
-                    ThemeShutterPreviewButton(tint: theme.shutterBurst, desc: "Burst")
+                HStack(alignment: .bottom, spacing: 28) {
+                    ThemeShutterPreviewButton(isCustom: false, tint: activeTheme.shutterProcessed, desc: "Standard")
+                    lensPreview()
                 }
             }
         }
@@ -237,10 +426,23 @@ private struct AppThemePreview: View {
 }
 
 private struct ThemeShutterPreviewButton: View {
-    let tint: Color
+    let isCustom: Bool
+    @Binding var tint: Color
     let desc: String
     
     private let height: CGFloat = 82
+    
+    init(isCustom: Bool, tint: Color, desc: String) {
+        self.isCustom = isCustom
+        self._tint = .constant(tint)
+        self.desc = desc
+    }
+    
+    init(isCustom: Bool, tint: Binding<Color>, desc: String) {
+        self.isCustom = isCustom
+        self._tint = tint
+        self.desc = desc
+    }
     
     var body: some View {
         VStack(spacing: 12) {
@@ -255,17 +457,24 @@ private struct ThemeShutterPreviewButton: View {
             }
             .frame(width: height, height: height)
             
-            Text(desc)
-                .font(.caption)
-                .fontWidth(.expanded)
+            HStack {
+                Text(desc)
+                    .font(.caption)
+                    .fontWidth(.expanded)
+                if isCustom {
+                    ColorPicker("", selection: $tint, supportsOpacity: true)
+                        .font(.caption)
+                        .fontWidth(.expanded)
+                        .labelsHidden()
+                }
+            }
         }
     }
 }
 
 #Preview {
-    @Previewable @State var hasUnlockedThemes = true
-    @Previewable @State var selectedThemeID = "blueberry"
+    @Previewable @State var appSettings = AppSettings()
     NavigationStack {
-        AppThemeSelectionView(hasUnlockedThemes: $hasUnlockedThemes, selectedThemeID: $selectedThemeID)
+        AppThemeSelectionView(appSettings: appSettings)
     }
 }

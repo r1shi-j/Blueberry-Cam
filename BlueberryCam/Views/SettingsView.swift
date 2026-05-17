@@ -7,11 +7,7 @@ struct SettingsView: View {
     @Environment(\.openURL) private var openURL
     
     @Bindable var cameraModel: CameraModel
-    @Binding var hasUnlockedThemes: Bool
-    @Binding var selectedAppThemeID: String
-    @Binding var usesAppThemeReadouts: Bool
-    @Binding var shutterCount: Int
-    @Binding var shutterCountBurst: Int
+    @Bindable var appSettings: AppSettings
     let resetToDefaults: () -> ()
     
     @State private var confettiCount = 0
@@ -256,17 +252,17 @@ struct SettingsView: View {
                 
                 Section {
                     NavigationLink {
-                        AppThemeSelectionView(hasUnlockedThemes: $hasUnlockedThemes, selectedThemeID: $selectedAppThemeID)
+                        AppThemeSelectionView(appSettings: appSettings)
                     } label: {
                         LabeledContent("App Theme") {
-                            Text(AppTheme.theme(for: selectedAppThemeID).name)
+                            Text(appSettings.selectedTheme.name)
                                 .contentTransition(.opacity)
-                                .animation(Animations.easeInOut, value: selectedAppThemeID)
+                                .animation(Animations.easeInOut, value: appSettings.selectedThemeID)
                         }
                     }
                     
                     Toggle("Readouts using App Theme", isOn: usesAppThemeReadoutsSelection)
-                        .disabled(selectedAppThemeID == AppTheme.defaultID)
+                        .disabled(appSettings.selectedThemeID == AppTheme.defaultID)
                 } header: {
                     HStack {
                         Text("Customisation")
@@ -275,7 +271,7 @@ struct SettingsView: View {
                             .symbolEffect(.bounce, options: .repeat(.periodic(delay: 1)).speed(0.7))
                     }
                 } footer: {
-                    if selectedAppThemeID == AppTheme.defaultID {
+                    if appSettings.selectedThemeID == AppTheme.defaultID {
                         Text("For the default theme, readout colours are restricted to the standard colour palette")
                     } else {
                         Text("Use the default colour palette or use a single colour defined in the app theme for the live readouts.")
@@ -323,7 +319,7 @@ struct SettingsView: View {
                     // TODO: Reset tips
                     
                     LabeledContent {
-                        Text(shutterCount.formatted())
+                        Text(appSettings.shutterCount.formatted())
                     } label: {
                         Button("Reset Shutter Count") {
                             triggerSettingsSelectionHaptic()
@@ -333,7 +329,7 @@ struct SettingsView: View {
                     }
                     
                     LabeledContent {
-                        Text(shutterCountBurst.formatted())
+                        Text(appSettings.shutterCountBurst.formatted())
                     } label: {
                         Button("Reset Burst Shutter Count") {
                             triggerSettingsSelectionHaptic()
@@ -395,8 +391,7 @@ struct SettingsView: View {
                 Button(Alerts.reset, role: .destructive) {
                     triggerSettingsResetHaptic()
                     resetToDefaults()
-                    selectedAppThemeID = AppTheme.defaultID
-                    usesAppThemeReadouts = false
+                    appSettings.resetThemePreferences()
                 }
             }
             .alert(countResetTarget?.confirmationTitle ?? "", isPresented: Binding(get: {
@@ -409,16 +404,9 @@ struct SettingsView: View {
                 Button(Alerts.cancel, role: .cancel) { }
                 Button(Alerts.reset, role: .destructive) {
                     triggerSettingsResetHaptic()
-                    switch countResetTarget {
-                        case .standard:
-                            shutterCount = 0
-                        case .burst:
-                            shutterCountBurst = 0
-                        case nil:
-                            break
+                    if let countResetTarget {
+                        appSettings.resetShutterCount(countResetTarget)
                     }
-                    hasUnlockedThemes = false
-                    selectedAppThemeID = AppTheme.defaultID
                     countResetTarget = nil
                 }
             }
@@ -433,9 +421,9 @@ struct SettingsView: View {
                     confettiCount += 1
                 }
             }
-            .onChange(of: selectedAppThemeID) { _, newThemeID in
+            .onChange(of: appSettings.selectedThemeID) { _, newThemeID in
                 if newThemeID == AppTheme.defaultID {
-                    usesAppThemeReadouts = false
+                    appSettings.usesAppThemeReadouts = false
                 }
             }
         }
@@ -446,7 +434,7 @@ struct SettingsView: View {
                     ConfettiCannon(
                         trigger: $confettiCount,
                         num: 50,
-                        confettis: ConfettiObjects.left,
+                        confettis: ConfettiObjects.captureLeft,
                         confettiSize: 12,
                         rainHeight: 800,
                         openingAngle: .degrees(45),
@@ -457,7 +445,7 @@ struct SettingsView: View {
                     ConfettiCannon(
                         trigger: $confettiCount,
                         num: 50,
-                        confettis: ConfettiObjects.right,
+                        confettis: ConfettiObjects.captureRight,
                         confettiSize: 12,
                         rainHeight: 800,
                         openingAngle: .degrees(105),
@@ -547,14 +535,14 @@ struct SettingsView: View {
     
     private var usesAppThemeReadoutsSelection: Binding<Bool> {
         Binding {
-            selectedAppThemeID == AppTheme.defaultID ? false : usesAppThemeReadouts
+            appSettings.selectedThemeID == AppTheme.defaultID ? false : appSettings.usesAppThemeReadouts
         } set: { newValue in
-            guard selectedAppThemeID != AppTheme.defaultID else {
-                usesAppThemeReadouts = false
+            guard appSettings.selectedThemeID != AppTheme.defaultID else {
+                appSettings.usesAppThemeReadouts = false
                 return
             }
             triggerSettingsSelectionHaptic()
-            usesAppThemeReadouts = newValue
+            appSettings.usesAppThemeReadouts = newValue
         }
     }
     
@@ -599,32 +587,11 @@ struct SettingsView: View {
     }
 }
 
-private enum ShutterCountResetTarget {
-    case standard
-    case burst
-    
-    var confirmationTitle: String {
-        switch self {
-            case .standard:
-                "Are you sure you want to reset the shutter count, this cannot be undone."
-            case .burst:
-                "Are you sure you want to reset the burst shutter count, this cannot be undone."
-        }
-    }
-}
-
 #Preview {
     @Previewable @State var cameraModel = CameraModel()
-    @Previewable @State var hasUnlockedThemes = false
-    @Previewable @State var selectedAppThemeID = AppTheme.defaultID
-    @Previewable @State var usesAppThemeReadouts = false
-    @Previewable @State var shutterCount = 0
-    @Previewable @State var shutterCountBurst = 0
+    @Previewable @State var appSettings = AppSettings()
     SettingsView(
         cameraModel: cameraModel,
-        hasUnlockedThemes: $hasUnlockedThemes,
-        selectedAppThemeID: $selectedAppThemeID,
-        usesAppThemeReadouts: $usesAppThemeReadouts,
-        shutterCount: $shutterCount,
-        shutterCountBurst: $shutterCountBurst) { }
+        appSettings: appSettings
+    ) { }
 }

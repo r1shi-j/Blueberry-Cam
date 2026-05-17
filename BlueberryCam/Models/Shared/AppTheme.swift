@@ -1,5 +1,21 @@
 import SwiftUI
 
+struct CustomThemePalette: Equatable {
+    static let defaults = CustomThemePalette(
+        backgroundHex: Color.black.toHex() ?? "000000",
+        accentHex: Color.yellow.toHex() ?? "FFFF00",
+        shutterRawHex: Color.blue.mix(with: .mint, by: 0.5).opacity(0.4).toHex() ?? "007FFF66",
+        shutterProRawHex: Color.purple.mix(with: .pink, by: 0.35).opacity(0.4).toHex() ?? "AF40D966",
+        shutterBurstHex: Color.yellow.opacity(0.8).toHex() ?? "FFFF00CC"
+    )
+    
+    var backgroundHex: String
+    var accentHex: String
+    var shutterRawHex: String
+    var shutterProRawHex: String
+    var shutterBurstHex: String
+}
+
 struct AppTheme: Equatable, Identifiable {
     let id: String
     let name: String
@@ -108,20 +124,29 @@ struct AppTheme: Equatable, Identifiable {
         )
     ]
     
-    static let custom: AppTheme = AppTheme(
-        id: customID,
-        name: "Custom",
-        background: .black,
-        accent: .yellow,
-        shutterRaw: .blue.mix(with: .mint, by: 0.5).opacity(0.4),
-        shutterProRaw: .purple.mix(with: .pink, by: 0.35).opacity(0.4),
-        shutterBurst: .yellow.opacity(0.8)
-    )
+    static func custom(from customTheme: CustomThemePalette) -> AppTheme {
+        AppTheme(
+            id: customID,
+            name: "Custom",
+            background: Color(hex: customTheme.backgroundHex),
+            accent: Color(hex: customTheme.accentHex),
+            shutterRaw: Color(hex: customTheme.shutterRawHex),
+            shutterProRaw: Color(hex: customTheme.shutterProRawHex),
+            shutterBurst: Color(hex: customTheme.shutterBurstHex)
+        )
+    }
     
-    static private let main: [AppTheme] = [classic] + standard + [custom]
-    static private let all: [AppTheme] = main + iphone17pro
+    static private var builtInThemes: [AppTheme] { [classic] + standard + iphone17pro }
     
-    static func theme(for id: String) -> AppTheme {
-        all.first { $0.id == id } ?? classic
+    static func theme(for id: String, customTheme: CustomThemePalette = .defaults) -> AppTheme {
+        if id == customID {
+            return custom(from: customTheme)
+        }
+        
+        return builtInThemes.first { $0.id == id } ?? classic
+    }
+    
+    func isThemeSpecificToDevice() -> Bool {
+        return AppTheme.iphone17pro.map(\.id).contains(self.id)
     }
 }

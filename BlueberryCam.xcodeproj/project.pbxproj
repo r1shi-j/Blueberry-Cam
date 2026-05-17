@@ -90,6 +90,7 @@
 				Models/Shared/BundleIDs.swift,
 				Models/Shared/CaptureAspectRatioOption.swift,
 				Models/Shared/CaptureMode.swift,
+				"Models/Shared/Color+Extension.swift",
 				Models/Shared/Constants.swift,
 				Models/Shared/FloatExtension.swift,
 				Models/Shared/Lens.swift,

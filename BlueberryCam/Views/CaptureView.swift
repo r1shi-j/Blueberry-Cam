@@ -32,10 +32,10 @@ extension CaptureView {
     private var focusReticleSliderXTolerance: CGFloat { 24 }
     private var focusReticleSliderYTolerance: CGFloat { 96 }
     private var appTheme: AppTheme {
-        AppTheme.theme(for: selectedAppThemeID)
+        appSettings.selectedTheme
     }
     private var usesThemedReadouts: Bool {
-        usesAppThemeReadouts && selectedAppThemeID != AppTheme.defaultID
+        appSettings.usesAppThemeReadouts && appSettings.selectedThemeID != AppTheme.defaultID
     }
     private var shouldMaskCaptureAspectRatioTransition: Bool {
         cameraModel.isCaptureAspectRatioTransitioning && cameraModel.activeLens.zoomFactor > 1
@@ -774,8 +774,8 @@ extension CaptureView {
         BottomBarView(
             cameraModel: cameraModel,
             theme: appTheme,
-            shutterCount: $shutterCount,
-            shutterCountBurst: $shutterCountBurst,
+            shutterCount: $appSettings.shutterCount,
+            shutterCountBurst: $appSettings.shutterCountBurst,
             onShutterPressBegan: handleShutterPressBegan,
             onShutterPressEnded: handleShutterPressEnded,
             onShutterPressCancelled: handleShutterPressCancelled
@@ -822,7 +822,7 @@ extension CaptureView {
         ConfettiCannon(
             trigger: $cameraModel.confettiCannonTrigger,
             num: 50,
-            confettis: ConfettiObjects.left,
+            confettis: ConfettiObjects.captureLeft,
             confettiSize: 12,
             rainHeight: 800,
             openingAngle: .degrees(45),
@@ -835,7 +835,7 @@ extension CaptureView {
         ConfettiCannon(
             trigger: $cameraModel.confettiCannonTrigger,
             num: 50,
-            confettis: ConfettiObjects.right,
+            confettis: ConfettiObjects.captureRight,
             confettiSize: 12,
             rainHeight: 800,
             openingAngle: .degrees(105),
@@ -949,11 +949,7 @@ struct CaptureView: View {
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.openURL) private var openURL
     
-    @Binding var hasUnlockedThemes: Bool
-    @Binding var selectedAppThemeID: String
-    @Binding var usesAppThemeReadouts: Bool
-    @Binding var shutterCount: Int
-    @Binding var shutterCountBurst: Int
+    @Bindable var appSettings: AppSettings
     @Bindable var permissionModel: PermissionModel
     @State private var cameraModel = CameraModel()
     @State private var levelModel = LevelMotionModel()
@@ -1019,11 +1015,7 @@ struct CaptureView: View {
             })) {
                 SettingsView(
                     cameraModel: cameraModel,
-                    hasUnlockedThemes: $hasUnlockedThemes,
-                    selectedAppThemeID: $selectedAppThemeID,
-                    usesAppThemeReadouts: $usesAppThemeReadouts,
-                    shutterCount: $shutterCount,
-                    shutterCountBurst: $shutterCountBurst,
+                    appSettings: appSettings,
                     resetToDefaults: cameraModel.resetToDefaults)
             }
     }
@@ -1046,7 +1038,7 @@ extension CaptureView {
     
     private func handleBurstPhotoCaptured() {
         triggerShutterFeedback()
-        shutterCountBurst += 1
+        appSettings.shutterCountBurst += 1
     }
     
     private func handleShutterPressBegan() {
@@ -1070,9 +1062,9 @@ extension CaptureView {
     
     private func handleOnAppear() {
         permissionModel.saveLocation = cameraModel.saveLocation
-        let standardShutterCount = $shutterCount
+        let appSettings = appSettings
         cameraModel.onStandardPhotoSaved = {
-            standardShutterCount.wrappedValue += 1
+            appSettings.shutterCount += 1
         }
         cameraModel.onTimerCountdownSecond = triggerCountdownFeedback
         UIDevice.current.beginGeneratingDeviceOrientationNotifications()
@@ -1234,39 +1226,4 @@ extension CaptureView {
     private func handleOnReceiveOrientationChange(_: Notification) {
         cameraModel.updateCaptureOrientation()
     }
-}
-
-enum ConfettiObjects {
-    static let left: [ConfettiType] = [
-        .sfSymbol(symbolName: "bolt.fill"),
-        .sfSymbol(symbolName: "camera.aperture"),
-        .sfSymbol(symbolName: "camera.shutter.button.fill"),
-        .sfSymbol(symbolName: "cloud.sun.fill"),
-        .sfSymbol(symbolName: "rainbow"),
-        .sfSymbol(symbolName: "bird"),
-        .image("camera.blueberry"),
-        .text("🫐"),
-        .text("🌉"),
-        .text("🌅"),
-        .text("🍛"),
-        .text("🏎️"),
-        .text("🏀"),
-        .text("🏈"),
-    ]
-    
-    static let right: [ConfettiType] = [
-        .sfSymbol(symbolName: "camera.macro"),
-        .sfSymbol(symbolName: "camera.filters"),
-        .sfSymbol(symbolName: "photo.stack.fill"),
-        .sfSymbol(symbolName: "cloud.bolt.rain"),
-        .sfSymbol(symbolName: "person.fill"),
-        .sfSymbol(symbolName: "mountain.2"),
-        .text("📸"),
-        .text("🌤️"),
-        .text("🌄"),
-        .text("🌃"),
-        .text("🐶"),
-        .text("🚙"),
-        .text("⚽️"),
-    ]
 }
