@@ -112,6 +112,7 @@ extension LockedCameraModel {
                 guard let self else { return }
                 Task { @MainActor in
                     guard self.cameraModelCanCapture, let settings = self.buildPhotoSettings(for: requestedCaptureMode) else { return }
+                    self.processingPhotoCount += 1
                     self.registerCaptureContext(for: settings, captureMode: requestedCaptureMode, onCapture: onCapture)
                     self.photoOutput.capturePhoto(with: settings, delegate: self)
                 }
@@ -119,6 +120,7 @@ extension LockedCameraModel {
             d.unlockForConfiguration()
         } else {
             guard let settings = buildPhotoSettings(for: requestedCaptureMode) else { return }
+            processingPhotoCount += 1
             registerCaptureContext(for: settings, captureMode: requestedCaptureMode, onCapture: onCapture)
             photoOutput.capturePhoto(with: settings, delegate: self)
         }

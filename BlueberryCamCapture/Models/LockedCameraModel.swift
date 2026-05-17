@@ -57,6 +57,8 @@ class LockedCameraModel: NSObject {
     
     // MARK: - UI State
     var isCapturing: Bool = false
+    var processingPhotoCount: Int = 0
+    var isProcessingPhoto: Bool { processingPhotoCount > 0 }
     var showError: Bool = false
     var errorMessage: String = ""
     

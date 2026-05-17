@@ -202,6 +202,7 @@ extension CameraModel: AVCapturePhotoCaptureDelegate {
                                                   isGenericAVFoundationFailure: Bool = false) {
         let shouldReportBurstFailure = context.isBurst && self._captureContextStore.markCaptureFailureIfNeeded(for: uniqueID)
         Task { @MainActor in
+            self.processingPhotoCount = max(0, self.processingPhotoCount - 1)
             if context.isBurst {
                 guard shouldReportBurstFailure else { return }
                 guard !self.shouldIgnoreBurstCaptureFailure(context: context, uniqueID: uniqueID) else { return }
@@ -217,6 +218,7 @@ extension CameraModel: AVCapturePhotoCaptureDelegate {
     
     private nonisolated func reportSaveSuccess(context: PhotoCaptureContext) {
         Task { @MainActor in
+            self.processingPhotoCount = max(0, self.processingPhotoCount - 1)
             if context.isBurst {
                 self.recordBurstSaveSuccess(context: context)
             } else {
@@ -233,6 +235,7 @@ extension CameraModel: AVCapturePhotoCaptureDelegate {
     
     private nonisolated func reportFileSaveFailure(_ error: Error, context: PhotoCaptureContext) {
         Task { @MainActor in
+            self.processingPhotoCount = max(0, self.processingPhotoCount - 1)
             self.recoverFromFileSaveLocationFailure(error)
             if context.isBurst {
                 self.recordBurstSaveFailure(context: context)
@@ -242,6 +245,7 @@ extension CameraModel: AVCapturePhotoCaptureDelegate {
     
     private nonisolated func reportSaveFailure(_ message: String, context: PhotoCaptureContext) {
         Task { @MainActor in
+            self.processingPhotoCount = max(0, self.processingPhotoCount - 1)
             if context.isBurst {
                 self.recordBurstSaveFailure(context: context)
             } else {

@@ -22,11 +22,19 @@ extension LockedCameraModel: AVCapturePhotoCaptureDelegate {
         )
         
         if let error {
-            Task { @MainActor in self.errorMessage = error.localizedDescription; self.showError = true }
+            Task { @MainActor in
+                self.processingPhotoCount = max(0, self.processingPhotoCount - 1)
+                self.errorMessage = error.localizedDescription
+                self.showError = true
+            }
             return
         }
         guard let data = photo.fileDataRepresentation() else {
-            Task { @MainActor in self.errorMessage = "Failed to get photo data."; self.showError = true }
+            Task { @MainActor in
+                self.processingPhotoCount = max(0, self.processingPhotoCount - 1)
+                self.errorMessage = "Failed to get photo data."
+                self.showError = true
+            }
             return
         }
         let isHeif = !photo.isRawPhoto && context.captureMode == .heif
@@ -43,6 +51,7 @@ extension LockedCameraModel: AVCapturePhotoCaptureDelegate {
               _captureContextStore.removeContext(for: resolvedSettings.uniqueID) != nil else { return }
         
         Task { @MainActor in
+            self.processingPhotoCount = max(0, self.processingPhotoCount - 1)
             self.errorMessage = error.localizedDescription
             self.showError = true
         }
@@ -62,7 +71,10 @@ extension LockedCameraModel: AVCapturePhotoCaptureDelegate {
             try data.write(to: fileURL)
             Self.appendToCaptureList(filename: filename, captureDate: captureDate, sessionURL: sessionURL)
         } catch {
-            Task { @MainActor in self.errorMessage = error.localizedDescription; self.showError = true }
+            Task { @MainActor in
+                self.errorMessage = error.localizedDescription
+                self.showError = true
+            }
             // Still attempt to save directly to Photos even if the session file write fails.
         }
         
@@ -76,6 +88,7 @@ extension LockedCameraModel: AVCapturePhotoCaptureDelegate {
         
         guard currentStatus == .authorized || currentStatus == .limited else {
             Task { @MainActor in
+                self.processingPhotoCount = max(0, self.processingPhotoCount - 1)
                 self.errorMessage = "Photos access denied. Please enable in Settings."
                 self.showError = true
             }
@@ -101,8 +114,14 @@ extension LockedCameraModel: AVCapturePhotoCaptureDelegate {
             // this is the only safe place to read placeholderForCreatedAsset.
             placeholderBox.value = req.placeholderForCreatedAsset?.localIdentifier
         }) { success, error in
+            Task { @MainActor in
+                self.processingPhotoCount = max(0, self.processingPhotoCount - 1)
+            }
             if let error {
-                Task { @MainActor in self.errorMessage = error.localizedDescription; self.showError = true }
+                Task { @MainActor in
+                    self.errorMessage = error.localizedDescription
+                    self.showError = true
+                }
                 return
             }
             guard success, let id = placeholderBox.value, let sessionURL else { return }

@@ -4,6 +4,7 @@ struct ShutterButton: View {
     let tint: Color
     let height: CGFloat
     var isEnabled = true
+    var isProcessing: Bool
     let onPressBegan: () -> Void
     let onPressEnded: () -> Void
     let onPressCancelled: () -> Void
@@ -18,9 +19,17 @@ struct ShutterButton: View {
                 .fill(.white)
                 .frame(width: height*0.84, height: height*0.84)
                 .glassEffect(.regular.interactive())
+                
+            if isProcessing {
+                ProgressView()
+                    .controlSize(.large)
+                    .tint(.black.opacity(0.6))
+            }
         }
         .frame(maxWidth: .infinity)
         .transition(.opacity)
+        .animation(.easeInOut(duration: 0.15), value: isPressed)
+        .animation(.easeInOut(duration: 0.2), value: isProcessing)
         .contentShape(.rect)
         .gesture(pressGesture)
         .allowsHitTesting(isEnabled)

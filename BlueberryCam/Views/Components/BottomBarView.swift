@@ -73,6 +73,7 @@ extension BottomBarView {
             tint: shutterTint,
             height: Style.buttonHeight,
             isEnabled: cameraModel.canUseShutterButton,
+            isProcessing: cameraModel.isProcessingPhoto && !cameraModel.isBurstCapturing,
             onPressBegan: onShutterPressBegan,
             onPressEnded: onShutterPressEnded,
             onPressCancelled: onShutterPressCancelled

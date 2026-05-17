@@ -185,6 +185,7 @@ extension CameraModel {
                 await self._burstCaptureTracker.waitForProcessingCapacity(limit: processingLimit)
                 guard !Task.isCancelled, self.canContinueBurstCapture else { break }
                 guard let settings = await self.buildNextBurstPhotoSettings() else { break }
+                self.processingPhotoCount += 1
                 self.registerCaptureContext(for: settings, isBurst: true, burstSessionID: burstSessionID)
                 let success = await self._burstCaptureTracker.waitForCapture(uniqueID: settings.uniqueID, gate: completionGate) { [photoOutput = self.photoOutput, weak self] in
                     guard let self else { return }
@@ -565,8 +566,8 @@ extension CameraModel {
             d.setExposureModeCustom(duration: duration, iso: isoValue) { [weak self] _ in
                 guard let self else { return }
                 Task { @MainActor in
-                    guard self.canCapturePhotoInCurrentState,
-                          let settings = self.buildPhotoSettings() else { return }
+                    guard self.canCapturePhotoInCurrentState, let settings = self.buildPhotoSettings() else { return }
+                    self.processingPhotoCount += 1
                     self.registerCaptureContext(for: settings, isBurst: false, onCapture: onCapture)
                     self.photoOutput.capturePhoto(with: settings, delegate: self)
                     if requestsConfettiAfterCapture {
@@ -577,6 +578,7 @@ extension CameraModel {
             d.unlockForConfiguration()
         } else {
             guard let settings = buildPhotoSettings() else { return }
+            processingPhotoCount += 1
             registerCaptureContext(for: settings, isBurst: false, onCapture: onCapture)
             photoOutput.capturePhoto(with: settings, delegate: self)
             if requestsConfettiAfterCapture {

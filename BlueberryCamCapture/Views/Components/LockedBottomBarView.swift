@@ -58,6 +58,7 @@ extension LockedBottomBarView {
         ShutterButton(
             tint: shutterTint,
             height: Style.buttonHeight,
+            isProcessing: cameraModel.isProcessingPhoto,
             onPressBegan: {},
             onPressEnded: onShutterPressEnded,
             onPressCancelled: {}
