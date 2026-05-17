@@ -4,6 +4,8 @@ struct LevelOverlayView: View {
     @Bindable var model: LevelMotionModel
     let theme: AppTheme
     
+    private let lineWidth: CGFloat = 1.2
+    
     var body: some View {
         GeometryReader { geo in
             let w = geo.size.width
@@ -22,7 +24,7 @@ struct LevelOverlayView: View {
                     .transition(.opacity)
                 case .flat:
                     Canvas { ctx, size in
-                        drawFlatMode(ctx: ctx, cx: cx, cy: cy)
+                        drawFlatMode(ctx: ctx, cx: cx, cy: cy, w: size.width)
                     }
                     .allowsHitTesting(false)
                     .transition(.opacity)
@@ -36,19 +38,14 @@ struct LevelOverlayView: View {
     // MARK: - Level Mode
     //
     // Layout (at 0°):
-    //   [── tick ──]     [── rotating bar ──]     [── tick ──]
-    //                ↑                         ↑
-    //            tickInner                 tickInner
+    //   [── tick ──][── rotating bar ──][── tick ──]
+    //    --tickLen--|------barLen------|--tickLen--
     //
-    // tickInner = barHalfLen so bar tip aligns with tick inner edge at 0°.
-    // Ticks also rotate to the nearest 90° cardinal, so in landscape
-    // they appear at the top/bottom instead of left/right.
     private func drawLevelMode(ctx: GraphicsContext, cx: CGFloat, cy: CGFloat, w: CGFloat) {
-        // ~2/3 of the previous sizing
-        let barHalfLen: CGFloat = w * 0.17    // bar tip
-        let tickInner: CGFloat = barHalfLen  // tick starts where bar ends
-        let tickOuter: CGFloat = w * 0.28    // tick outer edge
-        let lw: CGFloat = 1.2                 // same line width as crosshair
+        let barLen: CGFloat = w * 1/3   // bar length
+        let barHalfLen: CGFloat = barLen * 1/2  // half bar length
+        let tickLen: CGFloat = barLen * 1/3   // tick length
+        let lw: CGFloat = lineWidth   // same line width as crosshair
         
         let aligned = model.isAligned
         let barColor: Color = aligned ? theme.accent : .white
@@ -64,12 +61,12 @@ struct LevelOverlayView: View {
             layerCtx.translateBy(x: -cx, y: -cy)
             
             var lTick = Path()
-            lTick.move(to: CGPoint(x: cx - tickOuter, y: cy))
-            lTick.addLine(to: CGPoint(x: cx - tickInner, y: cy))
+            lTick.move(to: CGPoint(x: cx - barHalfLen, y: cy))
+            lTick.addLine(to: CGPoint(x: cx - barHalfLen - tickLen, y: cy))
             
             var rTick = Path()
-            rTick.move(to: CGPoint(x: cx + tickInner, y: cy))
-            rTick.addLine(to: CGPoint(x: cx + tickOuter, y: cy))
+            rTick.move(to: CGPoint(x: cx + barHalfLen, y: cy))
+            rTick.addLine(to: CGPoint(x: cx + barHalfLen + tickLen, y: cy))
             
             let tickStyle = StrokeStyle(lineWidth: lw, lineCap: .round)
             layerCtx.stroke(lTick, with: .color(tickColor), style: tickStyle)
@@ -91,13 +88,12 @@ struct LevelOverlayView: View {
     }
     
     // MARK: - Flat Mode
-    //
     // Fixed white crosshair at screen centre.
     // Floating yellow crosshair offset by gravity projection (inverted so it
     // moves in the intuitive direction — crosshair moves toward where "up" is).
-    private func drawFlatMode(ctx: GraphicsContext, cx: CGFloat, cy: CGFloat) {
-        let armLen: CGFloat = 14
-        let lw: CGFloat = 1.2
+    private func drawFlatMode(ctx: GraphicsContext, cx: CGFloat, cy: CGFloat, w: CGFloat) {
+        let armLen: CGFloat = w * 0.07 / 2
+        let lw: CGFloat = lineWidth
         
         // Fixed reference crosshair (white)
         drawCrosshair(ctx: ctx, x: cx, y: cy, color: .white.opacity(0.85), armLen: armLen, lineWidth: lw)
