@@ -1176,6 +1176,7 @@ extension CaptureView {
             isAwaitingFacingFlipCompletion = false
             var transaction = Transaction()
             transaction.disablesAnimations = true
+            
             withTransaction(transaction) {
                 visualZoomScale = 1.0
                 visualBlur = 0
@@ -1192,21 +1193,39 @@ extension CaptureView {
             let oldValue = Double(oldLens.label) ?? 1.0
             let newValue = Double(newLens.label) ?? 1.0
             let isZoomIn = newValue > oldValue
-            let targetScale: CGFloat = isZoomIn ? 1.035 : 0.965
-            withAnimation(.easeIn(duration: 0.15)) {
-                visualZoomScale = targetScale
-                visualOpacity = 0.62
-                visualBlur = 6
+            
+            let scale: CGFloat
+            let opacity: CGFloat
+            let blur: CGFloat
+            
+            // if switching to a digital crop on the same physical lens eg 1->2, 4->8 or vice versa, or front lens 1->1.5
+            if newLens.zoomFactor != oldLens.zoomFactor && oldLens.deviceType == newLens.deviceType {
+                scale = isZoomIn ? 1.01 : 0.99
+                opacity = 0.8
+                blur = 0
+            } else {
+                // For back lens switching
+                scale = isZoomIn ? 1.035 : 0.965
+                opacity = 0.62
+                blur = 6
+            }
+            
+            withAnimation(.easeIn(duration: 0.2)) {
+                visualZoomScale = scale
+                visualOpacity = opacity
+                visualBlur = blur
             }
         } else {
             // Keep the motion continuous; only the de-blur waits for the hardware swap.
             isAwaitingFacingFlipCompletion = true
             let edgeRotation: Double = newLens.isFront ? -82 : 82
+            
             withAnimation(.easeInOut(duration: 0.22)) {
                 visualOpacity = 0.06
                 visualBlur = 18
                 cameraModel.flipRotation = edgeRotation
             }
+            
             Task { @MainActor in
                 try? await Task.sleep(for: .milliseconds(220))
                 withAnimation(.easeOut(duration: 0.05)) {
@@ -1219,7 +1238,7 @@ extension CaptureView {
     private func handleOnChangeOfLensSwitchCount() {
         if isAwaitingSameFacingLensCompletion {
             isAwaitingSameFacingLensCompletion = false
-            withAnimation(.easeOut(duration: 0.22)) {
+            withAnimation(.easeOut(duration: 0.2)) {
                 visualZoomScale = 1.0
                 visualBlur = 0
                 visualOpacity = 1.0
