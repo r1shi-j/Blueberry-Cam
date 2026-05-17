@@ -91,33 +91,53 @@ struct AppTheme: Equatable, Identifiable {
         )
     ]
     
+    private enum iphone17ProColours: String {
+        case cosmicOrange, deepBlue, silver
+        
+        var name: String {
+            switch self {
+                case .cosmicOrange:
+                    "Cosmic Orange"
+                case .deepBlue:
+                    "Deep Blue"
+                case .silver:
+                    "Silver"
+            }
+        }
+        
+        var color: Color {
+            switch self {
+                case .cosmicOrange: return Color(uiColor: UIColor(red: 247/255, green: 126/255, blue: 45/255, alpha: 1)) // F77E2D
+                case .deepBlue: return Color(uiColor: UIColor(red: 50/255, green: 55/255, blue: 74/255, alpha: 1)) // 32374A
+                case .silver: return Color(uiColor: UIColor(red: 245/255, green: 245/255, blue: 245/255, alpha: 1)) // F5F5F5
+            }
+        }
+    }
+    
     static let iphone17pro: [AppTheme] = [
         AppTheme(
-            id: "cosmicOrange",
-            name: "Cosmic Orange",
-            // F77E2D
-            background: Color(uiColor: UIColor(red: 247/255, green: 126/255, blue: 45/255, alpha: 1)).opacity(0.3),
-            accent: Color(uiColor: UIColor(red: 247/255, green: 126/255, blue: 45/255, alpha: 1)),
+            id: iphone17ProColours.cosmicOrange.rawValue,
+            name: iphone17ProColours.cosmicOrange.name,
+            background: iphone17ProColours.cosmicOrange.color.opacity(0.3),
+            accent: iphone17ProColours.cosmicOrange.color,
             shutterRaw: .mint.mix(with: .orange, by: 0.3).opacity(0.5),
             shutterProRaw: .yellow.mix(with: .purple, by: 0.4).opacity(0.5),
             shutterBurst: .yellow.mix(with: .blue, by: 0.2).opacity(0.65)
         ),
         AppTheme(
-            id: "deepBlue",
-            name: "Deep Blue",
-            // 32374A
-            background: Color(uiColor: UIColor(red: 50/255, green: 55/255, blue: 74/255, alpha: 1)).opacity(0.4),
-            accent: Color(uiColor: UIColor(red: 50/255, green: 55/255, blue: 74/255, alpha: 1)).mix(with: .white, by: 0.35),
+            id: iphone17ProColours.deepBlue.rawValue,
+            name: iphone17ProColours.deepBlue.name,
+            background: iphone17ProColours.deepBlue.color.opacity(0.4),
+            accent: iphone17ProColours.deepBlue.color.mix(with: .blue, by: 0.14).mix(with: .white, by: 0.24),
             shutterRaw: .blue.mix(with: .black, by: 0.4).opacity(0.5),
             shutterProRaw: .blue.mix(with: .purple, by: 0.36).mix(with: .black, by: 0.2).opacity(0.5),
             shutterBurst: .red.mix(with: .black, by: 0.4).opacity(0.65)
         ),
         AppTheme(
-            id: "silver",
-            name: "Silver",
-            // F5F5F5
-            background: Color(uiColor: UIColor(red: 245/255, green: 245/255, blue: 245/255, alpha: 1)).opacity(0.2),
-            accent: Color(uiColor: UIColor(red: 245/255, green: 245/255, blue: 245/255, alpha: 1)),
+            id: iphone17ProColours.silver.rawValue,
+            name: iphone17ProColours.silver.name,
+            background: iphone17ProColours.silver.color.opacity(0.2),
+            accent: iphone17ProColours.silver.color,
             shutterRaw: .mint.mix(with: .blue, by: 0.2).mix(with: .black, by: 0.2).opacity(0.5),
             shutterProRaw: .purple.mix(with: .mint, by: 0.45).opacity(0.5),
             shutterBurst: .yellow.mix(with: .black, by: 0.5).opacity(0.65)
