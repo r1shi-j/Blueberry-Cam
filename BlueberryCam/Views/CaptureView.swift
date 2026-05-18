@@ -409,10 +409,12 @@ extension CaptureView {
     
     // MARK: - Level / Horizon overlay
     @ViewBuilder
-    private func level() -> some View {
+    private func level(_ previewRect: CGRect) -> some View {
         if cameraModel.shouldShowLevel {
-            LevelOverlayView(model: levelModel, theme: appTheme)
-                .ignoresSafeArea()
+            LevelOverlayView(model: levelModel, theme: appTheme, aspectRatio: cameraModel.gridAspectRatio)
+                .frame(width: previewRect.width, height: previewRect.height)
+                .position(x: previewRect.midX, y: previewRect.midY)
+                .animation(.smooth(duration: 0.28), value: cameraModel.gridAspectRatio)
         }
     }
     
@@ -885,7 +887,7 @@ extension CaptureView {
                         focusPeaking(previewRect)
                         focusLoupe(previewRect)
                         grid(previewRect)
-                        level()
+                        level(previewRect)
                     }
                     qrCode(previewRect)
                     lensCleaning(previewRect)

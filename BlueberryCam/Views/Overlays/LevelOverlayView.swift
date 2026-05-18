@@ -3,6 +3,7 @@ import SwiftUI
 struct LevelOverlayView: View {
     @Bindable var model: LevelMotionModel
     let theme: AppTheme
+    let aspectRatio: CGFloat
     
     private let lineWidth: CGFloat = 1.2
     
@@ -18,7 +19,7 @@ struct LevelOverlayView: View {
                     EmptyView()
                 case .level:
                     Canvas { ctx, size in
-                        drawLevelMode(ctx: ctx, cx: cx, cy: cy, w: size.width)
+                        drawLevelMode(ctx: ctx, cx: cx, cy: cy, w: size.width, h: size.height)
                     }
                     .allowsHitTesting(false)
                     .transition(.opacity)
@@ -41,8 +42,17 @@ struct LevelOverlayView: View {
     //   [── tick ──][── rotating bar ──][── tick ──]
     //    --tickLen--|------barLen------|--tickLen--
     //
-    private func drawLevelMode(ctx: GraphicsContext, cx: CGFloat, cy: CGFloat, w: CGFloat) {
-        let barLen: CGFloat = w * 1/3   // bar length
+    private func drawLevelMode(ctx: GraphicsContext, cx: CGFloat, cy: CGFloat, w: CGFloat, h: CGFloat) {
+        let nearestCardinal = (model.tiltAngleDeg / 90.0).rounded() * 90.0
+        let isLandscape = abs(Int(nearestCardinal)) % 180 == 90
+        
+        let screenAspect = w / h
+        let cropW: CGFloat = aspectRatio < screenAspect ? h * aspectRatio : w
+        let cropH: CGFloat = aspectRatio < screenAspect ? h : w / aspectRatio
+        
+        let referenceLength = isLandscape ? cropH : cropW
+        
+        let barLen: CGFloat = referenceLength * 1/3   // bar length
         let barHalfLen: CGFloat = barLen * 1/2  // half bar length
         let tickLen: CGFloat = barLen * 1/3   // tick length
         let lw: CGFloat = lineWidth   // same line width as crosshair
@@ -50,10 +60,6 @@ struct LevelOverlayView: View {
         let aligned = model.isAligned
         let barColor: Color = aligned ? theme.accent : .white
         let tickColor: Color = Colors.buttonText
-        
-        // Ticks rotate to the NEAREST cardinal (0°, 90°, 180°, 270°),
-        // tracking the bar's axis regardless of device orientation.
-        let nearestCardinal = (model.tiltAngleDeg / 90.0).rounded() * 90.0
         
         ctx.drawLayer { layerCtx in
             layerCtx.translateBy(x: cx, y: cy)
