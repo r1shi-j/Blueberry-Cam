@@ -18,11 +18,10 @@ struct LevelOverlayView: View {
                 case .hidden:
                     EmptyView()
                 case .level:
-                    Canvas { ctx, size in
-                        drawLevelMode(ctx: ctx, cx: cx, cy: cy, w: size.width, h: size.height)
-                    }
-                    .allowsHitTesting(false)
-                    .transition(.opacity)
+                    levelModeView(w: w, h: h)
+                        .position(x: cx, y: cy)
+                        .allowsHitTesting(false)
+                        .transition(.opacity)
                 case .flat:
                     Canvas { ctx, size in
                         drawFlatMode(ctx: ctx, cx: cx, cy: cy, w: size.width)
@@ -42,7 +41,8 @@ struct LevelOverlayView: View {
     //   [── tick ──][── rotating bar ──][── tick ──]
     //    --tickLen--|------barLen------|--tickLen--
     //
-    private func drawLevelMode(ctx: GraphicsContext, cx: CGFloat, cy: CGFloat, w: CGFloat, h: CGFloat) {
+    @ViewBuilder
+    private func levelModeView(w: CGFloat, h: CGFloat) -> some View {
         let nearestCardinal = (model.tiltAngleDeg / 90.0).rounded() * 90.0
         let isLandscape = abs(Int(nearestCardinal)) % 180 == 90
         
@@ -53,44 +53,32 @@ struct LevelOverlayView: View {
         let referenceLength = isLandscape ? cropH : cropW
         
         let barLen: CGFloat = referenceLength * 1/3   // bar length
-        let barHalfLen: CGFloat = barLen * 1/2  // half bar length
         let tickLen: CGFloat = barLen * 1/3   // tick length
-        let lw: CGFloat = lineWidth   // same line width as crosshair
         
         let aligned = model.isAligned
         let barColor: Color = aligned ? theme.accent : .white
         let tickColor: Color = Colors.buttonText
         
-        ctx.drawLayer { layerCtx in
-            layerCtx.translateBy(x: cx, y: cy)
-            layerCtx.rotate(by: Angle.degrees(nearestCardinal))
-            layerCtx.translateBy(x: -cx, y: -cy)
+        ZStack {
+            // Ticks
+            HStack(spacing: barLen) {
+                Capsule()
+                    .fill(tickColor)
+                    .frame(width: tickLen, height: lineWidth)
+                Capsule()
+                    .fill(tickColor)
+                    .frame(width: tickLen, height: lineWidth)
+            }
+            .rotationEffect(.degrees(-nearestCardinal))
             
-            var lTick = Path()
-            lTick.move(to: CGPoint(x: cx - barHalfLen, y: cy))
-            lTick.addLine(to: CGPoint(x: cx - barHalfLen - tickLen, y: cy))
-            
-            var rTick = Path()
-            rTick.move(to: CGPoint(x: cx + barHalfLen, y: cy))
-            rTick.addLine(to: CGPoint(x: cx + barHalfLen + tickLen, y: cy))
-            
-            let tickStyle = StrokeStyle(lineWidth: lw, lineCap: .round)
-            layerCtx.stroke(lTick, with: .color(tickColor), style: tickStyle)
-            layerCtx.stroke(rTick, with: .color(tickColor), style: tickStyle)
+            // Gravity-stabilised rotating bar
+            Capsule()
+                .fill(barColor.opacity(0.92))
+                .frame(width: barLen, height: lineWidth)
+                .rotationEffect(.degrees(-model.tiltAngleDeg))
+                .animation(.easeInOut(duration: 0.15), value: aligned)
         }
-        
-        // Gravity-stabilised bar: rotate by NEGATIVE tiltAngleDeg so it
-        // always stays truly horizontal in the real world.
-        var barPath = Path()
-        barPath.move(to: CGPoint(x: cx - barHalfLen, y: cy))
-        barPath.addLine(to: CGPoint(x: cx + barHalfLen, y: cy))
-        
-        ctx.drawLayer { layerCtx in
-            layerCtx.translateBy(x: cx, y: cy)
-            layerCtx.rotate(by: Angle.degrees(-model.tiltAngleDeg))
-            layerCtx.translateBy(x: -cx, y: -cy)
-            layerCtx.stroke(barPath, with: .color(barColor.opacity(0.92)), style: StrokeStyle(lineWidth: lw, lineCap: .round))
-        }
+        .animation(.spring(response: 0.35, dampingFraction: 0.75), value: nearestCardinal)
     }
     
     // MARK: - Flat Mode
