@@ -118,6 +118,14 @@ extension TopBarView {
         cameraModel.isMacroEnabled ? theme.accent : Colors.buttonBackground
     }
     
+    private var macroButtonOpacity: Double {
+        cameraModel.isAutoExposure ? 1.0 : Style.disabledOpacity
+    }
+    
+    private var isMacroButtonDisabled: Bool {
+        !cameraModel.isAutoExposure
+    }
+    
     // MARK: - Dual Camera properties
     private var dualcamButtonSymbol: String {
         "inset.filled.rectangle.and.person.filled"
@@ -132,12 +140,12 @@ extension TopBarView {
     }
     
     private var dualcamButtonOpacity: Double {
-        guard cameraModel.supportsDualCamera else { return Style.disabledOpacity }
+        guard cameraModel.supportsDualCamera, cameraModel.isAutoExposure else { return Style.disabledOpacity }
         return cameraModel.isDualCameraEnabled || !cameraModel.isSwitchingLens ? 1.0 : Style.disabledOpacity
     }
     
     private var isDualcamButtonDisabled: Bool {
-        !cameraModel.supportsDualCamera || cameraModel.isSwitchingLens
+        !cameraModel.supportsDualCamera || cameraModel.isSwitchingLens || !cameraModel.isAutoExposure
     }
     
     // MARK: - Burst properties
@@ -487,7 +495,10 @@ extension TopBarView {
             } label: {
                 imageIcon(systemName: macroButtonSymbol, foregroundStyle: macroButtonForeground, background: macroButtonBackground)
             }
+            .disabled(isMacroButtonDisabled)
+            .opacity(macroButtonOpacity)
             .animation(Animations.bouncy, value: cameraModel.activeLens)
+            .animation(Animations.bouncy, value: cameraModel.isAutoExposure)
             .transition(.opacity.combined(with: .scale))
         }
     }
@@ -506,6 +517,7 @@ extension TopBarView {
         .allowsHitTesting(!isDualcamButtonDisabled)
         .opacity(dualcamButtonOpacity)
         .animation(Animations.bouncy, value: cameraModel.isSwitchingLens)
+        .animation(Animations.bouncy, value: cameraModel.isAutoExposure)
     }
     
     // MARK: - Burst
