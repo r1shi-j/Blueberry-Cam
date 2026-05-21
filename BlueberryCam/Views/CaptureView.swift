@@ -551,12 +551,8 @@ extension CaptureView {
     @ViewBuilder
     private func manualControlOverlays(in previewRect: CGRect) -> some View {
         ZStack {
-            if !cameraModel.showSimpleView, let selectedControl {
-                if selectedControl == .iso || selectedControl == .ss {
-                    manualISOOverlay(in: previewRect)
-                }
-                
-                switch selectedControl {
+            if !cameraModel.showSimpleView {
+                switch localSelectedControl {
                     case .ev:
                         manualTrailingOverlay(
                             title: "EV",
@@ -600,6 +596,7 @@ extension CaptureView {
                             previewRect: previewRect
                         )
                     case .iso, .ss:
+                        manualISOOverlay(in: previewRect)
                         manualTrailingOverlay(
                             title: "SS",
                             color: manualControlColor(for: .ss),
@@ -613,10 +610,11 @@ extension CaptureView {
                             accessibilityLabel: "Shutter speed",
                             previewRect: previewRect
                         )
+                    case .none:
+                        EmptyView()
                 }
             }
         }
-        .animation(Animations.manualControlShown, value: selectedControl)
     }
     
     private func manualISOOverlay(in previewRect: CGRect) -> some View {
@@ -645,16 +643,7 @@ extension CaptureView {
         .frame(width: previewRect.width, height: previewRect.height, alignment: .top)
         .padding(.top, 14)
         .position(x: previewRect.midX, y: previewRect.midY)
-        .transition(
-            .asymmetric(
-                insertion: .scale(scale: 0.72, anchor: .top)
-                    .combined(with: .opacity)
-                    .animation(.smooth(duration: 0.42)),
-                removal: .scale(scale: 0.72, anchor: .top)
-                    .combined(with: .opacity)
-                    .animation(.smooth(duration: 0.38))
-            )
-        )
+        .transition(.move(edge: .top).combined(with: .opacity))
     }
     
     private func manualTrailingOverlay(
@@ -899,6 +888,7 @@ extension CaptureView {
                     manualControlOverlays(in: previewRect)
                 }
                 .blur(radius: scenePhase != .active ? 20 : 0)
+                .clipShape(Path(previewRect))
                 
                 dualCameraTransitionCurtain()
                 
@@ -960,6 +950,7 @@ struct CaptureView: View {
     @State private var cameraModel = CameraModel()
     @State private var levelModel = LevelMotionModel()
     @State private var selectedControl: ManualControl?
+    @State private var localSelectedControl: ManualControl?
     @State private var hasConfiguredCamera = false
     @State private var didShowPermissionDeniedOverlay = false
     
@@ -1010,6 +1001,7 @@ struct CaptureView: View {
             .statusBarHidden()
             .onAppear(perform: handleOnAppear)
             .onDisappear(perform: handleOnDisappear)
+            .onChange(of: selectedControl, handleOnChangeOfSelectedControl)
             .onChange(of: permissionModel.allGranted, handleOnChangeOfPermissionsGranted)
             .onChange(of: cameraModel.shouldShowLevel, handleOnChangeOfShowingLevel)
             .onChange(of: scenePhase, handleOnChangeOfScenePhase)
@@ -1103,6 +1095,20 @@ extension CaptureView {
         levelModel.stopUpdates()
         cameraModel.clearTapPointInteraction(resetDeviceState: false)
         UIDevice.current.endGeneratingDeviceOrientationNotifications()
+    }
+    
+    private func handleOnChangeOfSelectedControl(_: ManualControl?, newValue: ManualControl?) {
+        Task { @MainActor in
+            if newValue == nil {
+                withAnimation(.smooth(duration: 1.7)) {
+                    localSelectedControl = nil
+                }
+            } else {
+                withAnimation(.smooth(duration: 0.3)) {
+                    localSelectedControl = newValue
+                }
+            }
+        }
     }
     
     private func configureCameraIfPermitted() {

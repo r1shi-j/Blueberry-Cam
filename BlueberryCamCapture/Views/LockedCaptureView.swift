@@ -228,12 +228,8 @@ extension LockedCaptureView {
     @ViewBuilder
     private func manualControlOverlays(in previewRect: CGRect) -> some View {
         ZStack {
-            if !cameraModel.showSimpleView, let selectedControl {
-                if selectedControl == .iso || selectedControl == .ss {
-                    manualISOOverlay(in: previewRect)
-                }
-                
-                switch selectedControl {
+            if !cameraModel.showSimpleView {
+                switch localSelectedControl {
                     case .ev:
                         manualTrailingOverlay(
                             title: "EV",
@@ -277,6 +273,7 @@ extension LockedCaptureView {
                             previewRect: previewRect
                         )
                     case .iso, .ss:
+                        manualISOOverlay(in: previewRect)
                         manualTrailingOverlay(
                             title: "SS",
                             color: manualControlColor(for: .ss),
@@ -290,10 +287,11 @@ extension LockedCaptureView {
                             accessibilityLabel: "Shutter speed",
                             previewRect: previewRect
                         )
+                    case .none:
+                        EmptyView()
                 }
             }
         }
-        .animation(Animations.manualControlShown, value: selectedControl)
     }
     
     private func manualISOOverlay(in previewRect: CGRect) -> some View {
@@ -322,16 +320,7 @@ extension LockedCaptureView {
         .frame(width: previewRect.width, height: previewRect.height, alignment: .top)
         .padding(.top, 14)
         .position(x: previewRect.midX, y: previewRect.midY)
-        .transition(
-            .asymmetric(
-                insertion: .scale(scale: 0.72, anchor: .top)
-                    .combined(with: .opacity)
-                    .animation(.smooth(duration: 0.42)),
-                removal: .scale(scale: 0.72, anchor: .top)
-                    .combined(with: .opacity)
-                    .animation(.smooth(duration: 0.38))
-            )
-        )
+        .transition(.move(edge: .top).combined(with: .opacity))
     }
     
     private func manualTrailingOverlay(
@@ -429,14 +418,13 @@ extension LockedCaptureView {
                 
                 ZStack {
                     viewFinder(previewRect)
-                    
                     if !cameraModel.showSimpleView {
                         focusBox()
                         focusLock(previewRect)
                     }
-                    
                     manualControlOverlays(in: previewRect)
                 }
+                .clipShape(Path(previewRect))
                 
                 VStack(spacing: 0) {
                     if !cameraModel.showSimpleView {
@@ -447,7 +435,6 @@ extension LockedCaptureView {
                     
                     bottomBarView()
                 }
-                
                 .allowsHitTesting(!cameraModel.isTimerCountingDown)
                 .animation(Animations.easeInOut, value: cameraModel.showSimpleView)
                 
@@ -484,6 +471,7 @@ struct LockedCaptureView: View {
     
     @State private var cameraModel = LockedCameraModel()
     @State private var selectedControl: ManualControl?
+    @State private var localSelectedControl: ManualControl?
     @State private var hasConfiguredCamera = false
     
     // Haptics
@@ -512,6 +500,7 @@ struct LockedCaptureView: View {
             .sensoryFeedback(.impact(flexibility: .soft), trigger: cameraModel.tap​Focus​Lock​Haptic​Trigger)
             .onAppear(perform: handleOnAppear)
             .onDisappear(perform: handleOnDisappear)
+            .onChange(of: selectedControl, handleOnChangeOfSelectedControl)
             .onChange(of: scenePhase, handleOnChangeOfScenePhase)
             .onChange(of: cameraModel.activeLens, handleOnChangeOfActiveLens)
             .onChange(of: cameraModel.lensSwitchCompletionCount, handleOnChangeOfLensSwitchCount)
@@ -556,6 +545,20 @@ extension LockedCaptureView {
         cameraModel.stopSession()
         cameraModel.clearTapPointInteraction(resetDeviceState: false)
         cameraModel.stopCaptureOrientationUpdates()
+    }
+    
+    private func handleOnChangeOfSelectedControl(_: ManualControl?, newValue: ManualControl?) {
+        Task { @MainActor in
+            if newValue == nil {
+                withAnimation(.smooth(duration: 1.7)) {
+                    localSelectedControl = nil
+                }
+            } else {
+                withAnimation(.smooth(duration: 0.3)) {
+                    localSelectedControl = newValue
+                }
+            }
+        }
     }
     
     private func configureCameraIfPermitted() {
