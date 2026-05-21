@@ -87,6 +87,14 @@ extension LockedTopBarView {
         cameraModel.isMacroEnabled ? theme.accent : Colors.buttonBackground
     }
     
+    private var macroButtonOpacity: Double {
+        cameraModel.isAutoExposure ? 1.0 : Style.disabledOpacity
+    }
+    
+    private var isMacroButtonDisabled: Bool {
+        !cameraModel.isAutoExposure
+    }
+    
     // MARK: - Timer properties
     private var timerButtonSymbol: String {
         "timer"
@@ -284,7 +292,10 @@ extension LockedTopBarView {
             } label: {
                 imageIcon(systemName: macroButtonSymbol, foregroundStyle: macroButtonForeground, background: macroButtonBackground)
             }
+            .disabled(isMacroButtonDisabled)
+            .opacity(macroButtonOpacity)
             .animation(Animations.bouncy, value: cameraModel.activeLens)
+            .animation(Animations.bouncy, value: cameraModel.isAutoExposure)
             .transition(.opacity.combined(with: .scale))
         }
     }
