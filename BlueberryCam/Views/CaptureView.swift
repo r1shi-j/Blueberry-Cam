@@ -753,7 +753,7 @@ extension CaptureView {
                 }
             }
             .foregroundStyle(.white)
-            .padding(.horizontal, 14)
+            .padding(.horizontal, cameraModel.shouldShowBurstIntervalCountdown ? 24 : 14)
             .padding(.vertical, 10)
             .glassEffect(.regular, in: .capsule)
             .allowsHitTesting(false)
