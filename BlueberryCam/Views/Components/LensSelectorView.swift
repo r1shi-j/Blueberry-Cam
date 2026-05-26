@@ -11,7 +11,12 @@ extension LensSelectorView {
         
         // Shortest distance between two lens circles
         static let distanceBetweenLensCircles: CGFloat = 8
+        
+        static let dragSelectionHitPadding: CGFloat = 12
+        static let dragSelectionDelay: Duration = .milliseconds(250)
     }
+    
+    private static let lensSelectorCoordinateSpace = "LensSelectorViewCoordinateSpace"
     
     // MARK: - Properties
     private var displayedLenses: [Lens] {
@@ -86,6 +91,7 @@ extension LensSelectorView {
     
     private func switchToLens(_ lens: Lens) {
         hapticTrigger += 1
+        dragHighlightedLens = nil
         cameraModel.switchLens(to: lens)
         withAnimation(Animations.bouncy) {
             isExpanded = false
@@ -94,12 +100,140 @@ extension LensSelectorView {
     
     private func toggleExpanded() {
         hapticTrigger += 1
+        dragHighlightedLens = nil
         withAnimation(Animations.bouncy) {
             isExpanded.toggle()
         }
     }
     
+    private var activeLensPressGesture: some Gesture {
+        DragGesture(minimumDistance: 0, coordinateSpace: .named(Self.lensSelectorCoordinateSpace))
+            .onChanged(handleActiveLensPressChanged)
+            .onEnded(handleActiveLensPressEnded)
+    }
+    
+    private func handleActiveLensPressChanged(_ value: DragGesture.Value) {
+        activeLensPressLocation = value.location
+        
+        if !isPressingActiveLens {
+            beginActiveLensPress()
+        }
+        
+        if isDragSelectingLens {
+            updateDragHighlightedLens(at: value.location)
+        }
+    }
+    
+    private func handleActiveLensPressEnded(_ value: DragGesture.Value) {
+        activeLensPressLocation = value.location
+        longPressTask?.cancel()
+        longPressTask = nil
+        
+        if isDragSelectingLens {
+            updateDragHighlightedLens(at: value.location)
+            let selectedLens = dragHighlightedLens
+            
+            isDragSelectingLens = false
+            isPressingActiveLens = false
+            activeLensPressLocation = nil
+            dragHighlightedLens = nil
+            
+            guard let selectedLens else {
+                hapticTrigger += 1
+                withAnimation(Animations.bouncy) {
+                    isExpanded = false
+                }
+                return
+            }
+            switchToLens(selectedLens)
+        } else {
+            isPressingActiveLens = false
+            activeLensPressLocation = nil
+            toggleExpanded()
+        }
+    }
+    
+    private func beginActiveLensPress() {
+        isPressingActiveLens = true
+        dragHighlightedLens = nil
+        longPressTask?.cancel()
+        longPressTask = Task { @MainActor in
+            try? await Task.sleep(for: Style.dragSelectionDelay)
+            guard !Task.isCancelled, isPressingActiveLens else { return }
+            
+            beginDragLensSelection()
+            if let activeLensPressLocation {
+                updateDragHighlightedLens(at: activeLensPressLocation)
+            }
+        }
+    }
+    
+    private func beginDragLensSelection() {
+        guard !isDragSelectingLens else { return }
+        
+        isDragSelectingLens = true
+        hapticTrigger += 1
+        withAnimation(Animations.bouncy) {
+            isExpanded = true
+        }
+    }
+    
+    private func updateDragHighlightedLens(at location: CGPoint) {
+        let nextLens = lens(at: location)
+        guard dragHighlightedLens != nextLens else { return }
+        
+        let previousLens = dragHighlightedLens
+        dragHighlightedLens = nextLens
+        if previousLens != nil || nextLens != nil {
+            selectionFeedbackTrigger += 1
+        }
+    }
+    
+    private func lens(at location: CGPoint) -> Lens? {
+        let lenses = alternateLenses
+        let center = CGPoint(x: height / 2, y: height / 2)
+        let hitRadius = (Style.lensDiameterInactive / 2) + Style.dragSelectionHitPadding
+        
+        return lenses.enumerated()
+            .map { index, lens in
+                let offset = lensOffset(at: index, count: lenses.count)
+                let lensCenter = CGPoint(x: center.x + offset.width, y: center.y + offset.height)
+                let dx = location.x - lensCenter.x
+                let dy = location.y - lensCenter.y
+                let distance = sqrt(dx * dx + dy * dy)
+                
+                return (lens: lens, distance: distance)
+            }
+            .filter { $0.distance <= hitRadius }
+            .min { $0.distance < $1.distance }?
+            .lens
+    }
+    
+    private func textStyle(for lens: Lens, isActive: Bool) -> Color {
+        if dragHighlightedLens == lens {
+            return theme.accent
+        }
+        
+        return isActive ? .black : .white.opacity(0.86)
+    }
+    
     // MARK: - Subviews
+    private func activeLensButton(_ lens: Lens) -> some View {
+        Text(lens.label)
+            .font(.system(.callout, design: .monospaced))
+            .bold()
+            .foregroundStyle(textStyle(for: lens, isActive: true))
+            .frame(width: Style.lensDiameterActive, height: Style.lensDiameterActive)
+            .contentShape(.circle)
+            .accessibilityLabel(lensButtonTitle(for: lens))
+            .accessibilityAddTraits(.isButton)
+            .accessibilityAction {
+                toggleExpanded()
+            }
+            .glassEffect(.regular.interactive().tint(theme.accent.opacity(0.86)), in: .circle)
+            .gesture(activeLensPressGesture)
+    }
+    
     private func lensButton(_ lens: Lens, isActive: Bool) -> some View {
         Button {
             if isActive {
@@ -111,7 +245,7 @@ extension LensSelectorView {
             Text(lens.label)
                 .font(.system(.callout, design: .monospaced))
                 .bold(isActive)
-                .foregroundStyle(isActive ? .black : .white.opacity(0.86))
+                .foregroundStyle(textStyle(for: lens, isActive: isActive))
                 .frame(
                     width: isActive ? Style.lensDiameterActive : Style.lensDiameterInactive,
                     height: isActive ? Style.lensDiameterActive : Style.lensDiameterInactive
@@ -120,12 +254,7 @@ extension LensSelectorView {
         }
         .buttonStyle(.plain)
         .accessibilityLabel(lensButtonTitle(for: lens))
-        .glassEffect(
-            .regular
-                .interactive()
-                .tint(isActive ? theme.accent.opacity(0.86) : .black.mix(with: .white, by: 0.24)),
-            in: .circle
-        )
+        .glassEffect(.regular.interactive().tint(isActive ? theme.accent.opacity(0.86) : .black.mix(with: .white, by: 0.24)), in: .circle)
     }
     
     @ViewBuilder
@@ -137,18 +266,13 @@ extension LensSelectorView {
             } label: {
                 Text(lens.label)
                     .font(.system(.callout, design: .monospaced))
-                    .foregroundStyle(.white.opacity(0.86))
+                    .foregroundStyle(textStyle(for: lens, isActive: false))
                     .frame(width: Style.lensDiameterInactive, height: Style.lensDiameterInactive)
                     .contentShape(.circle)
             }
             .buttonStyle(.plain)
             .accessibilityLabel(lensButtonTitle(for: lens))
-            .glassEffect(
-                .regular
-                    .interactive()
-                    .tint(.black.mix(with: .white, by: 0.24)),
-                in: .circle
-            )
+            .glassEffect(.regular.interactive().tint(.black.mix(with: .white, by: 0.24)), in: .circle)
             .offset(lensOffset(at: index, count: lenses.count))
             .transition(.scale(scale: 0.72).combined(with: .opacity))
         }
@@ -162,7 +286,13 @@ struct LensSelectorView: View {
     let height: CGFloat
     
     @State private var isExpanded = false
+    @State private var isPressingActiveLens = false
+    @State private var isDragSelectingLens = false
+    @State private var activeLensPressLocation: CGPoint?
+    @State private var dragHighlightedLens: Lens?
+    @State private var longPressTask: Task<Void, Never>?
     @State private var hapticTrigger = 0
+    @State private var selectionFeedbackTrigger = 0
     
     var body: some View {
         GlassEffectContainer(spacing: 8) {
@@ -171,13 +301,16 @@ struct LensSelectorView: View {
                     expandedLensButtons
                 }
                 
-                lensButton(cameraModel.activeLens, isActive: true)
+                activeLensButton(cameraModel.activeLens)
             }
         }
         .frame(width: height, height: height)
+        .coordinateSpace(name: Self.lensSelectorCoordinateSpace)
         .animation(Animations.bouncy, value: isExpanded)
         .animation(Animations.bouncy, value: cameraModel.activeLens)
+        .animation(Animations.easeInOut, value: dragHighlightedLens)
         .sensoryFeedback(.impact, trigger: hapticTrigger)
+        .sensoryFeedback(.selection, trigger: selectionFeedbackTrigger)
     }
 }
 
