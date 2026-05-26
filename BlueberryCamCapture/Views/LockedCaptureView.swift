@@ -238,7 +238,7 @@ extension LockedCaptureView {
                                 get: { cameraModel.exposureBias },
                                 set: { cameraModel.setExposureBias($0) }
                             ),
-                            range: -LockedCameraModel.minEV...LockedCameraModel.maxEV,
+                            range: LockedCameraModel.minEV...LockedCameraModel.maxEV,
                             step: 0.1,
                             majorTickStride: 5,
                             accessibilityLabel: "Exposure value",

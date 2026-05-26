@@ -561,7 +561,7 @@ extension CaptureView {
                                 get: { cameraModel.exposureBias },
                                 set: { cameraModel.setExposureBias($0) }
                             ),
-                            range: -CameraModel.minEV...CameraModel.maxEV,
+                            range: CameraModel.minEV...CameraModel.maxEV,
                             step: 0.1,
                             majorTickStride: 5,
                             accessibilityLabel: "Exposure value",
