@@ -236,7 +236,13 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
     
     // MARK: - UI State
     var isCapturing: Bool = false
-    var processingPhotoCount: Int = 0
+    var processingPhotoCount: Int = 0 {
+        didSet {
+            if oldValue > 0, processingPhotoCount == 0 {
+                updateMetadataOutputStatus()
+            }
+        }
+    }
     var isProcessingPhoto: Bool { processingPhotoCount > 0 }
     var showError: Bool = false
     var errorMessage: String = ""

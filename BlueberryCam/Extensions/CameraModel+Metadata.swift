@@ -63,19 +63,24 @@ extension CameraModel: AVCaptureMetadataOutputObjectsDelegate {
         let isEnabled = recognizeBarcodes && !isTimerCountingDown && !isBurstCapturing
         let types = supportedMetadataTypes
         
-        sessionQueue.async { [weak self] in
-            guard let self = self else { return }
-            self.session.beginConfiguration()
-            
-            if isEnabled {
-                let available = self.metadataOutput.availableMetadataObjectTypes
-                let toSet = types.filter { available.contains($0) }
-                self.metadataOutput.metadataObjectTypes = toSet
-            } else {
-                self.metadataOutput.metadataObjectTypes = []
+        // Skip session reconfiguration while a capture is being processed
+        // to avoid AVFoundation -11800 errors from session config changes
+        // racing with capture preparation (e.g. timer → capture path).
+        if processingPhotoCount == 0 {
+            sessionQueue.async { [weak self] in
+                guard let self = self else { return }
+                self.session.beginConfiguration()
+                
+                if isEnabled {
+                    let available = self.metadataOutput.availableMetadataObjectTypes
+                    let toSet = types.filter { available.contains($0) }
+                    self.metadataOutput.metadataObjectTypes = toSet
+                } else {
+                    self.metadataOutput.metadataObjectTypes = []
+                }
+                
+                self.session.commitConfiguration()
             }
-            
-            self.session.commitConfiguration()
         }
         
         if !isEnabled {

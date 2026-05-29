@@ -40,6 +40,12 @@ extension LockedCameraModel {
     }
     
     // MARK: Capturing
+    private var willFlashFireForTimerCapture: Bool {
+        guard isAutoExposure, supportsFlash else { return false }
+        guard flashMode == .on, photoOutput.supportedFlashModes.contains(.on) else { return false }
+        return true
+    }
+    
     func capturePhoto(onCapture: @escaping @MainActor @Sendable () -> Void) {
         guard timerCountdownTask == nil else { return }
         
@@ -57,12 +63,15 @@ extension LockedCameraModel {
                     self.timerCountdownTask = nil
                 }
                 
-                let endDate = Date().addingTimeInterval(TimeInterval(totalSeconds))
+                let flashLeadTime: TimeInterval = willFlashFireForTimerCapture ? 0.6 : 0
+                let displayEndDate = Date().addingTimeInterval(TimeInterval(totalSeconds))
+                let captureEndDate = flashLeadTime > 0 ? Date().addingTimeInterval(TimeInterval(totalSeconds) - flashLeadTime) : displayEndDate
                 let updateInterval: Duration = usesDetailedCountdown ? .milliseconds(16) : .milliseconds(100)
                 var lastHapticSecond = totalSeconds
+                var didFireCaptureEarly = false
                 
                 while true {
-                    let remaining = endDate.timeIntervalSinceNow
+                    let remaining = displayEndDate.timeIntervalSinceNow
                     guard remaining > 0 else { break }
                     
                     let displaySecond = max(0, Int(ceil(remaining)))
@@ -72,6 +81,12 @@ extension LockedCameraModel {
                     }
                     
                     self.timerCountdownValue = remaining
+                    
+                    if !didFireCaptureEarly, flashLeadTime > 0, Date() >= captureEndDate {
+                        self.performPhotoCapture(onCapture: onCapture)
+                        didFireCaptureEarly = true
+                    }
+                    
                     do {
                         try await Task.sleep(for: updateInterval)
                     } catch {
@@ -79,7 +94,9 @@ extension LockedCameraModel {
                     }
                 }
                 
-                self.performPhotoCapture(onCapture: onCapture)
+                if !didFireCaptureEarly {
+                    self.performPhotoCapture(onCapture: onCapture)
+                }
             }
             return
         }

@@ -34,6 +34,7 @@ extension CameraModel: AVCapturePhotoCaptureDelegate {
             isDualCameraCapture: false,
             dualCameraPipPlacement: .topTrailing,
             dualCameraPipRotationAngle: 0,
+            shouldDeferConfetti: false,
             onCapture: nil
         )
         if let error {
@@ -47,6 +48,11 @@ extension CameraModel: AVCapturePhotoCaptureDelegate {
             return
         }
         self._captureContextStore.markPhotoDataProduced(for: uniqueID)
+        if context.shouldDeferConfetti {
+            Task { @MainActor in
+                self.requestConfettiCannons()
+            }
+        }
         let isHeif = !photo.isRawPhoto && context.captureMode == .heif
         let photoFilter = context.photoFilter
         Task {
@@ -89,6 +95,7 @@ extension CameraModel: AVCapturePhotoCaptureDelegate {
             isDualCameraCapture: false,
             dualCameraPipPlacement: .topTrailing,
             dualCameraPipRotationAngle: 0,
+            shouldDeferConfetti: false,
             onCapture: nil
         )
         guard let error else {

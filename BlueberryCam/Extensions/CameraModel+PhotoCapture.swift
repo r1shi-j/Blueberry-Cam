@@ -355,7 +355,7 @@ extension CameraModel {
         }
     }
     
-    private func requestConfettiCannons() {
+    func requestConfettiCannons() {
         guard shouldShowConfettiCannons else { return }
         confettiCannonTrigger += 1
     }
@@ -363,6 +363,7 @@ extension CameraModel {
     private func registerCaptureContext(for settings: AVCapturePhotoSettings,
                                         isBurst: Bool,
                                         burstSessionID: Int? = nil,
+                                        shouldDeferConfetti: Bool = false,
                                         onCapture: (@MainActor @Sendable () -> Void)? = nil) {
         _captureContextStore.set(
             PhotoCaptureContext(
@@ -374,6 +375,7 @@ extension CameraModel {
                 isDualCameraCapture: isDualCameraEnabled,
                 dualCameraPipPlacement: dualCameraPipPlacement,
                 dualCameraPipRotationAngle: dualCameraPipRotationAngle,
+                shouldDeferConfetti: shouldDeferConfetti,
                 onCapture: onCapture
             ),
             for: settings.uniqueID
@@ -492,6 +494,12 @@ extension CameraModel {
     }
     
     // MARK: Capturing
+    private var willFlashFireForTimerCapture: Bool {
+        guard !isBurstModeEnabled, isAutoExposure, supportsFlash else { return false }
+        guard flashMode == .on, photoOutput.supportedFlashModes.contains(.on) else { return false }
+        return true
+    }
+    
     private func capturePhoto(onCapture: @escaping @MainActor @Sendable () -> Void) {
         guard timerCountdownTask == nil else { return }
         
@@ -509,12 +517,15 @@ extension CameraModel {
                     self.timerCountdownTask = nil
                 }
                 
-                let endDate = Date().addingTimeInterval(TimeInterval(totalSeconds))
+                let flashLeadTime: TimeInterval = self.willFlashFireForTimerCapture ? 0.6 : 0
+                let displayEndDate = Date().addingTimeInterval(TimeInterval(totalSeconds))
+                let captureEndDate = flashLeadTime > 0 ? Date().addingTimeInterval(TimeInterval(totalSeconds) - flashLeadTime) : displayEndDate
                 let updateInterval: Duration = usesDetailedCountdown ? .milliseconds(16) : .milliseconds(100)
                 var lastHapticSecond = totalSeconds
+                var didFireCaptureEarly = false
                 
                 while true {
-                    let remaining = endDate.timeIntervalSinceNow
+                    let remaining = displayEndDate.timeIntervalSinceNow
                     guard remaining > 0 else { break }
                     
                     let displaySecond = max(0, Int(ceil(remaining)))
@@ -524,6 +535,12 @@ extension CameraModel {
                     }
                     
                     self.timerCountdownValue = remaining
+                    
+                    if !didFireCaptureEarly, flashLeadTime > 0, Date() >= captureEndDate {
+                        self.performPhotoCapture(onCapture: onCapture, requestsConfettiAfterCapture: true)
+                        didFireCaptureEarly = true
+                    }
+                    
                     do {
                         try await Task.sleep(for: updateInterval)
                     } catch {
@@ -531,7 +548,9 @@ extension CameraModel {
                     }
                 }
                 
-                self.performPhotoCapture(onCapture: onCapture, requestsConfettiAfterCapture: true)
+                if !didFireCaptureEarly {
+                    self.performPhotoCapture(onCapture: onCapture, requestsConfettiAfterCapture: true)
+                }
             }
             return
         }
@@ -562,15 +581,16 @@ extension CameraModel {
                 return  // no valid shutter duration available, skip
             }
             let isoValue = max(d.activeFormat.minISO, min(d.activeFormat.maxISO, iso))
+            let shouldDeferConfetti = requestsConfettiAfterCapture && willFlashFireForTimerCapture
             try? d.lockForConfiguration()
             d.setExposureModeCustom(duration: duration, iso: isoValue) { [weak self] _ in
                 guard let self else { return }
                 Task { @MainActor in
                     guard self.canCapturePhotoInCurrentState, let settings = self.buildPhotoSettings() else { return }
                     self.processingPhotoCount += 1
-                    self.registerCaptureContext(for: settings, isBurst: false, onCapture: onCapture)
+                    self.registerCaptureContext(for: settings, isBurst: false, shouldDeferConfetti: shouldDeferConfetti, onCapture: onCapture)
                     self.photoOutput.capturePhoto(with: settings, delegate: self)
-                    if requestsConfettiAfterCapture {
+                    if requestsConfettiAfterCapture, !shouldDeferConfetti {
                         self.requestConfettiCannons()
                     }
                 }
@@ -578,10 +598,11 @@ extension CameraModel {
             d.unlockForConfiguration()
         } else {
             guard let settings = buildPhotoSettings() else { return }
+            let shouldDeferConfetti = requestsConfettiAfterCapture && willFlashFireForTimerCapture
             processingPhotoCount += 1
-            registerCaptureContext(for: settings, isBurst: false, onCapture: onCapture)
+            registerCaptureContext(for: settings, isBurst: false, shouldDeferConfetti: shouldDeferConfetti, onCapture: onCapture)
             photoOutput.capturePhoto(with: settings, delegate: self)
-            if requestsConfettiAfterCapture {
+            if requestsConfettiAfterCapture, !shouldDeferConfetti {
                 requestConfettiCannons()
             }
         }

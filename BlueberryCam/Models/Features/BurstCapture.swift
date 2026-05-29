@@ -11,6 +11,7 @@ struct PhotoCaptureContext: Sendable {
     let isDualCameraCapture: Bool
     let dualCameraPipPlacement: DualCameraPipPlacement
     let dualCameraPipRotationAngle: CGFloat
+    let shouldDeferConfetti: Bool
     let onCapture: (@MainActor @Sendable () -> Void)?
 }
 
