@@ -114,6 +114,5 @@ struct BlueberryCamApp: App {
 // improve aspect ratio switch when in selfie 1.5x
 // improve lens switching animation when going to different physical cameras lens
 /// I want to improve lens switching, so for exmaple if i am switching to a lens which has greater zoom, then the old lens should zoom in until it reaches the same zoom level as the new lens, and the new lens should be underneth this already int eh correct position, then they animete with blur and opacity. Eg if going from 1x to 4x, the 1x view digitally zooms 4x then they swap. Vice versa for zoom out, the old lens will zoom out...
-// improve dual cam lag, doesn't work with 4x/8x (have to go out and into app for it to load)? appears to work now
 
 // TODO: - Next Steps

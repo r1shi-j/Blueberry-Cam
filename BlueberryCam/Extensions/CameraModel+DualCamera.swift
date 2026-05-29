@@ -219,6 +219,18 @@ extension CameraModel {
                 self.session.stopRunning()
             }
             self.removeAllSessionInputsAndOutputs(from: self.session)
+            
+            // Configure multi-cam format for the main camera only if it's not a
+            // telephoto lens. Telephoto cameras trigger -17281 hardware errors
+            // when their format is changed for multi-cam. Their default format
+            // is already compatible.
+            if mainLens != .tele4x, mainLens != .tele8x, let mainDevice = Lens.captureDevice(uniqueID: mainCameraID) {
+                self.configurePreferredMultiCamFormat(for: mainDevice)
+            }
+            if let pipDevice = Lens.captureDevice(uniqueID: pipCameraID) {
+                self.configurePreferredMultiCamFormat(for: pipDevice)
+            }
+            
             multiCamSession.beginConfiguration()
             self.removeAllSessionInputsAndOutputs(from: multiCamSession)
             
@@ -236,9 +248,6 @@ extension CameraModel {
                 self.finishFailedDualCameraConfiguration(message: "Could not configure dual camera inputs.")
                 return
             }
-            
-            self.configurePreferredMultiCamFormat(for: mainDevice)
-            self.configurePreferredMultiCamFormat(for: pipDevice)
             
             multiCamSession.addInputWithNoConnections(mainInput)
             multiCamSession.addInputWithNoConnections(pipInput)
