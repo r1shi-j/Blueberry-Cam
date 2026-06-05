@@ -1,0 +1,119 @@
+{
+  "fill-specializations" : [
+    {
+      "value" : {
+        "automatic-gradient" : "extended-srgb:0.00000,0.53333,1.00000,1.00000"
+      }
+    },
+    {
+      "appearance" : "light",
+      "value" : {
+        "linear-gradient" : [
+          "display-p3:1.00000,0.47216,0.65412,1.00000",
+          "display-p3:0.87474,0.75738,0.96783,1.00000"
+        ],
+        "orientation" : {
+          "start" : {
+            "x" : 0.5,
+            "y" : 0
+          },
+          "stop" : {
+            "x" : 0.5,
+            "y" : 0.7
+          }
+        }
+      }
+    }
+  ],
+  "groups" : [
+    {
+      "layers" : [
+        {
+          "fill-specializations" : [
+            {
+              "value" : {
+                "linear-gradient" : [
+                  "display-p3:0.18652,0.16506,0.35824,1.00000",
+                  "display-p3:0.27737,0.13001,0.32191,1.00000"
+                ],
+                "orientation" : {
+                  "start" : {
+                    "x" : 0.8489467092496462,
+                    "y" : 0.07037874591336281
+                  },
+                  "stop" : {
+                    "x" : 0.20645084418560186,
+                    "y" : 0.781923427665384
+                  }
+                }
+              }
+            },
+            {
+              "appearance" : "dark",
+              "value" : {
+                "linear-gradient" : [
+                  "display-p3:1.00000,0.20771,0.39116,1.00000",
+                  "display-p3:0.60109,0.56606,0.96783,1.00000"
+                ],
+                "orientation" : {
+                  "start" : {
+                    "x" : 0.8358383921039827,
+                    "y" : 0.05602853714250486
+                  },
+                  "stop" : {
+                    "x" : 0.16259194486887354,
+                    "y" : 0.8484510505718437
+                  }
+                }
+              }
+            },
+            {
+              "appearance" : "tinted",
+              "value" : {
+                "linear-gradient" : [
+                  "display-p3:0.86785,0.90168,0.86159,1.00000",
+                  "display-p3:0.96867,1.00000,0.96288,1.00000"
+                ],
+                "orientation" : {
+                  "start" : {
+                    "x" : 0.15832037064889462,
+                    "y" : 0.8151554254914425
+                  },
+                  "stop" : {
+                    "x" : 0.867424200833229,
+                    "y" : 0.08674849501893007
+                  }
+                }
+              }
+            }
+          ],
+          "glass" : true,
+          "hidden" : false,
+          "image-name" : "tibbixel-dot-com-2240-svg.svg",
+          "name" : "tibbixel-dot-com-2240-svg",
+          "position" : {
+            "scale" : 0.57,
+            "translation-in-points" : [
+              0,
+              0
+            ]
+          }
+        }
+      ],
+      "shadow" : {
+        "kind" : "neutral",
+        "opacity" : 0.5
+      },
+      "translucency" : {
+        "enabled" : true,
+        "value" : 0.5
+      }
+    }
+  ],
+  "supported-platforms" : {
+    "circles" : [
+      "watchOS"
+    ],
+    "squares" : "shared"
+  }
+}
