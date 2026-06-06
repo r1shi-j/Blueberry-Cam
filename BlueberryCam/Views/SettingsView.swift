@@ -252,6 +252,38 @@ struct SettingsView: View {
                 
                 Section {
                     NavigationLink {
+                        NavigationStack {
+                            List {
+                                Section("Select an App Icon") {
+                                    Picker("", selection: $appSettings.selectedIcon) {
+                                        ForEach(AppIcon.allCases, id: \.self) { icon in
+                                            HStack(spacing: 20) {
+                                                Image(icon.previewImageName)
+                                                    .resizable()
+                                                    .frame(width: 44, height: 44)
+                                                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                                                Text(icon.rawValue)
+                                            }
+                                            .padding(.horizontal)
+                                            .padding(.vertical, 5)
+                                            .tag(icon)
+                                        }
+                                    }
+                                    .pickerStyle(.inline)
+                                    .labelsHidden()
+                                }
+                            }
+                            .navigationTitle("App Icon")
+                        }
+                    } label: {
+                        LabeledContent("App Icon") {
+                            Text(appSettings.selectedIcon.rawValue)
+                                .contentTransition(.opacity)
+                                .animation(Animations.easeInOut, value: appSettings.selectedIcon.rawValue)
+                        }
+                    }
+                    
+                    NavigationLink {
                         AppThemeSelectionView(appSettings: appSettings)
                     } label: {
                         LabeledContent("App Theme") {

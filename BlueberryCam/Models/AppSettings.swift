@@ -25,6 +25,7 @@ enum ShutterCountResetTarget {
 @Observable
 final class AppSettings {
     private enum Keys {
+        static let selectedIconID = "selectedAppIconID"
         static let selectedThemeID = "selectedAppThemeID"
         static let usesAppThemeReadouts = "usesAppThemeReadouts"
         static let shutterCount = "shutterCount"
@@ -46,6 +47,27 @@ final class AppSettings {
     private let defaults: UserDefaults
     
     var lockedCaptureHapticTrigger = 0
+    
+    var selectedIcon: AppIcon {
+        didSet {
+            guard selectedIcon != oldValue else { return }
+            
+            let newVal = selectedIcon.bundleValue
+            guard UIApplication.shared.alternateIconName != newVal else { return }
+            
+            let savedIcon = selectedIcon
+            UIApplication.shared.setAlternateIconName(newVal) { [weak self] error in
+                Task { @MainActor [weak self] in
+                    if error != nil {
+//                        print("❌", error)
+                        self?.selectedIcon = oldValue
+                    } else {
+                        self?.defaults.set(savedIcon.rawValue, forKey: Keys.selectedIconID)
+                    }
+                }
+            }
+        }
+    }
     
     var selectedThemeID: String {
         didSet {
@@ -135,6 +157,8 @@ final class AppSettings {
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
         
+        let savedRaw = defaults.string(forKey: Keys.selectedIconID) ?? ""
+        selectedIcon = AppIcon(rawValue: savedRaw) ?? .classic
         selectedThemeID = defaults.string(forKey: Keys.selectedThemeID) ?? AppTheme.defaultID
         usesAppThemeReadouts = defaults.object(forKey: Keys.usesAppThemeReadouts) as? Bool ?? false
         shutterCount = defaults.integer(forKey: Keys.shutterCount)

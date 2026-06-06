@@ -2,6 +2,40 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>CFBundleIcons</key>
+	<dict>
+		<key>CFBundleAlternateIcons</key>
+		<dict>
+			<key>WireframeGreen</key>
+			<dict>
+				<key>CFBundleIconFiles</key>
+				<array>
+					<string>WireframeGreen</string>
+				</array>
+			</dict>
+			<key>WireframeBlue</key>
+			<dict>
+				<key>CFBundleIconFiles</key>
+				<array>
+					<string>WireframeBlue</string>
+				</array>
+			</dict>
+			<key>WireframeOrange</key>
+			<dict>
+				<key>CFBundleIconFiles</key>
+				<array>
+					<string>WireframeOrange</string>
+				</array>
+			</dict>
+			<key>WireframePink</key>
+			<dict>
+				<key>CFBundleIconFiles</key>
+				<array>
+					<string>WireframePink</string>
+				</array>
+			</dict>
+		</dict>
+	</dict>
 	<key>NSUserActivityTypes</key>
 	<array>
 		<string>com.jansari.rishi.blueberrycam.opencamera</string>

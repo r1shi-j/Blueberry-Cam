@@ -904,6 +904,10 @@ extension CaptureView {
                         burstRealtimeFeedback()
                         Spacer()
                     }
+                    // For iPad
+                    // Button("Launch Settings") {
+                    //    cameraModel.appView = .settings
+                    // }
                     bottomBarView()
                 }
                 .allowsHitTesting(!cameraModel.isTimerCountingDown && !cameraModel.shouldShowDualCameraTransitionCurtain)
