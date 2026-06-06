@@ -30,10 +30,10 @@ final class AppSettings {
         static let usesAppThemeReadouts = "usesAppThemeReadouts"
         static let shutterCount = "shutterCount"
         static let shutterCountBurst = "shutterCountBurst"
-        static let manuallyUnlockedThemes = "manuallyUnlockedThemes"
-        static let manuallyUnlockedCustomThemes = "manuallyUnlockedCustomThemes"
-        static let didShowThemeUnlockMilestone = "didShowThemeUnlockMilestone"
-        static let didShowCustomThemeUnlockMilestone = "didShowCustomThemeUnlockMilestone"
+        static let manuallyUnlockedCustomisation = "manuallyUnlockedCustomisation"
+        static let manuallyUnlockedFullCustomisation = "manuallyUnlockedFullCustomisation"
+        static let didShowCustomisationUnlockMilestone = "didShowCustomisationUnlockMilestone"
+        static let didShowFullCustomisationUnlockMilestone = "didShowFullCustomisationUnlockMilestone"
         static let customBackground = "customTheme_background"
         static let customAccent = "customTheme_accent"
         static let customShutterRaw = "customTheme_shutterRaw"
@@ -59,7 +59,7 @@ final class AppSettings {
             UIApplication.shared.setAlternateIconName(newVal) { [weak self] error in
                 Task { @MainActor [weak self] in
                     if error != nil {
-//                        print("❌", error)
+                        //                        print("❌", error)
                         self?.selectedIcon = oldValue
                     } else {
                         self?.defaults.set(savedIcon.rawValue, forKey: Keys.selectedIconID)
@@ -88,6 +88,7 @@ final class AppSettings {
         didSet {
             defaults.set(shutterCount, forKey: Keys.shutterCount)
             validateSelectedThemeAvailability()
+            validateSelectedIconAvailability()
         }
     }
     
@@ -95,32 +96,35 @@ final class AppSettings {
         didSet {
             defaults.set(shutterCountBurst, forKey: Keys.shutterCountBurst)
             validateSelectedThemeAvailability()
+            validateSelectedIconAvailability()
         }
     }
     
-    var manuallyUnlockedThemes: Bool {
+    var manuallyUnlockedCustomisation: Bool {
         didSet {
-            defaults.set(manuallyUnlockedThemes, forKey: Keys.manuallyUnlockedThemes)
+            defaults.set(manuallyUnlockedCustomisation, forKey: Keys.manuallyUnlockedCustomisation)
             validateSelectedThemeAvailability()
+            validateSelectedIconAvailability()
         }
     }
     
-    var manuallyUnlockedCustomThemes: Bool {
+    var manuallyUnlockedFullCustomisation: Bool {
         didSet {
-            defaults.set(manuallyUnlockedCustomThemes, forKey: Keys.manuallyUnlockedCustomThemes)
+            defaults.set(manuallyUnlockedFullCustomisation, forKey: Keys.manuallyUnlockedFullCustomisation)
             validateSelectedThemeAvailability()
+            validateSelectedIconAvailability()
         }
     }
     
-    private var didShowThemeUnlockMilestone: Bool {
+    var didShowCustomisationUnlockMilestone: Bool {
         didSet {
-            defaults.set(didShowThemeUnlockMilestone, forKey: Keys.didShowThemeUnlockMilestone)
+            defaults.set(didShowCustomisationUnlockMilestone, forKey: Keys.didShowCustomisationUnlockMilestone)
         }
     }
     
-    private var didShowCustomThemeUnlockMilestone: Bool {
+    var didShowFullCustomisationUnlockMilestone: Bool {
         didSet {
-            defaults.set(didShowCustomThemeUnlockMilestone, forKey: Keys.didShowCustomThemeUnlockMilestone)
+            defaults.set(didShowFullCustomisationUnlockMilestone, forKey: Keys.didShowFullCustomisationUnlockMilestone)
         }
     }
     
@@ -134,23 +138,24 @@ final class AppSettings {
         }
     }
     
-    var hasUnlockedThemes: Bool {
-        manuallyUnlockedThemes || hasUnlockedCustomThemes || meetsStandardThemeRequirement
+    var hasUnlockedCustomisation: Bool {
+        manuallyUnlockedCustomisation || hasUnlockedFullCustomisation || meetsStandardCustomisationRequirement
     }
     
-    var hasUnlockedCustomThemes: Bool {
-        manuallyUnlockedCustomThemes || meetsCustomThemeRequirement
+    var hasUnlockedFullCustomisation: Bool {
+        manuallyUnlockedFullCustomisation || meetsFullCustomisationRequirement
     }
+    
     
     var selectedTheme: AppTheme {
         theme(for: selectedThemeID)
     }
     
-    private var meetsStandardThemeRequirement: Bool {
+    private var meetsStandardCustomisationRequirement: Bool {
         shutterCount >= 100 && shutterCountBurst >= 500
     }
     
-    private var meetsCustomThemeRequirement: Bool {
+    private var meetsFullCustomisationRequirement: Bool {
         shutterCount >= 1000 && shutterCountBurst >= 1000
     }
     
@@ -163,10 +168,10 @@ final class AppSettings {
         usesAppThemeReadouts = defaults.object(forKey: Keys.usesAppThemeReadouts) as? Bool ?? false
         shutterCount = defaults.integer(forKey: Keys.shutterCount)
         shutterCountBurst = defaults.integer(forKey: Keys.shutterCountBurst)
-        manuallyUnlockedThemes = defaults.object(forKey: Keys.manuallyUnlockedThemes) as? Bool ?? false
-        manuallyUnlockedCustomThemes = defaults.object(forKey: Keys.manuallyUnlockedCustomThemes) as? Bool ?? false
-        didShowThemeUnlockMilestone = defaults.object(forKey: Keys.didShowThemeUnlockMilestone) as? Bool ?? false
-        didShowCustomThemeUnlockMilestone = defaults.object(forKey: Keys.didShowCustomThemeUnlockMilestone) as? Bool ?? false
+        manuallyUnlockedCustomisation = defaults.object(forKey: Keys.manuallyUnlockedCustomisation) as? Bool ?? false
+        manuallyUnlockedFullCustomisation = defaults.object(forKey: Keys.manuallyUnlockedFullCustomisation) as? Bool ?? false
+        didShowCustomisationUnlockMilestone = defaults.object(forKey: Keys.didShowCustomisationUnlockMilestone) as? Bool ?? false
+        didShowFullCustomisationUnlockMilestone = defaults.object(forKey: Keys.didShowFullCustomisationUnlockMilestone) as? Bool ?? false
         
         let defaultTheme = CustomThemePalette.defaults
         customTheme = CustomThemePalette(
@@ -181,39 +186,41 @@ final class AppSettings {
             usesAppThemeReadouts = false
         }
         validateSelectedThemeAvailability()
+        validateSelectedIconAvailability()
     }
     
     func theme(for id: String) -> AppTheme {
         AppTheme.theme(for: id, customTheme: customTheme)
     }
     
-    func unlockThemes(with guess: String) -> Bool {
+    func unlockCustomisation(with guess: String) -> Bool {
         guard Self.sha256(guess) == Self.standardThemeUnlockKeyHash else {
             return false
         }
         
-        manuallyUnlockedThemes = true
+        manuallyUnlockedCustomisation = true
         return true
     }
     
-    func unlockCustomThemes(with guess: String) -> Bool {
+    func unlockFullCustomisation(with guess: String) -> Bool {
         guard Self.sha256(guess) == Self.customThemeUnlockKeyHash else {
             return false
         }
         
-        manuallyUnlockedCustomThemes = true
+        manuallyUnlockedFullCustomisation = true
         return true
     }
     
+    
     func nextThemeUnlockMilestone() -> ThemeUnlockMilestone? {
-        if meetsCustomThemeRequirement, !didShowCustomThemeUnlockMilestone {
-            didShowCustomThemeUnlockMilestone = true
-            didShowThemeUnlockMilestone = true
+        if meetsFullCustomisationRequirement, !didShowFullCustomisationUnlockMilestone {
+            didShowFullCustomisationUnlockMilestone = true
+            didShowCustomisationUnlockMilestone = true
             return .custom
         }
         
-        if meetsStandardThemeRequirement, !didShowThemeUnlockMilestone {
-            didShowThemeUnlockMilestone = true
+        if meetsStandardCustomisationRequirement, !didShowCustomisationUnlockMilestone {
+            didShowCustomisationUnlockMilestone = true
             return .standard
         }
         return nil
@@ -226,8 +233,8 @@ final class AppSettings {
     
     func canUseTheme(id: String) -> Bool {
         if id == AppTheme.defaultID { return true }
-        if id == AppTheme.customID { return hasUnlockedCustomThemes }
-        return hasUnlockedThemes
+        if id == AppTheme.customID { return hasUnlockedFullCustomisation }
+        return hasUnlockedCustomisation
     }
     
     func resetShutterCount(_ target: ShutterCountResetTarget) {
@@ -238,13 +245,13 @@ final class AppSettings {
                 shutterCountBurst = 0
         }
         
-        if !meetsStandardThemeRequirement {
-            didShowThemeUnlockMilestone = false
+        if !meetsStandardCustomisationRequirement {
+            didShowCustomisationUnlockMilestone = false
         }
-        if !meetsCustomThemeRequirement {
-            didShowCustomThemeUnlockMilestone = false
+        if !meetsFullCustomisationRequirement {
+            didShowFullCustomisationUnlockMilestone = false
         }
-        if !hasUnlockedThemes {
+        if !hasUnlockedCustomisation {
             resetThemePreferences()
         }
     }
@@ -254,6 +261,24 @@ final class AppSettings {
         var updatedTheme = customTheme
         updatedTheme[keyPath: keyPath] = hex
         customTheme = updatedTheme
+    }
+    
+    func canUseIcon(_ icon: AppIcon) -> Bool {
+        switch icon {
+            case .classic:
+                return true
+            case .blueberry:
+                return hasUnlockedFullCustomisation
+            case .blue, .green, .pink, .orange:
+                return hasUnlockedCustomisation
+        }
+    }
+    
+    private func validateSelectedIconAvailability() {
+        guard canUseIcon(selectedIcon) else {
+            selectedIcon = .classic
+            return
+        }
     }
     
     private func validateSelectedThemeAvailability() {

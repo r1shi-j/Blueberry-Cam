@@ -13,8 +13,8 @@ struct BlueberryCamApp: App {
     @Environment(\.scenePhase) private var scenePhase
     @State private var appSettings = AppSettings()
     @State private var permissionModel = PermissionModel()
-    @State private var isShowingUnlockedThemesAlert = false
-    @State private var isShowingUnlockedThemesCustomAlert = false
+    @State private var isShowingUnlockedIconsThemesAlert = false
+    @State private var isShowingUnlockedFullIconsThemesAlert = false
     @State private var confettiCannonsTrigger = 0
     
     private func printUserDefaultsData() {
@@ -27,10 +27,10 @@ struct BlueberryCamApp: App {
         switch appSettings.nextThemeUnlockMilestone() {
             case .standard:
                 confettiCannonsTrigger += 1
-                isShowingUnlockedThemesAlert = true
+                isShowingUnlockedIconsThemesAlert = true
             case .custom:
                 confettiCannonsTrigger += 1
-                isShowingUnlockedThemesCustomAlert = true
+                isShowingUnlockedFullIconsThemesAlert = true
             case nil:
                 break
         }
@@ -43,13 +43,18 @@ struct BlueberryCamApp: App {
                 confettiCannons()
             }
             .sensoryFeedback(.impact, trigger: appSettings.lockedCaptureHapticTrigger)
-            .alert("You have reached the criteria to unlock app themes!", isPresented: $isShowingUnlockedThemesAlert, actions: { }, message: {
+            .alert("You have reached the criteria to unlock app icons and themes!", isPresented: $isShowingUnlockedIconsThemesAlert, actions: { }, message: {
                 Text("Go to settings, and scroll down to app themes to customise the app!")
             })
-            .alert("You have reached the ultimate criteria to unlock custom app themes!", isPresented: $isShowingUnlockedThemesCustomAlert, actions: { }, message: {
+            .alert("You have reached the ultimate criteria to unlock all app icons and themes!", isPresented: $isShowingUnlockedFullIconsThemesAlert, actions: { }, message: {
                 Text("Go to settings, scroll down to app themes and select custom!")
             })
             .task {
+//                appSettings.manuallyUnlockedCustomisation = false
+//                appSettings.manuallyUnlockedFullCustomisation = false
+//                appSettings.didShowCustomisationUnlockMilestone = false
+//                appSettings.didShowFullCustomisationUnlockMilestone = false
+                
                 // printUserDefaultsData()
                 checkThemesUnlock()
                 await permissionModel.checkAndRequest()
@@ -100,7 +105,7 @@ struct BlueberryCamApp: App {
 }
 
 // MARK: - Paid Features Plan
-/// Paid features: bursts, dualcam, histograms, zebras, clipping, filters, save to files, barcodes, capture celebration, precise timer and app themes
+/// Paid features: bursts, dualcam, histograms, zebras, clipping, filters, save to files, barcodes, capture celebration, precise timer and app icons/themes
 /// One time purchases: App themes £1.49, App Themes + Custom £2.49
 /// Subscriptions: Full Unlock free 1 week trial, £2.99 per month, or £20 per year, includes all app themes at no extra cost
 

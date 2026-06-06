@@ -62,23 +62,23 @@ struct AppThemeSelectionView: View {
                     .font(.system(size: 18, weight: .bold, design: .serif))
                     .foregroundStyle(.white)
             }
-            //            ToolbarItem(placement: .topBarTrailing) {
-            //                Button("Debug", systemImage: "hammer.fill") {
-            //                    appSettings.selectedThemeID = AppTheme.defaultID
-            //                    previewingThemeID = AppTheme.defaultID
-            //                    appSettings.manuallyUnlockedThemes.toggle()
-            //                    appSettings.manuallyUnlockedCustomThemes = appSettings.manuallyUnlockedThemes
-            //                    appSettings.didShowCustomThemeUnlockMilestone = appSettings.manuallyUnlockedThemes
-            //                    appSettings.didShowThemeUnlockMilestone = appSettings.didShowCustomThemeUnlockMilestone
-            //                }
-            //            }
+            //                        ToolbarItem(placement: .topBarTrailing) {
+            //                            Button("Debug", systemImage: "hammer.fill") {
+            //                                appSettings.selectedThemeID = AppTheme.defaultID
+            //                                previewingThemeID = AppTheme.defaultID
+            //                                appSettings.manuallyUnlockedThemes.toggle()
+            //                                appSettings.manuallyUnlockedCustomThemes = appSettings.manuallyUnlockedThemes
+            //                                appSettings.didShowCustomThemeUnlockMilestone = appSettings.manuallyUnlockedThemes
+            //                                appSettings.didShowThemeUnlockMilestone = appSettings.didShowCustomThemeUnlockMilestone
+            //                            }
+            //                        }
             ToolbarItem(placement: .topBarTrailing) {
-                if !appSettings.hasUnlockedThemes {
+                if !appSettings.hasUnlockedCustomisation {
                     Button("Locked", systemImage: "lock.fill") {
                         isShowingLockedAlert = true
                     }
                 } else {
-                    if !appSettings.hasUnlockedCustomThemes {
+                    if !appSettings.hasUnlockedFullCustomisation {
                         Button("Locked", systemImage: "lock.fill") {
                             isShowingLockedCustomAlert = true
                         }
@@ -90,25 +90,25 @@ struct AppThemeSelectionView: View {
                 }
             }
         }
-        .alert("Requirements not met to unlock app themes.", isPresented: $isShowingLockedAlert) {
-            SecureField("Unlock Themes Key", text: $unlockThemesGuess)
+        .alert("Requirements not met to unlock app icons and themes.", isPresented: $isShowingLockedAlert) {
+            SecureField("Unlock Icons and Themes Key", text: $unlockThemesGuess)
                 .onSubmit {
                     submitThemeUnlockKey()
                 }
             Button("Cancel", role: .cancel, action: resetUnlockState)
             Button("Unlock", action: submitThemeUnlockKey)
         } message: {
-            Text("To unlock app themes, your standard shutter count must be at least 100, and burst count at least 500.\nYou can check your statistics at the bottom of settings, or below the photos link shortcut to the left of the shutter button.\nAlternatively, if you have an unlock key enter it below.")
+            Text("To unlock app icons and themes, your standard shutter count must be at least 100, and burst count at least 500.\nYou can check your statistics at the bottom of settings, or below the photos link shortcut to the left of the shutter button.\nAlternatively, if you have an unlock key enter it below.")
         }
-        .alert("Requirements not met to unlock custom app themes.", isPresented: $isShowingLockedCustomAlert) {
-            SecureField("Unlock Custom Themes Key", text: $unlockThemesCustomGuess)
+        .alert("Requirements not met to unlock all app icons and themes.", isPresented: $isShowingLockedCustomAlert) {
+            SecureField("Unlock All Icons and Themes Key", text: $unlockThemesCustomGuess)
                 .onSubmit {
                     submitCustomThemeUnlockKey()
                 }
             Button("Cancel", role: .cancel, action: resetUnlockState)
             Button("Unlock", action: submitCustomThemeUnlockKey)
         } message: {
-            Text("To unlock custom app themes, your standard shutter count must be at least 1000, and burst count at least 1000.\nYou can check your statistics at the bottom of settings, or below the photos link shortcut to the left of the shutter button.\nAlternatively, if you have an unlock key enter it below.")
+            Text("To unlock all app icons and themes, your standard shutter count must be at least 1000, and burst count at least 1000.\nYou can check your statistics at the bottom of settings, or below the photos link shortcut to the left of the shutter button.\nAlternatively, if you have an unlock key enter it below.")
         }
         .alert("Incorrect unlock key", isPresented: $isShowingIncorrectUnlockAlert) {
             Button("Cancel", role: .cancel, action: resetUnlockState)
@@ -124,9 +124,9 @@ struct AppThemeSelectionView: View {
                 isShowingLockedCustomAlert = true
             }
         } message: {
-            Text("Check the custom unlock key and try again.")
+            Text("Check the full unlock key and try again.")
         }
-        .alert("All themes are unlocked!", isPresented: $isShowingUnlockedAlert) { }
+        .alert("All app icons and themes are unlocked!", isPresented: $isShowingUnlockedAlert) { }
     }
     
     // MARK: - Subviews
@@ -159,7 +159,7 @@ struct AppThemeSelectionView: View {
                     customBadge(theme.accent)
                         .padding(.trailing)
                 }
-                if !appSettings.hasUnlockedThemes && theme.id != AppTheme.customID {
+                if !appSettings.hasUnlockedCustomisation && theme.id != AppTheme.customID {
                     previewButton(theme)
                         .opacity(theme.id == previewingThemeID ? 0 : 1)
                 }
@@ -167,13 +167,13 @@ struct AppThemeSelectionView: View {
                     .padding(.leading)
             }
             .contentShape(.rect)
-            .animation(Animations.easeInOut, value: appSettings.hasUnlockedThemes)
-            .animation(Animations.easeInOut, value: appSettings.hasUnlockedCustomThemes)
+            .animation(Animations.easeInOut, value: appSettings.hasUnlockedCustomisation)
+            .animation(Animations.easeInOut, value: appSettings.hasUnlockedFullCustomisation)
         }
         .padding(.horizontal, 4)
         .padding(.vertical, 14)
         .buttonStyle(.plain)
-        .disabled(!appSettings.hasUnlockedThemes && theme.id == AppTheme.customID)
+        .disabled(!appSettings.hasUnlockedCustomisation && theme.id == AppTheme.customID)
     }
     
     private func themeName(_ theme: AppTheme) -> some View {
@@ -236,10 +236,10 @@ struct AppThemeSelectionView: View {
                     .contentTransition(.symbolEffect(.replace))
                     .symbolEffect(.bounce, value: appSettings.selectedThemeID)
             } else {
-                if !appSettings.hasUnlockedCustomThemes && theme.id == AppTheme.customID {
+                if !appSettings.hasUnlockedFullCustomisation && theme.id == AppTheme.customID {
                     Image(systemName: "lock")
                         .transition(.opacity.combined(with: .scale(scale: 0.85)))
-                } else if !appSettings.hasUnlockedThemes {
+                } else if !appSettings.hasUnlockedCustomisation {
                     Image(systemName: "lock.fill")
                         .transition(.opacity.combined(with: .scale(scale: 0.85)))
                 } else {
@@ -253,8 +253,8 @@ struct AppThemeSelectionView: View {
     // MARK: - Functions
     private func hasUnlockedTheme(_ theme: AppTheme) -> Bool {
         if theme.id == AppTheme.defaultID { return true }
-        guard appSettings.hasUnlockedThemes else { return false }
-        if theme.id == AppTheme.customID { return appSettings.hasUnlockedCustomThemes }
+        guard appSettings.hasUnlockedCustomisation else { return false }
+        if theme.id == AppTheme.customID { return appSettings.hasUnlockedFullCustomisation }
         if AppTheme.iphone17pro.map(\.id).contains(theme.id) { return DeviceModel.isIphone17ProSeries }
         return true
     }
@@ -264,7 +264,7 @@ struct AppThemeSelectionView: View {
             selectionHapticTrigger += 1
             withAnimation(Animations.easeInOut) {
                 previewingThemeID = theme.id
-                if appSettings.hasUnlockedThemes {
+                if appSettings.hasUnlockedCustomisation {
                     appSettings.selectedThemeID = theme.id
                 }
             }
@@ -279,7 +279,7 @@ struct AppThemeSelectionView: View {
     }
     
     private func submitThemeUnlockKey() {
-        if appSettings.unlockThemes(with: unlockThemesGuess) {
+        if appSettings.unlockCustomisation(with: unlockThemesGuess) {
             applyUnlockedThemeSelection()
         } else {
             unlockThemesGuess = ""
@@ -288,7 +288,7 @@ struct AppThemeSelectionView: View {
     }
     
     private func submitCustomThemeUnlockKey() {
-        if appSettings.unlockCustomThemes(with: unlockThemesCustomGuess) {
+        if appSettings.unlockFullCustomisation(with: unlockThemesCustomGuess) {
             applyUnlockedThemeSelection()
         } else {
             unlockThemesCustomGuess = ""
