@@ -6,11 +6,11 @@
 	<dict>
 		<key>CFBundleAlternateIcons</key>
 		<dict>
-			<key>WireframeGreen</key>
+			<key>Blueberry</key>
 			<dict>
 				<key>CFBundleIconFiles</key>
 				<array>
-					<string>WireframeGreen</string>
+					<string>Blueberry</string>
 				</array>
 			</dict>
 			<key>WireframeBlue</key>
@@ -18,6 +18,13 @@
 				<key>CFBundleIconFiles</key>
 				<array>
 					<string>WireframeBlue</string>
+				</array>
+			</dict>
+			<key>WireframeGreen</key>
+			<dict>
+				<key>CFBundleIconFiles</key>
+				<array>
+					<string>WireframeGreen</string>
 				</array>
 			</dict>
 			<key>WireframeOrange</key>

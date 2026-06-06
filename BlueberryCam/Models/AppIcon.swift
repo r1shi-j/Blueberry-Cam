@@ -1,7 +1,8 @@
 import Foundation
 
 enum AppIcon: String, CaseIterable {
-    case classic = "Classic Blueberry"
+    case classic = "Blueberry Camera"
+    case blueberry = "Blueberry"
     case blue = "Wireframe Blueberry"
     case green = "Wireframe Forest"
     case pink = "Wireframe Rose"
@@ -10,6 +11,7 @@ enum AppIcon: String, CaseIterable {
     var bundleValue: String? {
         switch self {
             case .classic: nil
+            case .blueberry: "Blueberry"
             case .blue: "WireframeBlue"
             case .green: "WireframeGreen"
             case .pink: "WireframePink"
@@ -19,7 +21,8 @@ enum AppIcon: String, CaseIterable {
     
     var previewImageName: String {
         switch self {
-            case .classic: "BlueberryCamIconPreview"
+            case .classic: "BlueberryCamPreview"
+            case .blueberry: "BlueberryPreview"
             case .blue: "WireframeBluePreview"
             case .green: "WireframeGreenPreview"
             case .pink: "WireframePinkPreview"

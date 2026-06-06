@@ -506,8 +506,8 @@
 		5B3325152F5C7A3200874430 /* Debug configuration for PBXNativeTarget "BlueberryCam" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES = "WireframeBlue WireframeGreen WireframePink WireframeOrange";
-				ASSETCATALOG_COMPILER_APPICON_NAME = BlueberryCamIcon;
+				ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES = "WireframeBlue WireframeGreen WireframePink WireframeOrange Blueberry";
+				ASSETCATALOG_COMPILER_APPICON_NAME = BlueberryCam;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_IDENTITY = "Apple Development";
@@ -554,8 +554,8 @@
 		5B3325162F5C7A3200874430 /* Release configuration for PBXNativeTarget "BlueberryCam" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES = "WireframeBlue WireframeGreen WireframePink WireframeOrange";
-				ASSETCATALOG_COMPILER_APPICON_NAME = BlueberryCamIcon;
+				ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES = "WireframeBlue WireframeGreen WireframePink WireframeOrange Blueberry";
+				ASSETCATALOG_COMPILER_APPICON_NAME = BlueberryCam;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_IDENTITY = "Apple Development";
