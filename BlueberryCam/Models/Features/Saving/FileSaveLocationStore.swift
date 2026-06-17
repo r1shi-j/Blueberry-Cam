@@ -99,6 +99,16 @@ enum FileSaveLocationStore {
         UserDefaults.standard.bool(forKey: folderIsExternalKey)
     }
     
+    nonisolated static func currentDirectoryURL() -> URL? {
+        do {
+            let directory = try resolveDirectory()
+            defer { directory.stopAccessing() }
+            return directory.url
+        } catch {
+            return nil
+        }
+    }
+    
     private nonisolated static func resolveDirectory() throws -> ResolvedDirectory {
         guard let bookmark = UserDefaults.standard.data(forKey: bookmarkKey) else {
             try ensureDefaultDirectoryExists()

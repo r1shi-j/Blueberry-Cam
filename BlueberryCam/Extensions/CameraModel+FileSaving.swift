@@ -82,4 +82,8 @@ extension CameraModel {
         
         return error.localizedDescription
     }
+    
+    func currentFileSaveLocationURL() -> URL? {
+        FileSaveLocationStore.currentDirectoryURL()
+    }
 }

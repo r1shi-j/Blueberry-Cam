@@ -8,13 +8,30 @@ extension BottomBarView {
     }
     
     // MARK: - Properties
-    private var photosLinkSymbolName: String {
-        "photo.on.rectangle.angled.fill"
+    private var shortcutLinkSymbolName: String {
+        if cameraModel.saveLocation == .files {
+            return "folder"
+        }
+        return "photo.on.rectangle.angled.fill"
     }
     
-    private func openPhotosApp() {
-        guard let url = URL(string: "photos-redirect://") else { return }
-        openURL(url)
+    private func openShortcutLocation() {
+        if cameraModel.saveLocation == .files {
+            if let folderURL = cameraModel.currentFileSaveLocationURL() {
+                let path = folderURL.path
+                if let encodedPath = path.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed),
+                   let filesAppURL = URL(string: "shareddocuments://\(encodedPath)") {
+                    openURL(filesAppURL)
+                } else if let filesURL = URL(string: "shareddocuments://") {
+                    openURL(filesURL)
+                }
+            } else if let filesURL = URL(string: "shareddocuments://") {
+                openURL(filesURL)
+            }
+        } else {
+            guard let url = URL(string: "photos-redirect://") else { return }
+            openURL(url)
+        }
     }
     
     private var isShowingBurstCount: Bool {
@@ -43,16 +60,16 @@ extension BottomBarView {
     }
     
     // MARK: Subviews
-    // MARK: - Photos shortcut
-    private func photosShortcut() -> some View {
-        Button(action: openPhotosApp) {
-            Image(systemName: photosLinkSymbolName)
+    // MARK: - Media shortcut
+    private func mediaShortcut() -> some View {
+        Button(action: openShortcutLocation) {
+            Image(systemName: shortcutLinkSymbolName)
                 .font(.system(size: 18))
                 .symbolRenderingMode(.hierarchical)
                 .tint(.white.opacity(0.8))
                 .padding()
                 .clipShape(.circle)
-                .glassEffect(.regular.interactive().tint(.black.mix(with: .white, by: 0.2)), in: .circle)
+                .glassEffect(.regular.interactive().tint(.black.mix(with: theme.accent, by: 0.3)), in: .circle)
         }
         .frame(height: Style.buttonHeight)
         .frame(maxWidth: .infinity)
@@ -106,7 +123,7 @@ struct BottomBarView: View {
         VStack {
             HStack(alignment: .center, spacing: 0) {
                 if !cameraModel.showSimpleView {
-                    photosShortcut()
+                    mediaShortcut()
                 }
                 if !(cameraModel.isTimerCountingDown && cameraModel.shouldHideUIWhileCountingDown) {
                     shutterButton()
