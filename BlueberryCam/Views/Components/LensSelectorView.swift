@@ -272,7 +272,7 @@ extension LensSelectorView {
             }
             .buttonStyle(.plain)
             .accessibilityLabel(lensButtonTitle(for: lens))
-            .glassEffect(.regular.interactive().tint(.black.mix(with: .white, by: 0.24)), in: .circle)
+            .glassEffect(.regular.interactive().tint(theme.accent.opacity(0.2)), in: .circle)
             .offset(lensOffset(at: index, count: lenses.count))
             .transition(.scale(scale: 0.72).combined(with: .opacity))
         }

@@ -119,8 +119,7 @@ extension CameraModel {
                     camera.videoZoomFactor = zoomRefresh.reset
                 }
                 camera.setDynamicAspectRatio(ratio.dynamicAspectRatio) { _, error in
-                    Task { @MainActor [weak self] in
-                        guard let self else { return }
+                    Task { @MainActor in
                         guard let error else {
                             self.restoreZoomAfterCaptureAspectRatioChange(deviceUniqueID: deviceUniqueID,
                                                                           targetZoom: zoomRefresh?.target,
@@ -136,8 +135,7 @@ extension CameraModel {
                 }
                 camera.unlockForConfiguration()
             } catch {
-                Task { @MainActor [weak self] in
-                    guard let self else { return }
+                Task { @MainActor in
                     if endsTransition {
                         self.isCaptureAspectRatioTransitioning = false
                     }
@@ -170,8 +168,7 @@ extension CameraModel {
                 camera.unlockForConfiguration()
             }
             
-            Task { @MainActor [weak self] in
-                guard let self else { return }
+            Task { @MainActor in
                 self.updateCaptureOrientation()
                 if endsTransition {
                     try? await Task.sleep(for: .milliseconds(targetZoom == nil ? 40 : 110))

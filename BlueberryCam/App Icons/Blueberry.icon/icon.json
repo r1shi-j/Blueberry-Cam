@@ -1,4 +1,7 @@
 {
+  "features" : [
+    "specular-location"
+  ],
   "fill" : {
     "automatic-gradient" : "display-p3:0.70308,0.83379,1.00000,1.00000",
     "orientation" : {
@@ -35,7 +38,15 @@
         "kind" : "none",
         "opacity" : 0.34
       },
-      "specular" : true,
+      "specular-specializations" : [
+        {
+          "value" : true
+        },
+        {
+          "appearance" : "tinted",
+          "value" : "inside"
+        }
+      ],
       "translucency" : {
         "enabled" : true,
         "value" : 0.31

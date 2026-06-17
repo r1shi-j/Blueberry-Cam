@@ -49,7 +49,7 @@ extension BottomBarView {
             Image(systemName: photosLinkSymbolName)
                 .font(.system(size: 18))
                 .symbolRenderingMode(.hierarchical)
-                .tint(.primary)
+                .tint(.white.opacity(0.8))
                 .padding()
                 .clipShape(.circle)
                 .glassEffect(.regular.interactive().tint(.black.mix(with: .white, by: 0.2)), in: .circle)
