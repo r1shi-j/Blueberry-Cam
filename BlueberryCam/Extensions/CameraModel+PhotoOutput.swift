@@ -28,6 +28,7 @@ extension CameraModel: AVCapturePhotoCaptureDelegate {
         let context = self._captureContextStore.context(for: uniqueID) ?? PhotoCaptureContext(
             captureMode: self._pendingCaptureModeBox.value,
             photoFilter: self._pendingPhotoFilterBox.value,
+            retroMegaPixels: self._pendingPhotoFilterBox.retroMegaPixels,
             saveLocation: self._pendingSaveLocationBox.value,
             isBurst: false,
             burstSessionID: nil,
@@ -55,6 +56,7 @@ extension CameraModel: AVCapturePhotoCaptureDelegate {
         }
         let isHeif = !photo.isRawPhoto && context.captureMode == .heif
         let photoFilter = context.photoFilter
+        let retroMegaPixels = context.retroMegaPixels
         Task {
             let loc = await MainActor.run {
                 self.recordBurstPhotoDataProduced(context: context)
@@ -63,6 +65,7 @@ extension CameraModel: AVCapturePhotoCaptureDelegate {
             let filteredData = self.filteredPhotoDataIfNeeded(
                 from: data,
                 filter: photoFilter,
+                retroMegaPixels: retroMegaPixels,
                 isRaw: photo.isRawPhoto,
                 isHEIF: isHeif
             ) ?? data
@@ -89,6 +92,7 @@ extension CameraModel: AVCapturePhotoCaptureDelegate {
         let context = self._captureContextStore.context(for: uniqueID) ?? PhotoCaptureContext(
             captureMode: self._pendingCaptureModeBox.value,
             photoFilter: self._pendingPhotoFilterBox.value,
+            retroMegaPixels: self._pendingPhotoFilterBox.retroMegaPixels,
             saveLocation: self._pendingSaveLocationBox.value,
             isBurst: false,
             burstSessionID: nil,
@@ -507,6 +511,7 @@ extension CameraModel: AVCapturePhotoCaptureDelegate {
     
     private nonisolated func filteredPhotoDataIfNeeded(from data: Data,
                                                        filter: PhotoFilter,
+                                                       retroMegaPixels: Float = 0.3,
                                                        isRaw: Bool,
                                                        isHEIF: Bool) -> Data? {
         guard !isRaw, filter != .off else { return data }
@@ -521,6 +526,9 @@ extension CameraModel: AVCapturePhotoCaptureDelegate {
         switch filter {
             case .off:
                 filteredImage = sourceImage
+            case .retro:
+                guard let output = retroImage(from: sourceImage, megaPixels: retroMegaPixels) else { return nil }
+                filteredImage = output
             case .temperatureAndTint:
                 guard let output = processedImage(
                     named: "CITemperatureAndTint",
@@ -737,6 +745,17 @@ extension CameraModel: AVCapturePhotoCaptureDelegate {
         let metadata = (CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any]) ?? [:]
         var outputMetadata = metadata
         outputMetadata[kCGImagePropertyOrientation] = CGImagePropertyOrientation.up.rawValue
+        outputMetadata[kCGImagePropertyPixelWidth] = cgImage.width
+        outputMetadata[kCGImagePropertyPixelHeight] = cgImage.height
+        if var exif = outputMetadata[kCGImagePropertyExifDictionary] as? [CFString: Any] {
+            exif[kCGImagePropertyExifPixelXDimension] = cgImage.width
+            exif[kCGImagePropertyExifPixelYDimension] = cgImage.height
+            outputMetadata[kCGImagePropertyExifDictionary] = exif
+        }
+        // If want to compress even more
+//        if filter == .retro {
+//            outputMetadata[kCGImageDestinationLossyCompressionQuality] = 0.75
+//        }
         
         let destinationUTType: CFString = isHEIF ? (UTType.heic.identifier as CFString) : sourceType
         let outputData = NSMutableData()
@@ -889,9 +908,9 @@ extension CameraModel: AVCapturePhotoCaptureDelegate {
                                               red: CGFloat,
                                               green: CGFloat,
                                               blue: CGFloat,
-                                              redBias: CGFloat,
+                                              redBias: CGFloat = 0,
                                               greenBias: CGFloat = 0,
-                                              blueBias: CGFloat) -> CIImage? {
+                                              blueBias: CGFloat = 0) -> CIImage? {
         processedImage(
             named: "CIColorMatrix",
             inputImage: inputImage,
@@ -915,6 +934,232 @@ extension CameraModel: AVCapturePhotoCaptureDelegate {
     
     private nonisolated func croppedImage(_ image: CIImage, to extent: CGRect) -> CIImage {
         image.cropped(to: extent)
+    }
+    
+    private nonisolated func retroInterpolationFactor(for megaPixels: Double) -> Double {
+        // Uniform logarithmic distribution so 12MP -> 3MP -> 1MP -> 0.1MP scale evenly without cliff jumps
+        let minLog = log(0.1)
+        let maxLog = log(12.0)
+        let clampedLog = log(max(0.1, min(12.0, megaPixels)))
+        let t = (clampedLog - minLog) / (maxLog - minLog)
+        return 1.0 - t
+    }
+    
+    private nonisolated func chromaticAberrationImage(_ inputImage: CIImage, extent: CGRect, shift: Double = 1.2, verticalShift: Double = 1.0) -> CIImage {
+        guard let redChannel = colorMatrixImage(inputImage, red: 1, green: 0, blue: 0),
+              let greenChannel = colorMatrixImage(inputImage, red: 0, green: 1, blue: 0),
+              let blueChannel = colorMatrixImage(inputImage, red: 0, green: 0, blue: 1) else {
+            return inputImage
+        }
+        
+        let shiftedRed = redChannel.transformed(by: CGAffineTransform(translationX: -shift, y: 0))
+        let shiftedGreen = greenChannel.transformed(by: CGAffineTransform(translationX: shift, y: 0))
+        let shiftedBlue = blueChannel.transformed(by: CGAffineTransform(translationX: 0, y: -verticalShift))
+        
+        guard let redGreen = processedImage(
+            named: "CIScreenBlendMode",
+            inputImage: shiftedRed,
+            parameters: [kCIInputBackgroundImageKey: shiftedGreen]
+        ),
+        let fullRGB = processedImage(
+            named: "CIScreenBlendMode",
+            inputImage: shiftedBlue,
+            parameters: [kCIInputBackgroundImageKey: redGreen]
+        ) else {
+            return inputImage
+        }
+        
+        return fullRGB.cropped(to: extent)
+    }
+    
+    private nonisolated func vignetteImage(_ inputImage: CIImage, extent: CGRect, intensity: Double = 0.65) -> CIImage {
+        let maxDim = max(extent.width, extent.height)
+        let outerRadius = maxDim * 0.75
+        let innerRadius = maxDim * 0.30
+        let darkVal = max(0.0, 1.0 - intensity * 0.80)
+        
+        guard let gradient = CIFilter(name: "CIRadialGradient", parameters: [
+            kCIInputCenterKey: CIVector(x: extent.midX, y: extent.midY),
+            kCIInputRadius0Key: innerRadius,
+            kCIInputRadius1Key: outerRadius,
+            kCIInputColor0Key: CIColor(red: 1, green: 1, blue: 1, alpha: 1),
+            kCIInputColor1Key: CIColor(red: darkVal, green: darkVal, blue: darkVal, alpha: 1)
+        ])?.outputImage?.cropped(to: extent),
+        let vignetted = processedImage(
+            named: "CIMultiplyCompositing",
+            inputImage: gradient,
+            parameters: [kCIInputBackgroundImageKey: inputImage]
+        )?.cropped(to: extent) else {
+            return inputImage
+        }
+        return vignetted
+    }
+    
+    private nonisolated func pixelScale(for megaPixels: Double) -> Double {
+        if megaPixels <= 0.3 {
+            return 1.0
+        } else if megaPixels <= 1.0 {
+            let t = (megaPixels - 0.3) / (1.0 - 0.3)
+            return 1.0 + 0.8 * t
+        } else if megaPixels <= 4.0 {
+            let t = (megaPixels - 1.0) / (4.0 - 1.0)
+            return 1.8 + 1.2 * t
+        } else {
+            let t = (megaPixels - 4.0) / (12.0 - 4.0)
+            return max(1.0, 3.0 - 2.0 * t)
+        }
+    }
+    
+    private nonisolated func chromaticShiftPercent(for megaPixels: Double) -> Double {
+        // Smooth and uniform chromatic aberration activating at <= 5.0 MP:
+        // 5.0 MP -> 0.0000
+        // 3.0 MP -> 0.0014
+        // 1.0 MP -> 0.0020
+        // 0.1 MP -> 0.0028
+        if megaPixels > 5.0 {
+            return 0.0
+        } else if megaPixels >= 3.0 {
+            let t = (5.0 - megaPixels) / (5.0 - 3.0)
+            return 0.0014 * t
+        } else if megaPixels >= 1.0 {
+            let t = (3.0 - megaPixels) / (3.0 - 1.0)
+            return 0.0014 + (0.0020 - 0.0014) * t
+        } else {
+            let t = (1.0 - megaPixels) / (1.0 - 0.1)
+            return 0.0020 + (0.0028 - 0.0020) * t
+        }
+    }
+    
+    private nonisolated func retroImage(from sourceImage: CIImage, megaPixels: Float) -> CIImage? {
+        let clampedMP = max(0.1, min(12.0, Double(megaPixels)))
+        let extent = sourceImage.extent
+        let aspectRatio = extent.height > 0 ? extent.width / extent.height : (4.0 / 3.0)
+        
+        let targetPixels = clampedMP * 1_000_000.0
+        let targetHeight = max(120.0, round(sqrt(targetPixels / Double(aspectRatio))))
+        let targetWidth = max(160.0, round(targetHeight * Double(aspectRatio)))
+        
+        let scaleX = targetWidth / extent.width
+        let scaleY = targetHeight / extent.height
+        
+        let resized = sourceImage.transformed(by: CGAffineTransform(scaleX: scaleX, y: scaleY))
+        let targetExtent = CGRect(x: 0, y: 0, width: targetWidth, height: targetHeight)
+        let croppedResized = resized.cropped(to: targetExtent)
+        
+        let k = retroInterpolationFactor(for: clampedMP)
+        
+        // 1. Exposure lift / blown-out highlight white point
+        let exposed = processedImage(
+            named: "CIExposureAdjust",
+            inputImage: croppedResized,
+            parameters: [kCIInputEVKey: 0.30 + 0.18 * k]
+        ) ?? croppedResized
+        
+        // 2. Preserved crisp detail (minimal blur)
+        let softOptical: CIImage
+        if k > 0.1 {
+            softOptical = processedImage(
+                named: "CIGaussianBlur",
+                inputImage: exposed,
+                parameters: [kCIInputRadiusKey: 0.05 * k]
+            )?.cropped(to: targetExtent) ?? exposed
+        } else {
+            softOptical = exposed
+        }
+        
+        // 3. Smooth & uniform chromatic aberration (visible at 3-4MP, smooth to 0.1MP)
+        let shiftPct = chromaticShiftPercent(for: clampedMP)
+        let abberrated: CIImage
+        if shiftPct > 0.0001 {
+            let shiftH = max(1.4, targetWidth * shiftPct)
+            let shiftV = shiftH * 0.75
+            abberrated = chromaticAberrationImage(softOptical, extent: targetExtent, shift: shiftH, verticalShift: shiftV)
+        } else {
+            abberrated = softOptical
+        }
+        
+        // 4. Color tuning: warmer vintage tones with enriched blue in shadows & deep blacks
+        let contrast = 1.16 + 0.10 * k
+        let saturation = 1.10 + 0.08 * k
+        let brightness = 0.03 + 0.02 * k
+        let redGain = 1.05 + 0.04 * k       // Warmer golden reds
+        let greenGain = 1.01 + 0.015 * k
+        let blueGain = 0.96 - 0.02 * k
+        let redBias = 0.018 * k            // Warm vintage ambient glow
+        let blueBias = 0.038 * k           // Rich blue tint in shadows & deep blacks
+        let greenBias = 0.0
+        
+        guard let vintageToned = colorControlledImage(
+            abberrated,
+            saturation: saturation,
+            brightness: brightness,
+            contrast: contrast
+        ),
+        let warmed = colorMatrixImage(
+            vintageToned,
+            red: redGain,
+            green: greenGain,
+            blue: blueGain,
+            redBias: redBias,
+            greenBias: greenBias,
+            blueBias: blueBias
+        ) else {
+            return abberrated
+        }
+        
+        // 5. Halation highlight bloom
+        let bloomIntensity = 0.22 + 0.16 * k
+        let bloomRadius = 3.0 + 2.0 * k
+        let halated = processedImage(
+            named: "CIBloom",
+            inputImage: warmed,
+            parameters: [
+                kCIInputRadiusKey: bloomRadius,
+                kCIInputIntensityKey: bloomIntensity
+            ]
+        )?.cropped(to: targetExtent) ?? warmed
+        
+        // 6. Color posterization (prominent contour lines on saved photo)
+        let posterizeLevels = max(10, min(64, Int(10.0 + (1.0 - k) * 54.0)))
+        let posterized = processedImage(
+            named: "CIColorPosterize",
+            inputImage: halated,
+            parameters: ["inputLevels": posterizeLevels]
+        )?.cropped(to: targetExtent) ?? halated
+        
+        // 7. Visible Radial Vignette (slightly stronger at 0.1MP)
+        let vignetteIntensity = 0.72 + 0.22 * k
+        let vignetted = vignetteImage(posterized, extent: targetExtent, intensity: vignetteIntensity)
+        
+        // 8. Dynamic Pixelation (reduced slightly for refined look)
+        let pixScale = pixelScale(for: clampedMP)
+        let pixelated: CIImage
+        if pixScale > 1.05 {
+            pixelated = processedImage(
+                named: "CIPixellate",
+                inputImage: vignetted,
+                parameters: [
+                    kCIInputCenterKey: CIVector(x: targetExtent.midX, y: targetExtent.midY),
+                    kCIInputScaleKey: pixScale
+                ]
+            )?.cropped(to: targetExtent) ?? vignetted
+        } else {
+            pixelated = vignetted
+        }
+        
+        // 9. Crisp Sharpness (reduced blur)
+        let sharpness = 0.45 + 0.35 * k
+        let sharpened = sharpenedImage(pixelated, sharpness: sharpness) ?? pixelated
+        
+        // 10. Subtle Dithering
+        let ditherIntensity = 0.04 + 0.04 * k
+        let dithered = processedImage(
+            named: "CIDither",
+            inputImage: sharpened,
+            parameters: [kCIInputIntensityKey: ditherIntensity]
+        )?.cropped(to: targetExtent) ?? sharpened
+        
+        return dithered.cropped(to: targetExtent)
     }
     
     private nonisolated func largestInscribedSquareBySampling(_ image: CIImage, threshold: CGFloat = 0.01) -> CGRect {

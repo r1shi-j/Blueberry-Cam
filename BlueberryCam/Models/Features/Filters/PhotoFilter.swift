@@ -2,10 +2,12 @@ import Foundation
 
 final class PhotoFilterBox: @unchecked Sendable {
     nonisolated(unsafe) var value: PhotoFilter = .off
+    nonisolated(unsafe) var retroMegaPixels: Float = 0.3
 }
 
 enum PhotoFilter: String, CaseIterable, Identifiable {
     case off = "Off"
+    case retro = "Retro"
     case temperatureAndTint = "1980s"
     case chrome = "Chrome"
     case instant = "Instant"

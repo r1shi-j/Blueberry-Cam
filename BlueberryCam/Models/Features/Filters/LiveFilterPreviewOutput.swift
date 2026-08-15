@@ -2,7 +2,7 @@ import CoreVideo
 import Foundation
 
 protocol LiveFilterPreviewFrameRenderer: AnyObject {
-    nonisolated func render(pixelBuffer: CVPixelBuffer, filter: PhotoFilter, referenceSize: CGSize)
+    nonisolated func render(pixelBuffer: CVPixelBuffer, filter: PhotoFilter, retroMegaPixels: Float, referenceSize: CGSize)
 }
 
 final class LiveFilterPreviewOutput: @unchecked Sendable {
@@ -17,11 +17,11 @@ final class LiveFilterPreviewOutput: @unchecked Sendable {
         lock.unlock()
     }
     
-    nonisolated func render(pixelBuffer: CVPixelBuffer, filter: PhotoFilter, referenceSize: CGSize) {
+    nonisolated func render(pixelBuffer: CVPixelBuffer, filter: PhotoFilter, retroMegaPixels: Float = 0.3, referenceSize: CGSize) {
         lock.lock()
         let renderer = renderer
         lock.unlock()
         
-        renderer?.render(pixelBuffer: pixelBuffer, filter: filter, referenceSize: referenceSize)
+        renderer?.render(pixelBuffer: pixelBuffer, filter: filter, retroMegaPixels: retroMegaPixels, referenceSize: referenceSize)
     }
 }

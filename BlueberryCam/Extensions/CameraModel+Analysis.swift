@@ -21,6 +21,7 @@ extension CameraModel: AVCaptureVideoDataOutputSampleBufferDelegate {
             liveFilterPreviewOutput.render(
                 pixelBuffer: pixelBuffer,
                 filter: liveFilter,
+                retroMegaPixels: _livePhotoFilterBox.retroMegaPixels,
                 referenceSize: liveFilterPreviewReferenceSize
             )
         }

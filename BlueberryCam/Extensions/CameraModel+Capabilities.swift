@@ -21,7 +21,8 @@ extension CameraModel {
     var shouldShowResolutionPicker: Bool {
         guard !isDualCameraEnabled,
               !isConfiguringDualCamera,
-              !isDetachingPreviewForReconfiguration else { return false }
+              !isDetachingPreviewForReconfiguration,
+              selectedPhotoFilter != .retro else { return false }
         return !activeLens.isFront && availableResolutions.count > 1
     }
     
@@ -488,6 +489,7 @@ extension CameraModel {
               captureMode != .raw,
               isAutoExposure,
               !isMacroEnabled,
+              selectedPhotoFilter != .retro,
               highResolutionOption != nil else { return false }
         if captureMode == .proRaw, flashMode != .off {
             return false
@@ -505,7 +507,8 @@ extension CameraModel {
         isMacroEnabled ||
         (captureMode == .proRaw && flashMode != .off) ||
         !isAutoExposure ||
-        captureMode == .raw
+        captureMode == .raw ||
+        selectedPhotoFilter == .retro
     }
     
     func isHighResolutionOption(_ option: ResolutionOption) -> Bool {

@@ -552,6 +552,10 @@ extension CaptureView {
     private func manualControlOverlays(in previewRect: CGRect) -> some View {
         ZStack {
             if !cameraModel.showSimpleView {
+                if cameraModel.selectedPhotoFilter == .retro {
+                    retroQualityOverlay(in: previewRect)
+                }
+                
                 switch localSelectedControl {
                     case .ev:
                         manualTrailingOverlay(
@@ -615,6 +619,36 @@ extension CaptureView {
                 }
             }
         }
+        .animation(Animations.bouncy, value: cameraModel.selectedPhotoFilter)
+    }
+    
+    private func retroQualityOverlay(in previewRect: CGRect) -> some View {
+        VStack(spacing: 4) {
+            ManualRulerView(
+                value: Binding(
+                    get: { cameraModel.retroMegaPixels },
+                    set: { cameraModel.setRetroMegaPixels($0) }
+                ),
+                range: 0.1...12.0,
+                step: 0.1,
+                axis: .horizontal,
+                majorTickStride: 5,
+                accessibilityLabel: "Retro Resolution",
+                tickColor: manualRulerTickColor,
+                centerTickColor: manualRulerCenterTickColor,
+                centerTickShadowColor: manualRulerCenterTickShadowColor
+            )
+            .frame(width: previewRect.width * 0.78, height: 70)
+            
+            Text(cameraModel.formattedRetroMegaPixels)
+                .font(Fonts.manualLabel)
+                .foregroundStyle(usesThemedReadouts ? appTheme.readoutColor : appTheme.accent)
+                .tracking(2)
+        }
+        .frame(width: previewRect.width, height: previewRect.height, alignment: .top)
+        .padding(.top, 14)
+        .position(x: previewRect.midX, y: previewRect.midY)
+        .transition(.move(edge: .top).combined(with: .opacity))
     }
     
     private func manualISOOverlay(in previewRect: CGRect) -> some View {

@@ -161,6 +161,11 @@ extension CameraModel {
         selectedPhotoFilter = filter
     }
     
+    func setRetroMegaPixels(_ value: Float) {
+        let rounded = (value * 10).rounded() / 10
+        retroMegaPixels = max(0.1, min(12.0, rounded))
+    }
+    
     var isLiveFilterPreviewActive: Bool {
         !isDualCameraEnabled && selectedPhotoFilter != .off && !captureMode.isRawLike
     }

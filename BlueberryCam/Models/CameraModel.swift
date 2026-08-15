@@ -266,6 +266,21 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
             updateCameraControlsMode()
         }
     }
+    var retroMegaPixels: Float = 0.3 {
+        didSet {
+            let clamped = max(0.1, min(12.0, retroMegaPixels))
+            if retroMegaPixels != clamped {
+                retroMegaPixels = clamped
+                return
+            }
+            UserDefaults.standard.set(retroMegaPixels, forKey: "retroMegaPixels")
+            _livePhotoFilterBox.retroMegaPixels = retroMegaPixels
+            _pendingPhotoFilterBox.retroMegaPixels = retroMegaPixels
+        }
+    }
+    var formattedRetroMegaPixels: String {
+        String(format: "%.1f MP", retroMegaPixels)
+    }
     var confettiCannonTrigger = 0
     @ObservationIgnored
     var onStandardPhotoSaved: (() -> Void)?

@@ -177,6 +177,7 @@ extension CameraModel {
                 self.exposureDebounceTask?.cancel()
                 self._pendingCaptureModeBox.value = self.captureMode
                 self._pendingPhotoFilterBox.value = self.selectedPhotoFilter
+                self._pendingPhotoFilterBox.retroMegaPixels = self.retroMegaPixels
                 self._pendingSaveLocationBox.value = self.saveLocation
                 self.updateCaptureOrientation()
                 let completionGate = self.burstCaptureCompletionGate
@@ -369,6 +370,7 @@ extension CameraModel {
             PhotoCaptureContext(
                 captureMode: captureMode,
                 photoFilter: selectedPhotoFilter,
+                retroMegaPixels: retroMegaPixels,
                 saveLocation: saveLocation,
                 isBurst: isBurst,
                 burstSessionID: burstSessionID,
@@ -565,6 +567,7 @@ extension CameraModel {
         exposureDebounceTask?.cancel()
         _pendingCaptureModeBox.value = captureMode
         _pendingPhotoFilterBox.value = selectedPhotoFilter
+        _pendingPhotoFilterBox.retroMegaPixels = retroMegaPixels
         _pendingSaveLocationBox.value = saveLocation
         
         // Update orientation based on current physical position

@@ -45,7 +45,7 @@ final class FilteredCameraPreviewUIView: UIView {
         } else {
             self.renderer = nil
             super.init(frame: .zero)
-            backgroundColor = .black
+            backgroundColor = .clear
         }
     }
     
@@ -75,6 +75,7 @@ final class LiveFilterPreviewRenderer: NSObject, MTKViewDelegate, LiveFilterPrev
     private let lock = NSLock()
     nonisolated(unsafe) private var latestImage: CIImage?
     nonisolated(unsafe) private var latestFilter: PhotoFilter = .off
+    nonisolated(unsafe) private var latestRetroMegaPixels: Float = 0.3
     nonisolated(unsafe) private var latestReferenceSize: CGSize = .zero
     nonisolated(unsafe) private var isDrawScheduled = false
     
@@ -92,17 +93,23 @@ final class LiveFilterPreviewRenderer: NSObject, MTKViewDelegate, LiveFilterPrev
         view.enableSetNeedsDisplay = false
         view.preferredFramesPerSecond = 30
         view.colorPixelFormat = .bgra8Unorm
-        view.clearColor = MTLClearColor(red: 0, green: 0, blue: 0, alpha: 1)
+        view.isOpaque = false
+        view.layer.isOpaque = false
+        if let metalLayer = view.layer as? CAMetalLayer {
+            metalLayer.isOpaque = false
+        }
+        view.clearColor = MTLClearColor(red: 0, green: 0, blue: 0, alpha: 0)
         view.contentMode = .scaleAspectFit
     }
     
-    nonisolated func render(pixelBuffer: CVPixelBuffer, filter: PhotoFilter, referenceSize: CGSize) {
+    nonisolated func render(pixelBuffer: CVPixelBuffer, filter: PhotoFilter, retroMegaPixels: Float, referenceSize: CGSize) {
         guard filter != .off else { return }
         
         let image = CIImage(cvPixelBuffer: pixelBuffer)
         lock.lock()
         latestImage = image
         latestFilter = filter
+        latestRetroMegaPixels = retroMegaPixels
         latestReferenceSize = referenceSize
         guard !isDrawScheduled else {
             lock.unlock()
@@ -120,6 +127,7 @@ final class LiveFilterPreviewRenderer: NSObject, MTKViewDelegate, LiveFilterPrev
         lock.lock()
         latestImage = nil
         latestFilter = .off
+        latestRetroMegaPixels = 0.3
         latestReferenceSize = .zero
         isDrawScheduled = false
         lock.unlock()
@@ -131,6 +139,7 @@ final class LiveFilterPreviewRenderer: NSObject, MTKViewDelegate, LiveFilterPrev
         lock.lock()
         let sourceImage = latestImage
         let filter = latestFilter
+        let retroMegaPixels = latestRetroMegaPixels
         let referenceSize = latestReferenceSize
         isDrawScheduled = false
         lock.unlock()
@@ -146,11 +155,12 @@ final class LiveFilterPreviewRenderer: NSObject, MTKViewDelegate, LiveFilterPrev
         let filteredImage = filterRenderer.filteredImage(
             from: sourceImage,
             filter: filter,
+            retroMegaPixels: retroMegaPixels,
             referenceSize: referenceSize
         ) ?? sourceImage
         let fittedImage = fit(filteredImage, in: bounds)
-        let background = CIImage(color: .black).cropped(to: bounds)
-        let outputImage = fittedImage.composited(over: background)
+        let clearBg = CIImage(color: CIColor(red: 0, green: 0, blue: 0, alpha: 0)).cropped(to: bounds)
+        let outputImage = fittedImage.composited(over: clearBg)
         
         context.render(
             outputImage,
@@ -177,5 +187,6 @@ final class LiveFilterPreviewRenderer: NSObject, MTKViewDelegate, LiveFilterPrev
             .transformed(by: CGAffineTransform(translationX: -extent.minX, y: -extent.minY))
             .transformed(by: CGAffineTransform(scaleX: scale, y: scale))
             .transformed(by: CGAffineTransform(translationX: x, y: y))
+            .cropped(to: bounds)
     }
 }

@@ -5,6 +5,7 @@ import Foundation
 struct PhotoCaptureContext: Sendable {
     let captureMode: CaptureMode
     let photoFilter: PhotoFilter
+    let retroMegaPixels: Float
     let saveLocation: SaveLocation
     let isBurst: Bool
     let burstSessionID: Int?
