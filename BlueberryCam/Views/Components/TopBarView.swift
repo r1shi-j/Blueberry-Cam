@@ -140,12 +140,12 @@ extension TopBarView {
     }
     
     private var dualcamButtonOpacity: Double {
-        guard cameraModel.supportsDualCamera, cameraModel.isAutoExposure else { return Style.disabledOpacity }
+        guard cameraModel.supportsDualCamera, cameraModel.isAutoExposure, !cameraModel.isFilterRestrictingCaptureOptions else { return Style.disabledOpacity }
         return cameraModel.isDualCameraEnabled || !cameraModel.isSwitchingLens ? 1.0 : Style.disabledOpacity
     }
     
     private var isDualcamButtonDisabled: Bool {
-        !cameraModel.supportsDualCamera || cameraModel.isSwitchingLens || !cameraModel.isAutoExposure
+        !cameraModel.supportsDualCamera || cameraModel.isSwitchingLens || !cameraModel.isAutoExposure || cameraModel.isFilterRestrictingCaptureOptions
     }
     
     // MARK: - Burst properties
@@ -518,6 +518,7 @@ extension TopBarView {
         .opacity(dualcamButtonOpacity)
         .animation(Animations.bouncy, value: cameraModel.isSwitchingLens)
         .animation(Animations.bouncy, value: cameraModel.isAutoExposure)
+        .animation(Animations.bouncy, value: cameraModel.isFilterRestrictingCaptureOptions)
     }
     
     // MARK: - Burst
