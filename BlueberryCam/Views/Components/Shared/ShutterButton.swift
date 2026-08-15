@@ -47,7 +47,7 @@ struct ShutterButton: View {
         .transition(.opacity)
         .animation(.easeInOut(duration: 0.15), value: isPressed)
         .animation(.bouncy(duration: 0.5, extraBounce: 0.3), value: isForcePressed)
-        .contentShape(.rect)
+        .contentShape(.circle)
         .gesture(pressGesture)
         .allowsHitTesting(isEnabled)
         .accessibilityElement()
