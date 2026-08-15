@@ -870,54 +870,65 @@ extension CaptureView {
                 
                 ZStack {
                     viewFinder(previewRect)
-                    if !cameraModel.showSimpleView {
-                        zebras(previewRect)
-                        highlightClipping(previewRect)
-                        focusPeaking(previewRect)
-                        focusLoupe(previewRect)
-                        grid(previewRect)
-                        level(previewRect)
+                        .allowsHitTesting(!cameraModel.showHiddenView)
+                    if !cameraModel.showHiddenView {
+                        if !cameraModel.showSimpleView {
+                            zebras(previewRect)
+                            highlightClipping(previewRect)
+                            focusPeaking(previewRect)
+                            focusLoupe(previewRect)
+                            grid(previewRect)
+                            level(previewRect)
+                        }
+                        qrCode(previewRect)
+                        lensCleaning(previewRect)
+                        burstFeedback(previewRect)
+                        if !(cameraModel.isTimerCountingDown && cameraModel.shouldHideUIWhileCountingDown) && !$cameraModel.isBurstCapturing.wrappedValue {
+                            focusLock(previewRect)
+                            focusBox()
+                        }
+                        manualControlOverlays(in: previewRect)
                     }
-                    qrCode(previewRect)
-                    lensCleaning(previewRect)
-                    burstFeedback(previewRect)
-                    if !(cameraModel.isTimerCountingDown && cameraModel.shouldHideUIWhileCountingDown) && !$cameraModel.isBurstCapturing.wrappedValue {
-                        focusLock(previewRect)
-                        focusBox()
-                    }
-                    manualControlOverlays(in: previewRect)
                 }
                 .blur(radius: scenePhase != .active ? 20 : 0)
                 .clipShape(Path(previewRect))
                 
-                dualCameraTransitionCurtain()
-                
-                VStack(spacing: 0) {
-                    if !cameraModel.showSimpleView {
-                        VStack(spacing: 0) {
-                            topBarView()
-                            Spacer()
-                            bottomHistogram()
-                        }
+                if cameraModel.showHiddenView {
+                    Color.black
+                        .ignoresSafeArea()
                         .transition(.opacity)
-                    } else {
-                        burstRealtimeFeedback()
-                        Spacer()
+                    timerCountdownOverlay(in: previewRect)
+                } else {
+                    dualCameraTransitionCurtain()
+                    
+                    VStack(spacing: 0) {
+                        if !cameraModel.showSimpleView {
+                            VStack(spacing: 0) {
+                                topBarView()
+                                Spacer()
+                                bottomHistogram()
+                            }
+                            .transition(.opacity)
+                        } else {
+                            burstRealtimeFeedback()
+                            Spacer()
+                        }
+                        // For iPad
+                        // Button("Launch Settings") {
+                        //    cameraModel.appView = .settings
+                        // }
+                        bottomBarView()
                     }
-                    // For iPad
-                    // Button("Launch Settings") {
-                    //    cameraModel.appView = .settings
-                    // }
-                    bottomBarView()
+                    .allowsHitTesting(!cameraModel.isTimerCountingDown && !cameraModel.shouldShowDualCameraTransitionCurtain)
+                    .animation(Animations.easeInOut, value: cameraModel.showSimpleView)
+                    
+                    timerCountdownOverlay(in: previewRect)
+                    captureFlash(previewRect)
+                    confettiCannons(previewRect)
                 }
-                .allowsHitTesting(!cameraModel.isTimerCountingDown && !cameraModel.shouldShowDualCameraTransitionCurtain)
-                .animation(Animations.easeInOut, value: cameraModel.showSimpleView)
-                
-                timerCountdownOverlay(in: previewRect)
-                captureFlash(previewRect)
-                confettiCannons(previewRect)
             }
             .ignoresSafeArea(.keyboard)
+            .animation(Animations.easeInOut, value: cameraModel.showHiddenView)
         }
         .safeAreaInset(edge: .top, content: statusBarView)
     }
@@ -928,6 +939,7 @@ extension CaptureView {
             if permissionModel.allGranted {
                 cameraContent()
                     .animation(Animations.easeInOut, value: cameraModel.showSimpleView)
+                    .animation(Animations.easeInOut, value: cameraModel.showHiddenView)
                     .animation(Animations.easeInOut, value: cameraModel.isBurstCapturing)
                     .transition(.opacity)
             } else if permissionModel.anyDenied {
@@ -994,6 +1006,7 @@ struct CaptureView: View {
     
     var body: some View {
         appContent()
+            .background(Color.black.ignoresSafeArea())
             .animation(Animations.permissionsShown, value: permissionModel.allGranted)
             .animation(Animations.permissionsShown, value: permissionModel.anyDenied)
             .sensoryFeedback(.impact, trigger: hapticTrigger)

@@ -4,7 +4,11 @@ import Foundation
 
 extension CameraModel {
     var showSimpleView: Bool {
-        appView == .clean || appView == .settings || isBurstCapturing || (isTimerCountingDown && shouldHideUIWhileCountingDown)
+        showHiddenView || appView == .clean || appView == .settings || isBurstCapturing || (isTimerCountingDown && shouldHideUIWhileCountingDown)
+    }
+    
+    var showHiddenView: Bool {
+        appView == .hidden
     }
     
     func hideSettings() {
