@@ -162,8 +162,7 @@ extension CameraModel {
     }
     
     func setRetroMegaPixels(_ value: Float) {
-        let rounded = (value * 10).rounded() / 10
-        retroMegaPixels = max(0.1, min(12.0, rounded))
+        retroMegaPixels = max(0.01, min(12.0, value))
     }
     
     var isLiveFilterPreviewActive: Bool {

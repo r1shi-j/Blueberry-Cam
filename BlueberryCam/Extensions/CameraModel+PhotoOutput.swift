@@ -937,12 +937,17 @@ extension CameraModel: AVCapturePhotoCaptureDelegate {
     }
     
     private nonisolated func retroInterpolationFactor(for megaPixels: Double) -> Double {
-        // Uniform logarithmic distribution so 12MP -> 3MP -> 1MP -> 0.1MP scale evenly without cliff jumps
-        let minLog = log(0.1)
-        let maxLog = log(12.0)
-        let clampedLog = log(max(0.1, min(12.0, megaPixels)))
-        let t = (clampedLog - minLog) / (maxLog - minLog)
-        return 1.0 - t
+        let clamped = max(0.01, min(12.0, megaPixels))
+        if clamped >= 0.1 {
+            let minLog = log(0.1)
+            let maxLog = log(12.0)
+            let clampedLog = log(clamped)
+            let t = (clampedLog - minLog) / (maxLog - minLog)
+            return 1.0 - t
+        } else {
+            let t = (0.1 - clamped) / (0.1 - 0.01)
+            return 1.0 + 0.35 * t
+        }
     }
     
     private nonisolated func chromaticAberrationImage(_ inputImage: CIImage, extent: CGRect, shift: Double = 1.2, verticalShift: Double = 1.0) -> CIImage {
@@ -996,7 +1001,10 @@ extension CameraModel: AVCapturePhotoCaptureDelegate {
     }
     
     private nonisolated func pixelScale(for megaPixels: Double) -> Double {
-        if megaPixels <= 0.3 {
+        if megaPixels < 0.1 {
+            let t = (0.1 - megaPixels) / (0.1 - 0.01)
+            return 1.0 + 1.2 * t
+        } else if megaPixels <= 0.3 {
             return 1.0
         } else if megaPixels <= 1.0 {
             let t = (megaPixels - 0.3) / (1.0 - 0.3)
@@ -1015,7 +1023,7 @@ extension CameraModel: AVCapturePhotoCaptureDelegate {
         // 5.0 MP -> 0.0000
         // 3.0 MP -> 0.0014
         // 1.0 MP -> 0.0020
-        // 0.1 MP -> 0.0028
+        // <= 0.1 MP (0.1, 0.08, 0.06, 0.04, 0.02, 0.01) -> held constant at 0.0036
         if megaPixels > 5.0 {
             return 0.0
         } else if megaPixels >= 3.0 {
@@ -1025,24 +1033,26 @@ extension CameraModel: AVCapturePhotoCaptureDelegate {
             let t = (3.0 - megaPixels) / (3.0 - 1.0)
             return 0.0014 + (0.0020 - 0.0014) * t
         } else {
-            let t = (1.0 - megaPixels) / (1.0 - 0.1)
-            return 0.0020 + (0.0028 - 0.0020) * t
+            let t = (1.0 - max(0.1, megaPixels)) / (1.0 - 0.1)
+            return 0.0020 + (0.0036 - 0.0020) * t
         }
     }
     
     private nonisolated func retroImage(from sourceImage: CIImage, megaPixels: Float) -> CIImage? {
-        let clampedMP = max(0.1, min(12.0, Double(megaPixels)))
+        let clampedMP = max(0.01, min(12.0, Double(megaPixels)))
         let extent = sourceImage.extent
         let aspectRatio = extent.height > 0 ? extent.width / extent.height : (4.0 / 3.0)
         
         let targetPixels = clampedMP * 1_000_000.0
-        let targetHeight = max(120.0, round(sqrt(targetPixels / Double(aspectRatio))))
-        let targetWidth = max(160.0, round(targetHeight * Double(aspectRatio)))
+        let targetHeight = max(24.0, round(sqrt(targetPixels / Double(aspectRatio))))
+        let targetWidth = max(32.0, round(targetHeight * Double(aspectRatio)))
         
         let scaleX = targetWidth / extent.width
         let scaleY = targetHeight / extent.height
         
-        let resized = sourceImage.transformed(by: CGAffineTransform(scaleX: scaleX, y: scaleY))
+        let resized = sourceImage
+            .samplingNearest()
+            .transformed(by: CGAffineTransform(scaleX: scaleX, y: scaleY))
         let targetExtent = CGRect(x: 0, y: 0, width: targetWidth, height: targetHeight)
         let croppedResized = resized.cropped(to: targetExtent)
         
@@ -1055,23 +1065,28 @@ extension CameraModel: AVCapturePhotoCaptureDelegate {
             parameters: [kCIInputEVKey: 0.30 + 0.18 * k]
         ) ?? croppedResized
         
-        // 2. Preserved crisp detail (minimal blur)
+        // 2. Optical softness / blur (Disabled - commented out for future use)
+        let softOptical: CIImage = exposed
+        /*
         let softOptical: CIImage
         if k > 0.1 {
+            let blurRadius = min(0.04, 0.04 * k)
             softOptical = processedImage(
                 named: "CIGaussianBlur",
                 inputImage: exposed,
-                parameters: [kCIInputRadiusKey: 0.05 * k]
+                parameters: [kCIInputRadiusKey: blurRadius]
             )?.cropped(to: targetExtent) ?? exposed
         } else {
             softOptical = exposed
         }
+        */
         
-        // 3. Smooth & uniform chromatic aberration (visible at 3-4MP, smooth to 0.1MP)
+        // 3. Smooth chromatic aberration (visible at 3-4MP, enhanced below 1MP, capped <= 0.1MP)
         let shiftPct = chromaticShiftPercent(for: clampedMP)
         let abberrated: CIImage
         if shiftPct > 0.0001 {
-            let shiftH = max(1.4, targetWidth * shiftPct)
+            let minShift = clampedMP <= 1.0 ? 1.8 : 1.4
+            let shiftH = max(minShift, targetWidth * shiftPct)
             let shiftV = shiftH * 0.75
             abberrated = chromaticAberrationImage(softOptical, extent: targetExtent, shift: shiftH, verticalShift: shiftV)
         } else {
@@ -1107,9 +1122,9 @@ extension CameraModel: AVCapturePhotoCaptureDelegate {
             return abberrated
         }
         
-        // 5. Halation highlight bloom
+        // 5. Halation highlight bloom (scaled to image resolution)
         let bloomIntensity = 0.22 + 0.16 * k
-        let bloomRadius = 3.0 + 2.0 * k
+        let bloomRadius = max(0.5, (3.0 + 2.0 * k) * (targetWidth / 1500.0))
         let halated = processedImage(
             named: "CIBloom",
             inputImage: warmed,
@@ -1120,7 +1135,13 @@ extension CameraModel: AVCapturePhotoCaptureDelegate {
         )?.cropped(to: targetExtent) ?? warmed
         
         // 6. Color posterization (prominent contour lines on saved photo)
-        let posterizeLevels = max(10, min(64, Int(10.0 + (1.0 - k) * 54.0)))
+        let posterizeLevels: Int
+        if clampedMP >= 0.1 {
+            posterizeLevels = max(10, min(64, Int(10.0 + (1.0 - k) * 54.0)))
+        } else {
+            let subT = (0.1 - clampedMP) / (0.1 - 0.01)
+            posterizeLevels = max(6, Int(round(10.0 - subT * 4.0)))
+        }
         let posterized = processedImage(
             named: "CIColorPosterize",
             inputImage: halated,
@@ -1147,9 +1168,12 @@ extension CameraModel: AVCapturePhotoCaptureDelegate {
             pixelated = vignetted
         }
         
-        // 9. Crisp Sharpness (reduced blur)
+        // 9. Sharpness (Disabled - commented out for future use)
+        let sharpened: CIImage = pixelated
+        /*
         let sharpness = 0.45 + 0.35 * k
         let sharpened = sharpenedImage(pixelated, sharpness: sharpness) ?? pixelated
+        */
         
         // 10. Subtle Dithering
         let ditherIntensity = 0.04 + 0.04 * k

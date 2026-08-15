@@ -266,9 +266,17 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
             updateCameraControlsMode()
         }
     }
+    static let retroMegaPixelStops: [Float] = [
+        0.01, 0.02, 0.04, 0.06, 0.08,
+        0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9,
+        1.0, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9,
+        2.0, 2.3, 2.6, 2.9, 3.2, 3.5, 4.0,
+        4.5, 5.0, 5.5, 6.0,
+        7.0, 8.0, 9.0, 10.0, 11.0, 12.0
+    ]
     var retroMegaPixels: Float = 0.3 {
         didSet {
-            let clamped = max(0.1, min(12.0, retroMegaPixels))
+            let clamped = max(0.01, min(12.0, retroMegaPixels))
             if retroMegaPixels != clamped {
                 retroMegaPixels = clamped
                 return
@@ -278,8 +286,26 @@ class CameraModel: NSObject, AVCaptureSessionControlsDelegate {
             _pendingPhotoFilterBox.retroMegaPixels = retroMegaPixels
         }
     }
+    var retroMegaPixelIndex: Float {
+        get {
+            let stops = Self.retroMegaPixelStops
+            guard let nearest = stops.indices.min(by: {
+                abs(stops[$0] - retroMegaPixels) < abs(stops[$1] - retroMegaPixels)
+            }) else { return 7 }
+            return Float(nearest)
+        }
+        set {
+            let stops = Self.retroMegaPixelStops
+            let idx = max(0, min(stops.count - 1, Int(round(newValue))))
+            setRetroMegaPixels(stops[idx])
+        }
+    }
     var formattedRetroMegaPixels: String {
-        String(format: "%.1f MP", retroMegaPixels)
+        if retroMegaPixels < 0.1 {
+            return String(format: "%.2f MP", retroMegaPixels)
+        } else {
+            return String(format: "%.1f MP", retroMegaPixels)
+        }
     }
     var confettiCannonTrigger = 0
     @ObservationIgnored

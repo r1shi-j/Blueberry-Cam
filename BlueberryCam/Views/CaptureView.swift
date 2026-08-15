@@ -626,11 +626,11 @@ extension CaptureView {
         VStack(spacing: 4) {
             ManualRulerView(
                 value: Binding(
-                    get: { cameraModel.retroMegaPixels },
-                    set: { cameraModel.setRetroMegaPixels($0) }
+                    get: { cameraModel.retroMegaPixelIndex },
+                    set: { cameraModel.retroMegaPixelIndex = $0 }
                 ),
-                range: 0.1...12.0,
-                step: 0.1,
+                range: 0...Float(CameraModel.retroMegaPixelStops.count - 1),
+                step: 1.0,
                 axis: .horizontal,
                 majorTickStride: 5,
                 accessibilityLabel: "Retro Resolution",

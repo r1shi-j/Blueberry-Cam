@@ -184,6 +184,7 @@ final class LiveFilterPreviewRenderer: NSObject, MTKViewDelegate, LiveFilterPrev
         let y = bounds.midY - scaledHeight / 2
         
         return image
+            .samplingNearest()
             .transformed(by: CGAffineTransform(translationX: -extent.minX, y: -extent.minY))
             .transformed(by: CGAffineTransform(scaleX: scale, y: scale))
             .transformed(by: CGAffineTransform(translationX: x, y: y))

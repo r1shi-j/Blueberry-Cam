@@ -188,9 +188,9 @@ extension CameraModel {
         self.selectedPhotoFilter = defaultPhotoFilter
         
         if let retroMP = defaults.object(forKey: "retroMegaPixels") as? Float {
-            self.retroMegaPixels = max(0.1, min(12.0, retroMP))
+            self.retroMegaPixels = max(0.01, min(12.0, retroMP))
         } else if let retroMPDouble = defaults.object(forKey: "retroMegaPixels") as? Double {
-            self.retroMegaPixels = max(0.1, min(12.0, Float(retroMPDouble)))
+            self.retroMegaPixels = max(0.01, min(12.0, Float(retroMPDouble)))
         }
         self._livePhotoFilterBox.retroMegaPixels = self.retroMegaPixels
         self._pendingPhotoFilterBox.retroMegaPixels = self.retroMegaPixels
